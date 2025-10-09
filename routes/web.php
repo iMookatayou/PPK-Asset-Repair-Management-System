@@ -1,11 +1,16 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Auth\RegisteredUserController;
 
 require __DIR__.'/auth.php';
 
-Route::redirect('/', '/login');  
+Route::redirect('/', '/login');
 
-Route::middleware('auth')->group(function () {
-    Route::view('/', 'repair.index')->name('repair.index');        // หน้าแรกเป็นหน้าระบบ
+Route::middleware('guest')->group(function () {
+    Route::get('/register', [RegisteredUserController::class, 'create'])
+        ->name('register');
+
+    Route::post('/register', [RegisteredUserController::class, 'store']);
 });
