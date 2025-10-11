@@ -18,7 +18,7 @@ class MaintenanceRequest extends Model
         'completed_date' => 'datetime',
     ];
 
-    // ===== Constants (ตรงกับที่ใช้อยู่ในระบบพี่) =====
+    // ===== Constants =====
     public const STATUS_PENDING     = 'pending';
     public const STATUS_IN_PROGRESS = 'in_progress';
     public const STATUS_COMPLETED   = 'completed';
@@ -36,7 +36,7 @@ class MaintenanceRequest extends Model
     public function attachments() { return $this->hasMany(Attachment::class, 'request_id'); }
     public function logs()        { return $this->hasMany(MaintenanceLog::class, 'request_id'); }
 
-    // ===== Scopes ช่วยให้ query สั้นลง =====
+    // ===== Scopes =====
     public function scopeStatus($q, ?string $status)
     {
         return $status ? $q->where('status', $status) : $q;

@@ -14,13 +14,23 @@ class MaintenanceLog extends Model
         'created_at' => 'datetime',
     ];
 
-    // === คอนสแตนต์ action (อ้างอิงในโค้ดได้, ลดพิมพ์ผิด) ===
+    // === คอนสแตนต์ action ===
     public const ACTION_CREATE   = 'create_request';
     public const ACTION_UPDATE   = 'update_request';
     public const ACTION_ASSIGN   = 'assign_technician';
     public const ACTION_START    = 'start_request';
     public const ACTION_COMPLETE = 'complete_request';
     public const ACTION_CANCEL   = 'cancel_request';
+
+    // เติม created_at อัตโนมัติถ้าไม่ส่งมา
+    protected static function booted()
+    {
+        static::creating(function (self $log) {
+            if (empty($log->created_at)) {
+                $log->created_at = now();
+            }
+        });
+    }
 
     // === ความสัมพันธ์ ===
     public function request()
@@ -33,7 +43,7 @@ class MaintenanceLog extends Model
         return $this->belongsTo(User::class);
     }
 
-    // === Scopes ช่วยเขียน query ให้สั้น ===
+    // === Scopes ===
     public function scopeForRequest($query, int $requestId)
     {
         return $query->where('request_id', $requestId);
