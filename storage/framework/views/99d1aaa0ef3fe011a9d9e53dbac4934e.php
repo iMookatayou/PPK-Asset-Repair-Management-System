@@ -1,35 +1,26 @@
+<?php $__env->startSection('title', 'Asset Repair Dashboard Compact'); ?>
 
-<?php if (isset($component)) { $__componentOriginal9ac128a9029c0e4701924bd2d73d7f54 = $component; } ?>
-<?php if (isset($attributes)) { $__attributesOriginal9ac128a9029c0e4701924bd2d73d7f54 = $attributes; } ?>
-<?php $component = App\View\Components\AppLayout::resolve([] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
-<?php $component->withName('app-layout'); ?>
-<?php if ($component->shouldRender()): ?>
-<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
-<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
-<?php $attributes = $attributes->except(\App\View\Components\AppLayout::ignoredParameterNames()); ?>
-<?php endif; ?>
-<?php $component->withAttributes([]); ?>
-  
-   <?php $__env->slot('header', null, []); ?> 
-    <div class="flex items-center gap-3 w-full">
-      <h2 class="font-semibold text-lg sm:text-xl text-gray-100 leading-tight">
-        <?php echo e(__('Asset Repair Dashboard Compact')); ?>
 
-      </h2>
+<?php $__env->startSection('page-header'); ?>
+  <div class="flex items-center gap-3 w-full">
+    <h2 class="font-semibold text-lg sm:text-xl text-gray-100 leading-tight">
+      <?php echo e(__('Asset Repair Dashboard Compact')); ?>
 
-      
-      <?php
-        $stats = array_replace(['total'=>0,'pending'=>0,'inProgress'=>0,'completed'=>0,'monthCost'=>0], $stats ?? []);
-      ?>
-      <div class="ml-auto hidden md:flex items-center gap-2 text-xs">
-        <span class="px-2 py-0.5 rounded bg-zinc-800/70 text-zinc-300">Total: <?php echo e(number_format($stats['total'])); ?></span>
-        <span class="px-2 py-0.5 rounded bg-yellow-900/30 text-yellow-200">Pending: <?php echo e(number_format($stats['pending'])); ?></span>
-        <span class="px-2 py-0.5 rounded bg-sky-900/30 text-sky-200">In progress: <?php echo e(number_format($stats['inProgress'])); ?></span>
-        <span class="px-2 py-0.5 rounded bg-emerald-900/30 text-emerald-200">Completed: <?php echo e(number_format($stats['completed'])); ?></span>
-      </div>
+    </h2>
+
+    <?php
+      $stats = array_replace(['total'=>0,'pending'=>0,'inProgress'=>0,'completed'=>0,'monthCost'=>0], $stats ?? []);
+    ?>
+    <div class="ml-auto hidden md:flex items-center gap-2 text-xs">
+      <span class="px-2 py-0.5 rounded bg-zinc-800/70 text-zinc-300">Total: <?php echo e(number_format($stats['total'])); ?></span>
+      <span class="px-2 py-0.5 rounded bg-yellow-900/30 text-yellow-200">Pending: <?php echo e(number_format($stats['pending'])); ?></span>
+      <span class="px-2 py-0.5 rounded bg-sky-900/30 text-sky-200">In progress: <?php echo e(number_format($stats['inProgress'])); ?></span>
+      <span class="px-2 py-0.5 rounded bg-emerald-900/30 text-emerald-200">Completed: <?php echo e(number_format($stats['completed'])); ?></span>
     </div>
-   <?php $__env->endSlot(); ?>
+  </div>
+<?php $__env->stopSection(); ?>
 
+<?php $__env->startSection('content'); ?>
   
   <style>
     .chart-card { position: relative; height: 220px; }
@@ -57,7 +48,6 @@
     $byAssetType  = $byAssetType->take(9)->values();
     $byDept       = $byDept->take(8)->values();
 
-    // Clean helpers
     $intVal   = fn($v)=> is_numeric($v) ? (int)$v : 0;
     $strVal   = fn($v,$f='')=> is_string($v) && $v!=='' ? $v : $f;
 
@@ -70,7 +60,6 @@
     $deptLabels  = $byDept->map(fn($i)=> $strVal(is_array($i)?($i['dept']??'Unspecified'):($i->dept??'Unspecified'),'Unspecified'))->all();
     $deptCounts  = $byDept->map(fn($i)=> $intVal(is_array($i)?($i['cnt']??0):($i->cnt??0)) )->all();
 
-    // safe getter for array or object
     $get = function($row, $key, $fallback='-'){
       if (is_array($row))  return data_get($row, $key, $fallback);
       if (is_object($row)) return data_get((array)$row, $key, $fallback);
@@ -244,13 +233,6 @@
   </div>
 
   
-   <?php $__env->slot('footer', null, []); ?> 
-    <div class="text-xs text-zinc-400">
-      © <?php echo e(date('Y')); ?> <?php echo e(config('app.name','Asset Repair')); ?> — Dashboard
-    </div>
-   <?php $__env->endSlot(); ?>
-
-  
   <script>
     function loadChartJsOnce(cb){
       if (window.Chart) return cb();
@@ -289,7 +271,6 @@
       }catch(e){ console.warn('[ChartJS] render error', e); }
     }
 
-    // lazy render when visible
     const obs = new IntersectionObserver((entries)=>{
       entries.forEach(e=>{
         if(e.isIntersecting){
@@ -306,14 +287,13 @@
       if(el) obs.observe(el);
     });
   </script>
- <?php echo $__env->renderComponent(); ?>
-<?php endif; ?>
-<?php if (isset($__attributesOriginal9ac128a9029c0e4701924bd2d73d7f54)): ?>
-<?php $attributes = $__attributesOriginal9ac128a9029c0e4701924bd2d73d7f54; ?>
-<?php unset($__attributesOriginal9ac128a9029c0e4701924bd2d73d7f54); ?>
-<?php endif; ?>
-<?php if (isset($__componentOriginal9ac128a9029c0e4701924bd2d73d7f54)): ?>
-<?php $component = $__componentOriginal9ac128a9029c0e4701924bd2d73d7f54; ?>
-<?php unset($__componentOriginal9ac128a9029c0e4701924bd2d73d7f54); ?>
-<?php endif; ?>
-<?php /**PATH /Users/fenyb_/Documents/Asset-Repair-Management-System/resources/views/repair/dashboard.blade.php ENDPATH**/ ?>
+<?php $__env->stopSection(); ?>
+
+
+<?php $__env->startSection('footer'); ?>
+  <div class="text-xs text-zinc-400">
+    © <?php echo e(date('Y')); ?> <?php echo e(config('app.name','Asset Repair')); ?> — Dashboard
+  </div>
+<?php $__env->stopSection(); ?>
+
+<?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH /Users/fenyb_/Documents/Asset-Repair-Management-System/resources/views/repair/dashboard.blade.php ENDPATH**/ ?>

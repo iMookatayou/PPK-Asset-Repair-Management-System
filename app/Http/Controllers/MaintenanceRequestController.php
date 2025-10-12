@@ -265,6 +265,67 @@ class MaintenanceRequestController extends Controller
         return response()->json(['message'=>'transition_ok','data'=>$req->fresh(['asset','reporter','technician'])]);
     }
 
+    // ====== เพิ่ม: สำหรับหน้า List (Blade) ======
+    public function indexPage(Request $request)
+    {
+        $status   = $request->query('status');
+        $priority = $request->query('priority');
+        $q        = $request->query('q');
+
+        $list = MaintenanceRequest::with(['asset','reporter','technician'])
+            ->when($status, fn($qb)=>$qb->where('status',$status))
+            ->when($priority, fn($qb)=>$qb->where('priority',$priority))
+            ->when($q, fn($qb)=>$qb->where(function($w) use ($q){
+                $w->where('title','like',"%$q%")
+                ->orWhere('description','like',"%$q%");
+            }))
+            ->orderByRaw('COALESCE(request_date, created_at) DESC')
+            ->paginate(20);
+
+        return view('maintenance.requests.index', compact('list'));
+    }
+
+    // ====== เพิ่ม: สำหรับหน้า Show (Blade) ======
+    public function showPage(MaintenanceRequest $req)
+    {
+        $req->load(['asset','reporter','technician','attachments','logs'=>fn($q)=>$q->latest()]);
+        return view('maintenance.requests.show', compact('req'));
+    }
+
+        // ====== เพิ่ม: transition จากหน้า Blade (redirect back) ======
+    public function transitionFromBlade(Request $request, MaintenanceRequest $req)
+    {
+        // reuse logic เดิม
+        $this->transition($request, $req);
+
+        // transition() คืน JSON; เราต้องคืน redirect สำหรับ Blade:
+        return back()->with('ok','บันทึกแล้ว');
+    }
+
+    // ====== เพิ่ม: upload จากหน้า Blade (redirect back) ======
+    public function uploadAttachmentFromBlade(Request $request, MaintenanceRequest $req)
+    {
+        $validated = $request->validate([
+            'type' => ['nullable', Rule::in(['before','after','other'])],
+            'file' => ['required','file','max:10240'],
+        ]);
+
+        $file   = $request->file('file');
+        $folder = "maintenance/{$req->id}";
+        $path   = $file->storePublicly($folder, ['disk' => 'public']);
+
+        // ต้องมี relation: $req->attachments()->create([...])
+        $req->attachments()->create([
+            'type'          => $validated['type'] ?? 'other',
+            'path'          => $path,
+            'original_name' => $file->getClientOriginalName(),
+            'mime'          => $file->getMimeType(),
+            'size'          => $file->getSize(),
+        ]);
+
+        return back()->with('ok','อัปโหลดไฟล์แล้ว');
+    }
+
     private function log(int $requestId, ?int $userId, string $action, ?string $note = null): void
     {
         MaintenanceLog::create([

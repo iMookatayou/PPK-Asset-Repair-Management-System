@@ -1,0 +1,1 @@
+<?php /**PATH /Users/fenyb_/Documents/Asset-Repair-Management-System/resources/views/assets/index.blade.php ENDPATH**/ ?>

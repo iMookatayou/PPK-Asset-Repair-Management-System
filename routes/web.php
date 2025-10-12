@@ -41,21 +41,25 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/repair/dashboard', [RepairDashboardController::class, 'index'])
         ->name('repair.dashboard');
 
-    // คง URL เดิมไว้: /dashboard → redirect ไปของจริง
     Route::get('/dashboard', fn () => redirect()->route('repair.dashboard'))
         ->name('dashboard');
 
     // ===== Maintenance Requests =====
     Route::prefix('maintenance')->name('maintenance.')->group(function () {
-        Route::get('/requests', [MaintenanceRequestController::class, 'index'])->name('requests.index');
-        Route::get('/requests/create', [MaintenanceRequestController::class, 'create'])->name('requests.create');
-        Route::post('/requests', [MaintenanceRequestController::class, 'store'])->name('requests.store');
 
-        Route::get('/requests/{request}', [MaintenanceRequestController::class, 'show'])->name('requests.show');
-        Route::get('/requests/{request}/edit', [MaintenanceRequestController::class, 'edit'])->name('requests.edit');
-        Route::put('/requests/{request}', [MaintenanceRequestController::class, 'update'])->name('requests.update');
-        Route::delete('/requests/{request}', [MaintenanceRequestController::class, 'destroy'])->name('requests.destroy');
+        Route::get('/requests',              [MaintenanceRequestController::class, 'indexPage'])->name('requests.index');
+        Route::get('/requests/create',       [MaintenanceRequestController::class, 'createPage'])->name('requests.create'); // ถ้ามีหน้า create แบบ Blade
+        Route::post('/requests',             [MaintenanceRequestController::class, 'store'])->name('requests.store');
+
+        Route::get('/requests/{req}',        [MaintenanceRequestController::class, 'showPage'])->name('requests.show');
+        Route::get('/requests/{req}/edit',   [MaintenanceRequestController::class, 'editPage'])->name('requests.edit');     // ถ้ามีหน้า edit แบบ Blade
+        Route::put('/requests/{req}',        [MaintenanceRequestController::class, 'update'])->name('requests.update');
+        Route::delete('/requests/{req}',     [MaintenanceRequestController::class, 'destroy'])->name('requests.destroy');
+
+        Route::post('/requests/{req}/transition',  [MaintenanceRequestController::class, 'transitionFromBlade'])->name('requests.transition');
+        Route::post('/requests/{req}/attachments', [MaintenanceRequestController::class, 'uploadAttachmentFromBlade'])->name('requests.attachments');
     });
+
 
     // ====== Assets (placeholder ให้เมนูไม่พัง) ======
     Route::prefix('assets')->name('assets.')->group(function () {
@@ -71,5 +75,3 @@ Route::middleware(['auth'])->group(function () {
     });
 });
 
-// (optional) fallback
-// Route::fallback(fn () => redirect()->route('repair.dashboard'));

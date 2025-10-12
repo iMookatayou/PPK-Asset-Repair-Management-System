@@ -1,25 +1,28 @@
 {{-- resources/views/repair/dashboard.blade.php --}}
-<x-app-layout>
-  {{-- ===== Topbar header ===== --}}
-  <x-slot name="header">
-    <div class="flex items-center gap-3 w-full">
-      <h2 class="font-semibold text-lg sm:text-xl text-gray-100 leading-tight">
-        {{ __('Asset Repair Dashboard Compact') }}
-      </h2>
+@extends('layouts.app')
 
-      {{-- Quick stats mini badges --}}
-      @php
-        $stats = array_replace(['total'=>0,'pending'=>0,'inProgress'=>0,'completed'=>0,'monthCost'=>0], $stats ?? []);
-      @endphp
-      <div class="ml-auto hidden md:flex items-center gap-2 text-xs">
-        <span class="px-2 py-0.5 rounded bg-zinc-800/70 text-zinc-300">Total: {{ number_format($stats['total']) }}</span>
-        <span class="px-2 py-0.5 rounded bg-yellow-900/30 text-yellow-200">Pending: {{ number_format($stats['pending']) }}</span>
-        <span class="px-2 py-0.5 rounded bg-sky-900/30 text-sky-200">In progress: {{ number_format($stats['inProgress']) }}</span>
-        <span class="px-2 py-0.5 rounded bg-emerald-900/30 text-emerald-200">Completed: {{ number_format($stats['completed']) }}</span>
-      </div>
+@section('title', 'Asset Repair Dashboard Compact')
+
+{{-- ===== Topbar header (แทน x-slot header) ===== --}}
+@section('page-header')
+  <div class="flex items-center gap-3 w-full">
+    <h2 class="font-semibold text-lg sm:text-xl text-gray-100 leading-tight">
+      {{ __('Asset Repair Dashboard Compact') }}
+    </h2>
+
+    @php
+      $stats = array_replace(['total'=>0,'pending'=>0,'inProgress'=>0,'completed'=>0,'monthCost'=>0], $stats ?? []);
+    @endphp
+    <div class="ml-auto hidden md:flex items-center gap-2 text-xs">
+      <span class="px-2 py-0.5 rounded bg-zinc-800/70 text-zinc-300">Total: {{ number_format($stats['total']) }}</span>
+      <span class="px-2 py-0.5 rounded bg-yellow-900/30 text-yellow-200">Pending: {{ number_format($stats['pending']) }}</span>
+      <span class="px-2 py-0.5 rounded bg-sky-900/30 text-sky-200">In progress: {{ number_format($stats['inProgress']) }}</span>
+      <span class="px-2 py-0.5 rounded bg-emerald-900/30 text-emerald-200">Completed: {{ number_format($stats['completed']) }}</span>
     </div>
-  </x-slot>
+  </div>
+@endsection
 
+@section('content')
   {{-- ===== Page-only styles (เบา ๆ) ===== --}}
   <style>
     .chart-card { position: relative; height: 220px; }
@@ -47,7 +50,6 @@
     $byAssetType  = $byAssetType->take(9)->values();
     $byDept       = $byDept->take(8)->values();
 
-    // Clean helpers
     $intVal   = fn($v)=> is_numeric($v) ? (int)$v : 0;
     $strVal   = fn($v,$f='')=> is_string($v) && $v!=='' ? $v : $f;
 
@@ -60,7 +62,6 @@
     $deptLabels  = $byDept->map(fn($i)=> $strVal(is_array($i)?($i['dept']??'Unspecified'):($i->dept??'Unspecified'),'Unspecified'))->all();
     $deptCounts  = $byDept->map(fn($i)=> $intVal(is_array($i)?($i['cnt']??0):($i->cnt??0)) )->all();
 
-    // safe getter for array or object
     $get = function($row, $key, $fallback='-'){
       if (is_array($row))  return data_get($row, $key, $fallback);
       if (is_object($row)) return data_get((array)$row, $key, $fallback);
@@ -233,13 +234,6 @@
     </div>
   </div>
 
-  {{-- ===== Footer (optional override) ===== --}}
-  <x-slot name="footer">
-    <div class="text-xs text-zinc-400">
-      © {{ date('Y') }} {{ config('app.name','Asset Repair') }} — Dashboard
-    </div>
-  </x-slot>
-
   {{-- ===== Charts and UX helpers ===== --}}
   <script>
     function loadChartJsOnce(cb){
@@ -279,7 +273,6 @@
       }catch(e){ console.warn('[ChartJS] render error', e); }
     }
 
-    // lazy render when visible
     const obs = new IntersectionObserver((entries)=>{
       entries.forEach(e=>{
         if(e.isIntersecting){
@@ -296,4 +289,11 @@
       if(el) obs.observe(el);
     });
   </script>
-</x-app-layout>
+@endsection
+
+{{-- ===== Footer (แทน x-slot footer) ===== --}}
+@section('footer')
+  <div class="text-xs text-zinc-400">
+    © {{ date('Y') }} {{ config('app.name','Asset Repair') }} — Dashboard
+  </div>
+@endsection
