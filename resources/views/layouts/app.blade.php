@@ -115,22 +115,43 @@
 
 <body class="bg-zinc-900 text-zinc-100">
 
-  {{-- ======= TOPBAR: DASHBOARD + BADGES ======= --}}
-  <div class="topbar px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 bg-[#0b1422] border-b border-zinc-800">
+  {{-- ======= TOPBAR: DASHBOARD + BADGES + LOGIN LINK ======= --}}
+    <div class="topbar px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 bg-[#0b1422] border-b border-zinc-800">
+    {{-- Left: Brand + Stats --}}
     <div class="flex items-center gap-3 flex-wrap">
-      <a href="{{ url('/') }}" class="flex items-center gap-2 text-zinc-100 no-underline">
+        <a href="{{ url('/') }}" class="flex items-center gap-2 text-zinc-100 no-underline">
         <img src="https://laravel.com/img/logomark.min.svg" alt="Laravel" class="w-7 h-7 opacity-90">
         <span class="font-semibold text-[15px] tracking-wide">
-          {{ config('app.name','Asset Repair Dashboard') }}
+            {{ config('app.name','Asset Repair Dashboard') }}
         </span>
-      </a>
+        </a>
 
-      {{-- Stats badges --}}
-      <div class="flex items-center gap-1.5 text-[13px] font-medium">
+        {{-- Stats badges --}}
+        <div class="flex items-center gap-1.5 text-[13px] font-medium">
         @yield('topbadges')
-      </div>
+        </div>
     </div>
-  </div>
+
+    {{-- Right: Sidebar toggle + Login redirect --}}
+    <div class="flex items-center gap-2 ml-auto">
+        <button id="btnSidebar"
+                class="lg:hidden inline-flex items-center px-2 py-1 rounded-md border border-white/20 text-zinc-100/90 bg-white/5 hover:bg-white/10 transition-colors"
+                aria-controls="side" aria-expanded="false" title="เมนู">
+        ☰
+        </button>
+
+        {{-- ปุ่มออกจากระบบ (แค่ไปหน้า login) --}}
+        <a href="{{ route('login') }}"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20 border border-white/20 text-zinc-100 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none"
+            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1" />
+        </svg>
+        <span class="hidden md:inline">Logout</span>
+        </a>
+    </div>
+    </div>
 
   {{-- ======= LAYOUT GRID ======= --}}
   <div id="layout" class="layout">
