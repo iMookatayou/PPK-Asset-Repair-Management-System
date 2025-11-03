@@ -78,16 +78,14 @@ Route::middleware(['auth'])->group(function () {
     // ---------------------
     // Assets (Blade) — resource ครบ: index/create/store/show/edit/update/destroy
     // ---------------------
-    Route::get('/assets', [AssetController::class, 'indexPage'])->name('assets.index');
-        Route::post('/assets', [AssetController::class, 'store']);
-        Route::get('/assets/{asset}', [AssetController::class, 'show']);
-        Route::put('/assets/{asset}', [AssetController::class, 'update']);
-        Route::delete('/assets/{asset}', [AssetController::class, 'destroy']);
-        Route::prefix('assets')->group(function () {
-        Route::get('/',            [AssetController::class, 'indexPage'])->name('assets.index');
-        Route::get('/create',      [AssetController::class, 'createPage'])->name('assets.create');
-        Route::get('/{asset}',     [AssetController::class, 'showPage'])->name('assets.show');
-        Route::get('/{asset}/edit',[AssetController::class, 'editPage'])->name('assets.edit');
+    Route::prefix('assets')->name('assets.')->group(function () {
+        Route::get('/',              [AssetController::class, 'indexPage'])->name('index');
+        Route::get('/create',        [AssetController::class, 'createPage'])->name('create');
+        Route::post('/',             [AssetController::class, 'storePage'])->name('store');
+        Route::get('/{asset}',       [AssetController::class, 'showPage'])->name('show');
+        Route::get('/{asset}/edit',  [AssetController::class, 'editPage'])->name('edit');
+        Route::put('/{asset}',       [AssetController::class, 'updatePage'])->name('update');
+        Route::delete('/{asset}',    [AssetController::class, 'destroyPage'])->name('destroy');
     });
     // ---------------------
     // Users (placeholder สำหรับหน้า Users)

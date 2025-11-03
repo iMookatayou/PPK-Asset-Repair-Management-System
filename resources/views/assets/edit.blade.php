@@ -3,26 +3,22 @@
 
 @section('page-header')
   <div class="flex items-center justify-between">
-    <h1 class="text-xl font-semibold">Edit Asset</h1>
-    <a href="{{ route('assets.show',$asset) }}" class="text-zinc-600 hover:underline focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded">
-      Back
-    </a>
+    <a href="{{ route('assets.show', $asset) }}" class="text-zinc-600 hover:underline">Back</a>
   </div>
 @endsection
 
 @section('content')
-  <form method="POST" action="{{ route('assets.update',$asset) }}" class="space-y-4">
-    @csrf @method('PUT')
-    @include('asset.form', ['asset' => $asset])
-
-    <div class="flex items-center justify-between">
-      <form method="POST" action="{{ route('assets.destroy',$asset) }}" onsubmit="return confirm('Delete this asset?')">
+  <form method="POST" action="{{ route('assets.update', $asset) }}" class="rounded-xl border bg-white p-6 space-y-4">
+    @method('PUT')
+    @include('assets.form', ['asset'=>$asset])
+    <div class="flex justify-between">
+      <form method="POST" action="{{ route('assets.destroy', $asset) }}" onsubmit="return confirm('Delete this asset?')">
         @csrf @method('DELETE')
-        <button class="rounded-lg border border-rose-300 px-4 py-2 text-rose-700 hover:bg-rose-50">Delete</button>
+        <button class="px-4 py-2 rounded border text-rose-700">Delete</button>
       </form>
       <div class="flex gap-2">
-        <a href="{{ route('assets.show',$asset) }}" class="rounded-lg border px-4 py-2 text-zinc-700 hover:bg-zinc-50">Cancel</a>
-        <button class="rounded-lg bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700">Update</button>
+        <a href="{{ route('assets.show', $asset) }}" class="px-4 py-2 rounded border">Cancel</a>
+        <button class="px-4 py-2 rounded bg-emerald-600 text-white">Update</button>
       </div>
     </div>
   </form>

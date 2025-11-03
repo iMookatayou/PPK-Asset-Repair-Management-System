@@ -78,7 +78,7 @@
   </a>
 
   
-  <?php $active = $is('assets.*'); ?>
+  <?php $active = request()->routeIs('assets.*'); ?>
   <a href="<?php echo e(route('assets.index')); ?>" class="<?php echo e($base); ?> <?php echo e($active ? $on : $off); ?>">
     <span class="w-1.5 h-7 rounded-full bg-emerald-500 
       <?php echo e($active ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'); ?>"></span>

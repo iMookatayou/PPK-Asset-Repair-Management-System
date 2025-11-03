@@ -38,7 +38,7 @@
   </a>
 
   {{-- Assets --}}
-  @php $active = $is('assets.*'); @endphp
+  @php $active = request()->routeIs('assets.*'); @endphp
   <a href="{{ route('assets.index') }}" class="{{ $base }} {{ $active ? $on : $off }}">
     <span class="w-1.5 h-7 rounded-full bg-emerald-500 
       {{ $active ? 'opacity-100' : 'opacity-0 group-hover:opacity-60' }}"></span>
