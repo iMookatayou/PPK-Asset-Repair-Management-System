@@ -8,14 +8,26 @@
   @vite(['resources/css/app.css','resources/js/app.js'])
 
   <style>
-    /* =========================
-       Base Layout (Light theme)
-       ========================= */
-    .layout { display:grid; grid-template-columns: 260px 1fr; min-height:100dvh; transition:grid-template-columns .2s ease; }
+    .layout { display:grid; grid-template-columns: 260px 1fr; min-height: 100vh; transition:grid-template-columns .2s ease; }
     .sidebar { background:#ffffff; border-right:1px solid #e5e7eb; width:260px; transition:width .2s ease; }
     .topbar  { position:sticky; top:0; z-index:30; }
     .content { padding:1rem; }
-    .footer  { border-top:1px solid #e5e7eb; padding:.75rem 1rem; color:#6b7280; }
+    .footer{
+      background:#0E2B51;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:44px;
+      padding:.75rem 1rem;
+      font-weight:600;
+      font-size:0.875rem;
+      line-height:1.2;
+      color:#ffffff !important;
+    }
+
+    .footer * {
+      color:#ffffff !important;
+    }
 
     @media (min-width: 1024px){
       .sidebar.collapsed { width:76px !important; }
@@ -186,7 +198,7 @@
     </main>
   </div>
 
-  <div class="footer text-xs">
+  <div class="footer">
     @hasSection('footer')
       @yield('footer')
     @else
@@ -277,5 +289,69 @@
     handleResize(mql);
     mql.addEventListener?.('change', handleResize);
   </script>
+
+  {{-- === Global Loader (spinner only) === --}}
+  <div id="loaderOverlay" class="loader-overlay" aria-hidden="true">
+    <div class="loader-spinner"></div>
+  </div>
+
+  <style>
+    .loader-overlay{
+      position:fixed; inset:0;
+      background:rgba(255,255,255,.6);
+      backdrop-filter:blur(2px);
+      display:flex; align-items:center; justify-content:center;
+      z-index:99999;
+      visibility:hidden; opacity:0;
+      transition:opacity .2s ease, visibility .2s;
+    }
+    .loader-overlay.show{ visibility:visible; opacity:1; }
+    .loader-spinner{
+      width:38px; height:38px;
+      border:4px solid #0E2B51;
+      border-top-color:transparent;
+      border-radius:50%;
+      animation:spin .7s linear infinite;
+    }
+    @keyframes spin{ to{ transform:rotate(360deg) } }
+  </style>
+
+  <script>
+    // Global API
+    window.Loader = {
+      show(){ document.getElementById('loaderOverlay')?.classList.add('show') },
+      hide(){ document.getElementById('loaderOverlay')?.classList.remove('show') }
+    };
+
+    // ซ่อนเมื่อ DOM พร้อม
+    document.addEventListener('DOMContentLoaded', () => Loader.hide());
+
+    // แสดงตอนเปลี่ยนหน้า (ยกเว้นลิงก์ที่มี data-no-loader, target, หรือ anchor ภายในหน้า)
+    document.addEventListener('click', (e) => {
+      const a = e.target.closest('a');
+      if (!a) return;
+      const href = a.getAttribute('href') || '';
+      const noLoader = a.hasAttribute('data-no-loader') || a.getAttribute('target');
+      const isAnchorSamePage = href.startsWith('#');
+      if (!noLoader && href && !isAnchorSamePage) {
+        Loader.show();
+      }
+    });
+
+    // แสดงตอน submit form (ยกเว้นฟอร์มที่มี data-no-loader)
+    document.addEventListener('submit', (e) => {
+      const form = e.target;
+      if (form instanceof HTMLFormElement) {
+        if (!form.hasAttribute('data-no-loader')) {
+          Loader.show();
+        }
+      }
+    });
+
+    // ก่อน unload หน้า (ช่วยกรณีเปลี่ยนหน้าโดยไม่ผ่าน click/submit)
+    window.addEventListener('beforeunload', () => Loader.show());
+  </script>
+  {{-- === /Global Loader === --}}
+
 </body>
 </html>

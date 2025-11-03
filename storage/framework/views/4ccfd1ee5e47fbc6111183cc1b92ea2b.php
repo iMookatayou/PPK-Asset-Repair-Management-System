@@ -145,5 +145,37 @@
     <span class="truncate">Users</span>
   </a>
 
-</nav>
-<?php /**PATH C:\Users\Developer\development\Asset-Repair-Management-System\resources\views/components/sidebar.blade.php ENDPATH**/ ?>
+  
+  <?php $active = $is('chat.*'); ?>
+  <a href="<?php echo e(route('chat.index')); ?>" class="<?php echo e($base); ?> <?php echo e($active ? $on : $off); ?>">
+    <span class="w-1.5 h-7 rounded-full bg-emerald-500 
+      <?php echo e($active ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'); ?>"></span>
+
+    <span class="w-8 h-8 flex items-center justify-center">
+      <?php if (isset($component)) { $__componentOriginalbb2de5a19350412a96a4922f84030513 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalbb2de5a19350412a96a4922f84030513 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.app-icon','data' => ['name' => 'live','class' => 'w-4 h-4 
+      '.e($active ? 'text-emerald-600' : 'text-zinc-500 group-hover:text-emerald-600').'']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('app-icon'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['name' => 'live','class' => 'w-4 h-4 
+      '.e($active ? 'text-emerald-600' : 'text-zinc-500 group-hover:text-emerald-600').'']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalbb2de5a19350412a96a4922f84030513)): ?>
+<?php $attributes = $__attributesOriginalbb2de5a19350412a96a4922f84030513; ?>
+<?php unset($__attributesOriginalbb2de5a19350412a96a4922f84030513); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalbb2de5a19350412a96a4922f84030513)): ?>
+<?php $component = $__componentOriginalbb2de5a19350412a96a4922f84030513; ?>
+<?php unset($__componentOriginalbb2de5a19350412a96a4922f84030513); ?>
+<?php endif; ?>
+    </span>
+
+    <span class="truncate">Livechat</span>
+  </a>
+</nav><?php /**PATH C:\Users\Developer\development\Asset-Repair-Management-System\resources\views/components/sidebar.blade.php ENDPATH**/ ?>

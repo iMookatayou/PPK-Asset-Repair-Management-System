@@ -8,11 +8,6 @@ use Illuminate\Http\Request;
 
 class AttachmentController extends Controller
 {
-    /**
-     * รองรับสองกรณี:
-     * 1) GET /attachments?request_id=123   -> เฉพาะของใบงานนั้น
-     * 2) GET /attachments                   -> ทั้งหมด (paginate)
-     */
     public function index(Request $request)
     {
         $requestId = $request->integer('request_id');
@@ -24,11 +19,6 @@ class AttachmentController extends Controller
         return response()->json($q->paginate(20));
     }
 
-    /**
-     * สำหรับ route แบบ nested: GET /repair-requests/{req}/attachments
-     * ใช้ได้ทันทีถ้าพี่เพิ่ม route นี้ใน api.php:
-     * Route::get('/repair-requests/{req}/attachments', [AttachmentController::class, 'indexByRequest']);
-     */
     public function indexByRequest(MaintenanceRequest $req)
     {
         return response()->json(
@@ -41,7 +31,7 @@ class AttachmentController extends Controller
     {
         $data = $request->validate([
             'request_id' => 'required|exists:maintenance_requests,id',
-            'file_path'  => 'required|string|max:255', // เก็บ path ตามสคีมเดิม
+            'file_path'  => 'required|string|max:255', 
             'file_type'  => 'nullable|string|max:50',
         ]);
 

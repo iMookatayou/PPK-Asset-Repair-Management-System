@@ -32,7 +32,7 @@
   @media (max-width:980px){.grid-2{grid-template-columns:1fr}.grid-row{grid-template-columns:1fr}}
   /* chips/badges */
   .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;
-    border:1px solid var(--chip-line);background:var(--chip);font-size:12px;color:#d1d5db}
+    border:1px solid var(--chip-line);background:var(--chip);font-size:12px;color:#d1d5db;white-space:nowrap}
   .chip.soft{background:linear-gradient(180deg,#0f1218,#0c0e12);border-color:#1f2430}
   .chip.good{border-color:var(--good);color:#86efac}
   .chip.warn{border-color:var(--warn);color:#fde68a}
@@ -87,54 +87,65 @@
     background:linear-gradient(90deg,rgba(79,70,229,.3),rgba(6,182,212,.18) 60%,transparent);
     border:1px solid rgba(79,70,229,.25);padding:8px 12px;border-radius:12px
   }
+  /* print */
+  @media print{
+    .page-head,.btn,.thumb .cap a{display:none!important}
+    body{background:#fff;color:#000}
+    .card{box-shadow:none;border-color:#ccc}
+  }
 </style>
 <?php $__env->stopPush(); ?>
 
 <?php $__env->startSection('content'); ?>
-<div class="page-head">
+<?php
+  $statusText = str_replace('_',' ',$req->status);
+  $statusClass = match($req->status){
+    'completed' => 'good', 'canceled' => 'bad',
+    'assigned','in_progress' => 'warn', default => 'info'
+  };
+  $prio = strtolower((string)$req->priority);
+  $prioClass = match($prio){ 'high'=>'bad','medium'=>'warn','low'=>'good', default=>'info' };
+  $requestedAt = optional($req->request_date ?? $req->created_at);
+?>
+
+<div class="page-head" role="banner">
   <div class="container">
     <div class="titlebar">
-      <h1><i data-lucide="wrench"></i> Repair Detail #<?php echo e($req->id); ?></h1>
-      <span class="chip soft">
-        <i data-lucide="package"></i><?php echo e($req->asset->name ?? $req->asset_id); ?>
-
-      </span>
-      <?php
-        $status = str_replace('_',' ',$req->status);
-        $statusClass = match($req->status){
-          'completed' => 'good', 'canceled' => 'bad',
-          'assigned','in_progress' => 'warn', default => 'info'
-        };
-        $prioClass = match(strtolower($req->priority)){
-          'high' => 'bad', 'medium' => 'warn', 'low' => 'good', default => 'info'
-        };
-      ?>
-      <span class="chip <?php echo e($statusClass); ?>"><i data-lucide="workflow"></i><?php echo e($status); ?></span>
+      <h1><i data-lucide="wrench"></i> Repair Detail <span id="rid">#<?php echo e($req->id); ?></span></h1>
+      <span class="chip soft" title="Asset"><i data-lucide="package"></i><?php echo e($req->asset->name ?? $req->asset_id); ?></span>
+      <span class="chip <?php echo e($statusClass); ?>"><i data-lucide="workflow"></i><?php echo e($statusText); ?></span>
       <span class="chip <?php echo e($prioClass); ?>"><i data-lucide="flag-triangle-right"></i><?php echo e($req->priority); ?></span>
 
-      <div style="margin-left:auto;display:flex;gap:8px">
+      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn ghost" id="copyIdBtn" title="คัดลอกเลขงาน"><i data-lucide="copy"></i> Copy ID</button>
+        <button type="button" class="btn ghost" onclick="window.print()" title="พิมพ์"><i data-lucide="printer"></i> Print</button>
         <a class="btn ghost" href="<?php echo e(route('maintenance.requests.index')); ?>"><i data-lucide="arrow-left"></i> กลับรายการ</a>
       </div>
     </div>
+
     <?php if(session('ok')): ?>
-      <div class="subrow"><span class="chip good"><i data-lucide="check-circle-2"></i><?php echo e(session('ok')); ?></span></div>
+      <div class="subrow" role="status"><span class="chip good"><i data-lucide="check-circle-2"></i><?php echo e(session('ok')); ?></span></div>
     <?php endif; ?>
     <?php if($errors->any()): ?>
-      <div class="subrow"><span class="chip bad"><i data-lucide="alert-triangle"></i> ดำเนินการไม่สำเร็จ</span></div>
+      <div class="subrow" role="alert">
+        <span class="chip bad"><i data-lucide="alert-triangle"></i> ดำเนินการไม่สำเร็จ</span>
+        <span class="chip soft"><?php echo e(collect($errors->all())->take(3)->implode(' • ')); ?></span>
+      </div>
     <?php endif; ?>
   </div>
 </div>
 
-<div class="container">
+<div class="container" role="main">
+  
   <div class="card">
-    <div class="meta">
+    <div class="meta" aria-label="ข้อมูลหลัก">
       <div class="kv">
         <div class="k"><i data-lucide="hash"></i>หมายเลข</div>
         <div class="v">#<?php echo e($req->id); ?></div>
       </div>
       <div class="kv">
         <div class="k"><i data-lucide="user-2"></i>ผู้แจ้ง</div>
-        <div class="v"><?php echo e($req->reporter_name ?? '-'); ?></div>
+        <div class="v"><?php echo e($req->reporter_name ?? ($req->reporter->name ?? '-')); ?></div>
       </div>
       <div class="kv">
         <div class="k"><i data-lucide="package"></i>ทรัพย์สิน</div>
@@ -150,13 +161,12 @@
       <div>
         <div class="k"><i data-lucide="type"></i>หัวข้อ</div>
         <div class="v" style="font-size:15px"><?php echo e($req->title); ?></div>
-        <div class="hr"></div>
+        <div class="hr" role="separator" aria-hidden="true"></div>
         <div class="k"><i data-lucide="file-text"></i>รายละเอียด</div>
         <div class="prose prose-invert" style="margin-top:4px"><?php echo e($req->description ?: '-'); ?></div>
       </div>
       <div>
         <div class="k"><i data-lucide="calendar-clock"></i>เวลา</div>
-        <?php $requestedAt = optional($req->request_date ?? $req->created_at); ?>
         <div class="ribbon" style="margin-top:6px;display:grid;gap:6px">
           <span class="chip info">
             <i data-lucide="calendar-search"></i>
@@ -195,22 +205,22 @@
       <div>
         <label for="action"><i data-lucide="workflow"></i> Action</label>
         <select id="action" name="action" required aria-required="true">
-          <option value="" disabled selected>เลือกการดำเนินการ…</option>
-          <option value="assign" <?php if(old('action')==='assign'): echo 'selected'; endif; ?>>assign</option>
-          <option value="start" <?php if(old('action')==='start'): echo 'selected'; endif; ?>>start</option>
+          <option value="" disabled <?php echo e(old('action') ? '' : 'selected'); ?>>เลือกการดำเนินการ…</option>
+          <option value="assign"   <?php if(old('action')==='assign'): echo 'selected'; endif; ?>>assign</option>
+          <option value="start"    <?php if(old('action')==='start'): echo 'selected'; endif; ?>>start</option>
           <option value="complete" <?php if(old('action')==='complete'): echo 'selected'; endif; ?>>complete</option>
-          <option value="cancel" <?php if(old('action')==='cancel'): echo 'selected'; endif; ?>>cancel</option>
+          <option value="cancel"   <?php if(old('action')==='cancel'): echo 'selected'; endif; ?>>cancel</option>
         </select>
       </div>
 
       <div id="techWrap" style="display:none">
         <label for="technician_id"><i data-lucide="user-round"></i> Technician ID</label>
-        <input id="technician_id" type="number" name="technician_id" placeholder="เช่น 5" inputmode="numeric" />
+        <input id="technician_id" type="number" name="technician_id" placeholder="เช่น 5" inputmode="numeric" value="<?php echo e(old('technician_id')); ?>"/>
       </div>
 
       <div style="grid-column:1/-1">
         <label for="remark"><i data-lucide="message-square"></i> Remark</label>
-        <input id="remark" type="text" name="remark" placeholder="บันทึกเพิ่มเติม (optional)" />
+        <input id="remark" type="text" name="remark" placeholder="บันทึกเพิ่มเติม (optional)" value="<?php echo e(old('remark')); ?>"/>
       </div>
 
       <div style="grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap">
@@ -230,14 +240,14 @@
       <div>
         <label for="att_type"><i data-lucide="badge-info"></i> ประเภท</label>
         <select id="att_type" name="type">
-          <option value="before">before</option>
-          <option value="after">after</option>
-          <option value="other" selected>other</option>
+          <option value="before" <?php if(old('type')==='before'): echo 'selected'; endif; ?>>before</option>
+          <option value="after"  <?php if(old('type')==='after'): echo 'selected'; endif; ?>>after</option>
+          <option value="other"  <?php if(old('type','other')==='other'): echo 'selected'; endif; ?>>other</option>
         </select>
       </div>
       <div>
         <label for="file"><i data-lucide="paperclip"></i> ไฟล์</label>
-        <input id="file" type="file" name="file" required aria-required="true" />
+        <input id="file" type="file" name="file" required aria-required="true" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"/>
       </div>
       <div style="grid-column:1/-1">
         <button type="submit" class="btn"><i data-lucide="upload-cloud"></i> อัปโหลด</button>
@@ -266,7 +276,8 @@
               </div>
             <?php endif; ?>
             <figcaption class="cap">
-              <span class="chip"><i data-lucide="tag"></i><?php echo e($tag); ?></span>
+              <span class="chip" title="ประเภทไฟล์"><i data-lucide="tag"></i><?php echo e($tag); ?></span>
+              <span class="muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?php echo e($name); ?></span>
               <?php if($url !== '#'): ?>
                 <a class="chip" href="<?php echo e($url); ?>" target="_blank" rel="noopener"><i data-lucide="download"></i> เปิด</a>
               <?php endif; ?>
@@ -302,7 +313,7 @@
               <time datetime="<?php echo e($log->created_at->toIso8601String()); ?>"><?php echo e($log->created_at->format('Y-m-d H:i')); ?></time>
             </span>
             <?php if($log->user_id): ?>
-              <span class="chip"><i data-lucide="user"></i><?php echo e($log->user_id); ?></span>
+              <span class="chip" title="ผู้ใช้ที่ดำเนินการ"><i data-lucide="user"></i><?php echo e($log->user_id); ?></span>
             <?php endif; ?>
           </header>
           <?php if($log->note): ?>
@@ -320,7 +331,8 @@
 <?php $__env->startPush('scripts'); ?>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script>
-  lucide.createIcons({attrs:{width:18,height:18, 'stroke-width':1.8}});
+  lucide.createIcons({attrs:{width:18,height:18,'stroke-width':1.8}});
+
   // toggle technician input visibility/required by action
   const actionSel = document.getElementById('action');
   const techWrap  = document.getElementById('techWrap');
@@ -337,6 +349,23 @@
   }
   actionSel?.addEventListener('change', syncTech);
   syncTech();
+
+  // copy repair id
+  const copyBtn = document.getElementById('copyIdBtn');
+  copyBtn?.addEventListener('click', async () => {
+    const idText = document.getElementById('rid')?.textContent?.replace('#','') ?? '<?php echo e($req->id); ?>';
+    try{
+      await navigator.clipboard.writeText(idText);
+      copyBtn.classList.add('good');
+      copyBtn.innerHTML = '<i data-lucide="check"></i> Copied';
+      lucide.createIcons();
+      setTimeout(()=>{
+        copyBtn.classList.remove('good');
+        copyBtn.innerHTML = '<i data-lucide="copy"></i> Copy ID';
+        lucide.createIcons();
+      }, 1400);
+    }catch(e){}
+  });
 </script>
 <?php $__env->stopPush(); ?>
 

@@ -5,7 +5,8 @@
 @section('page-header')
   <div class="flex items-center justify-between">
     <a href="{{ route('maintenance.requests.create') }}"
-       class="inline-flex items-center rounded-lg bg-emerald-600 px-3 py-2 text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+       class="inline-flex items-center rounded-lg bg-emerald-600 px-3 py-2 text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+       onclick="showLoader()">
       + New Request
     </a>
   </div>
@@ -14,7 +15,9 @@
 @section('content')
   {{-- Filters --}}
   <form method="GET" action="{{ route('maintenance.requests.index') }}"
-        class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4" role="search" aria-label="Filter maintenance requests">
+        class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4"
+        role="search" aria-label="Filter maintenance requests"
+        onsubmit="showLoader()">
     <div>
       <label for="q" class="block text-sm text-zinc-600">Search</label>
       <input id="q" type="text" name="q" value="{{ request('q') }}"
@@ -117,7 +120,8 @@
 
             <td class="p-2 align-top">
               <a href="{{ route('maintenance.requests.show', $row) }}"
-                 class="text-emerald-700 hover:underline focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded">
+                 class="text-emerald-700 hover:underline focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded"
+                 onclick="showLoader()">
                 View
               </a>
             </td>
@@ -134,4 +138,60 @@
   <div class="mt-4">
     {{ $list->withQueryString()->links() }}
   </div>
+@endsection
+
+@section('after-content')
+{{-- Loader --}}
+<div id="loaderOverlay" class="loader-overlay">
+  <div class="loader-spinner"></div>
+</div>
+
+<style>
+  .loader-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(255,255,255,.6);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity .2s ease, visibility .2s;
+  }
+  .loader-overlay.show {
+    visibility: visible;
+    opacity: 1;
+  }
+  .loader-spinner {
+    width: 38px;
+    height: 38px;
+    border: 4px solid #0E2B51;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+</style>
+
+<script>
+  function showLoader() {
+    document.getElementById("loaderOverlay").classList.add("show");
+  }
+  function hideLoader() {
+    document.getElementById("loaderOverlay").classList.remove("show");
+  }
+  document.addEventListener("DOMContentLoaded", hideLoader);
+
+  // pagination & general link click
+  document.addEventListener("click", e => {
+    const link = e.target.closest("a");
+    if (link && !link.target && link.href) {
+      showLoader();
+    }
+  });
+</script>
 @endsection

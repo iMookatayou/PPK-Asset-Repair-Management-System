@@ -1,3 +1,4 @@
+{{-- resources/views/maintenance/show.blade.php --}}
 @extends('layouts.app')
 
 @section('title','Repair #'.$req->id)
@@ -34,7 +35,7 @@
   @media (max-width:980px){.grid-2{grid-template-columns:1fr}.grid-row{grid-template-columns:1fr}}
   /* chips/badges */
   .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;
-    border:1px solid var(--chip-line);background:var(--chip);font-size:12px;color:#d1d5db}
+    border:1px solid var(--chip-line);background:var(--chip);font-size:12px;color:#d1d5db;white-space:nowrap}
   .chip.soft{background:linear-gradient(180deg,#0f1218,#0c0e12);border-color:#1f2430}
   .chip.good{border-color:var(--good);color:#86efac}
   .chip.warn{border-color:var(--warn);color:#fde68a}
@@ -89,53 +90,65 @@
     background:linear-gradient(90deg,rgba(79,70,229,.3),rgba(6,182,212,.18) 60%,transparent);
     border:1px solid rgba(79,70,229,.25);padding:8px 12px;border-radius:12px
   }
+  /* print */
+  @media print{
+    .page-head,.btn,.thumb .cap a{display:none!important}
+    body{background:#fff;color:#000}
+    .card{box-shadow:none;border-color:#ccc}
+  }
 </style>
 @endpush
 
 @section('content')
-<div class="page-head">
+@php
+  $statusText = str_replace('_',' ',$req->status);
+  $statusClass = match($req->status){
+    'completed' => 'good', 'canceled' => 'bad',
+    'assigned','in_progress' => 'warn', default => 'info'
+  };
+  $prio = strtolower((string)$req->priority);
+  $prioClass = match($prio){ 'high'=>'bad','medium'=>'warn','low'=>'good', default=>'info' };
+  $requestedAt = optional($req->request_date ?? $req->created_at);
+@endphp
+
+<div class="page-head" role="banner">
   <div class="container">
     <div class="titlebar">
-      <h1><i data-lucide="wrench"></i> Repair Detail #{{ $req->id }}</h1>
-      <span class="chip soft">
-        <i data-lucide="package"></i>{{ $req->asset->name ?? $req->asset_id }}
-      </span>
-      @php
-        $status = str_replace('_',' ',$req->status);
-        $statusClass = match($req->status){
-          'completed' => 'good', 'canceled' => 'bad',
-          'assigned','in_progress' => 'warn', default => 'info'
-        };
-        $prioClass = match(strtolower($req->priority)){
-          'high' => 'bad', 'medium' => 'warn', 'low' => 'good', default => 'info'
-        };
-      @endphp
-      <span class="chip {{ $statusClass }}"><i data-lucide="workflow"></i>{{ $status }}</span>
+      <h1><i data-lucide="wrench"></i> Repair Detail <span id="rid">#{{ $req->id }}</span></h1>
+      <span class="chip soft" title="Asset"><i data-lucide="package"></i>{{ $req->asset->name ?? $req->asset_id }}</span>
+      <span class="chip {{ $statusClass }}"><i data-lucide="workflow"></i>{{ $statusText }}</span>
       <span class="chip {{ $prioClass }}"><i data-lucide="flag-triangle-right"></i>{{ $req->priority }}</span>
 
-      <div style="margin-left:auto;display:flex;gap:8px">
+      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn ghost" id="copyIdBtn" title="คัดลอกเลขงาน"><i data-lucide="copy"></i> Copy ID</button>
+        <button type="button" class="btn ghost" onclick="window.print()" title="พิมพ์"><i data-lucide="printer"></i> Print</button>
         <a class="btn ghost" href="{{ route('maintenance.requests.index') }}"><i data-lucide="arrow-left"></i> กลับรายการ</a>
       </div>
     </div>
+
     @if(session('ok'))
-      <div class="subrow"><span class="chip good"><i data-lucide="check-circle-2"></i>{{ session('ok') }}</span></div>
+      <div class="subrow" role="status"><span class="chip good"><i data-lucide="check-circle-2"></i>{{ session('ok') }}</span></div>
     @endif
     @if($errors->any())
-      <div class="subrow"><span class="chip bad"><i data-lucide="alert-triangle"></i> ดำเนินการไม่สำเร็จ</span></div>
+      <div class="subrow" role="alert">
+        <span class="chip bad"><i data-lucide="alert-triangle"></i> ดำเนินการไม่สำเร็จ</span>
+        <span class="chip soft">{{ collect($errors->all())->take(3)->implode(' • ') }}</span>
+      </div>
     @endif
   </div>
 </div>
 
-<div class="container">
+<div class="container" role="main">
+  {{-- Basic Info --}}
   <div class="card">
-    <div class="meta">
+    <div class="meta" aria-label="ข้อมูลหลัก">
       <div class="kv">
         <div class="k"><i data-lucide="hash"></i>หมายเลข</div>
         <div class="v">#{{ $req->id }}</div>
       </div>
       <div class="kv">
         <div class="k"><i data-lucide="user-2"></i>ผู้แจ้ง</div>
-        <div class="v">{{ $req->reporter_name ?? '-' }}</div>
+        <div class="v">{{ $req->reporter_name ?? ($req->reporter->name ?? '-') }}</div>
       </div>
       <div class="kv">
         <div class="k"><i data-lucide="package"></i>ทรัพย์สิน</div>
@@ -151,13 +164,12 @@
       <div>
         <div class="k"><i data-lucide="type"></i>หัวข้อ</div>
         <div class="v" style="font-size:15px">{{ $req->title }}</div>
-        <div class="hr"></div>
+        <div class="hr" role="separator" aria-hidden="true"></div>
         <div class="k"><i data-lucide="file-text"></i>รายละเอียด</div>
         <div class="prose prose-invert" style="margin-top:4px">{{ $req->description ?: '-' }}</div>
       </div>
       <div>
         <div class="k"><i data-lucide="calendar-clock"></i>เวลา</div>
-        @php $requestedAt = optional($req->request_date ?? $req->created_at); @endphp
         <div class="ribbon" style="margin-top:6px;display:grid;gap:6px">
           <span class="chip info">
             <i data-lucide="calendar-search"></i>
@@ -196,22 +208,22 @@
       <div>
         <label for="action"><i data-lucide="workflow"></i> Action</label>
         <select id="action" name="action" required aria-required="true">
-          <option value="" disabled selected>เลือกการดำเนินการ…</option>
-          <option value="assign" @selected(old('action')==='assign')>assign</option>
-          <option value="start" @selected(old('action')==='start')>start</option>
+          <option value="" disabled {{ old('action') ? '' : 'selected' }}>เลือกการดำเนินการ…</option>
+          <option value="assign"   @selected(old('action')==='assign')>assign</option>
+          <option value="start"    @selected(old('action')==='start')>start</option>
           <option value="complete" @selected(old('action')==='complete')>complete</option>
-          <option value="cancel" @selected(old('action')==='cancel')>cancel</option>
+          <option value="cancel"   @selected(old('action')==='cancel')>cancel</option>
         </select>
       </div>
 
       <div id="techWrap" style="display:none">
         <label for="technician_id"><i data-lucide="user-round"></i> Technician ID</label>
-        <input id="technician_id" type="number" name="technician_id" placeholder="เช่น 5" inputmode="numeric" />
+        <input id="technician_id" type="number" name="technician_id" placeholder="เช่น 5" inputmode="numeric" value="{{ old('technician_id') }}"/>
       </div>
 
       <div style="grid-column:1/-1">
         <label for="remark"><i data-lucide="message-square"></i> Remark</label>
-        <input id="remark" type="text" name="remark" placeholder="บันทึกเพิ่มเติม (optional)" />
+        <input id="remark" type="text" name="remark" placeholder="บันทึกเพิ่มเติม (optional)" value="{{ old('remark') }}"/>
       </div>
 
       <div style="grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap">
@@ -231,14 +243,14 @@
       <div>
         <label for="att_type"><i data-lucide="badge-info"></i> ประเภท</label>
         <select id="att_type" name="type">
-          <option value="before">before</option>
-          <option value="after">after</option>
-          <option value="other" selected>other</option>
+          <option value="before" @selected(old('type')==='before')>before</option>
+          <option value="after"  @selected(old('type')==='after')>after</option>
+          <option value="other"  @selected(old('type','other')==='other')>other</option>
         </select>
       </div>
       <div>
         <label for="file"><i data-lucide="paperclip"></i> ไฟล์</label>
-        <input id="file" type="file" name="file" required aria-required="true" />
+        <input id="file" type="file" name="file" required aria-required="true" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"/>
       </div>
       <div style="grid-column:1/-1">
         <button type="submit" class="btn"><i data-lucide="upload-cloud"></i> อัปโหลด</button>
@@ -266,7 +278,8 @@
               </div>
             @endif
             <figcaption class="cap">
-              <span class="chip"><i data-lucide="tag"></i>{{ $tag }}</span>
+              <span class="chip" title="ประเภทไฟล์"><i data-lucide="tag"></i>{{ $tag }}</span>
+              <span class="muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $name }}</span>
               @if($url !== '#')
                 <a class="chip" href="{{ $url }}" target="_blank" rel="noopener"><i data-lucide="download"></i> เปิด</a>
               @endif
@@ -302,7 +315,7 @@
               <time datetime="{{ $log->created_at->toIso8601String() }}">{{ $log->created_at->format('Y-m-d H:i') }}</time>
             </span>
             @if($log->user_id)
-              <span class="chip"><i data-lucide="user"></i>{{ $log->user_id }}</span>
+              <span class="chip" title="ผู้ใช้ที่ดำเนินการ"><i data-lucide="user"></i>{{ $log->user_id }}</span>
             @endif
           </header>
           @if($log->note)
@@ -320,7 +333,8 @@
 @push('scripts')
 <script src="https://unpkg.com/lucide@latest"></script>
 <script>
-  lucide.createIcons({attrs:{width:18,height:18, 'stroke-width':1.8}});
+  lucide.createIcons({attrs:{width:18,height:18,'stroke-width':1.8}});
+
   // toggle technician input visibility/required by action
   const actionSel = document.getElementById('action');
   const techWrap  = document.getElementById('techWrap');
@@ -337,5 +351,22 @@
   }
   actionSel?.addEventListener('change', syncTech);
   syncTech();
+
+  // copy repair id
+  const copyBtn = document.getElementById('copyIdBtn');
+  copyBtn?.addEventListener('click', async () => {
+    const idText = document.getElementById('rid')?.textContent?.replace('#','') ?? '{{ $req->id }}';
+    try{
+      await navigator.clipboard.writeText(idText);
+      copyBtn.classList.add('good');
+      copyBtn.innerHTML = '<i data-lucide="check"></i> Copied';
+      lucide.createIcons();
+      setTimeout(()=>{
+        copyBtn.classList.remove('good');
+        copyBtn.innerHTML = '<i data-lucide="copy"></i> Copy ID';
+        lucide.createIcons();
+      }, 1400);
+    }catch(e){}
+  });
 </script>
 @endpush

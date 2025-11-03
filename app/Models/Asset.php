@@ -12,7 +12,7 @@ class Asset extends Model
     protected $fillable = [
         'asset_code',
         'name',
-        'type',            // ← เพิ่มให้ตรงกับคอลัมน์ใหม่
+        'type',           
         'category',
         'brand',
         'model',
@@ -22,6 +22,7 @@ class Asset extends Model
         'warranty_expire',
         'status',
         'department_id',
+        'category_id',
     ];
 
     protected $casts = [
@@ -71,5 +72,9 @@ class Asset extends Model
     public function scopeType($q, ?string $type)
     {
         return $type ? $q->where('type', $type) : $q;
+    }
+    public function categoryRef()
+    {
+        return $this->belongsTo(AssetCategory::class, 'category_id');
     }
 }

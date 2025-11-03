@@ -65,4 +65,17 @@
     <span class="truncate">Users</span>
   </a>
 
+  {{-- Users --}}
+  @php $active = $is('chat.*'); @endphp
+    <a href="{{ route('chat.index') }}" class="{{ $base }} {{ $active ? $on : $off }}">
+      <span class="w-1.5 h-7 rounded-full bg-emerald-500 
+        {{ $active ? 'opacity-100' : 'opacity-0 group-hover:opacity-60' }}"></span>
+
+      <span class="w-8 h-8 flex items-center justify-center">
+        <x-si-codenewbie class="w-4 h-4 
+          {{ $active ? 'text-emerald-600' : 'text-zinc-500 group-hover:text-emerald-600' }}" />
+      </span>
+
+      <span class="truncate">Livechat</span>
+    </a>
 </nav>

@@ -1,268 +1,242 @@
-<?php
-  /** @var \App\Models\MaintenanceRequest|null $req */
-  $priorities = ['low' => 'Low', 'medium' => 'Medium', 'high' => 'High', 'urgent' => 'Urgent'];
-  $defaultReporter = old('reporter_id', (string)($req->reporter_id ?? auth()->id()));
-?>
+<?php $__env->startSection('title', 'Maintenance Requests'); ?>
 
-<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<?php $__env->startSection('page-header'); ?>
+  <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div class="flex flex-wrap items-center gap-2">
+      
+      <?php
+        $total      = $metrics['total']      ?? $list->total();
+        $pending    = $metrics['pending']    ?? ($counters['pending']    ?? null);
+        $inprogress = $metrics['in_progress']?? ($counters['in_progress']?? null);
+        $completed  = $metrics['completed']  ?? ($counters['completed']  ?? null);
+      ?>
+      <span class="rounded-full bg-zinc-100 px-3 py-1 text-sm text-zinc-700">Total: <?php echo e(number_format($total)); ?></span>
+      <?php if(isset($pending)): ?>
+        <span class="rounded-full bg-zinc-100 px-3 py-1 text-sm text-zinc-700">Pending: <?php echo e(number_format($pending)); ?></span>
+      <?php endif; ?>
+      <?php if(isset($inprogress)): ?>
+        <span class="rounded-full bg-blue-50 px-3 py-1 text-sm text-blue-700">In progress: <?php echo e(number_format($inprogress)); ?></span>
+      <?php endif; ?>
+      <?php if(isset($completed)): ?>
+        <span class="rounded-full bg-emerald-50 px-3 py-1 text-sm text-emerald-700">Completed: <?php echo e(number_format($completed)); ?></span>
+      <?php endif; ?>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <a href="<?php echo e(route('maintenance.requests.create')); ?>"
+         class="inline-flex items-center rounded-lg bg-emerald-600 px-3 py-2 text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        + New Request
+      </a>
+      <a href="<?php echo e(route('maintenance.requests.index')); ?>"
+         class="hidden rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 md:inline-block">
+        Refresh
+      </a>
+    </div>
+  </div>
+<?php $__env->stopSection(); ?>
+
+<?php $__env->startSection('content'); ?>
   
-  <div>
-    <label for="asset_id" class="block text-sm font-medium text-slate-700">
-      Asset <span class="text-rose-600" aria-hidden="true">*</span>
-    </label>
-    <select
-      id="asset_id"
-      name="asset_id"
-      required
-      class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-emerald-600 focus:ring-emerald-600
-             <?php $__errorArgs = ['asset_id'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> border-rose-400 ring-rose-200 <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>"
-      aria-invalid="<?php $__errorArgs = ['asset_id'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> true <?php else: ?> false <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>"
-      aria-describedby="<?php $__errorArgs = ['asset_id'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> asset_id_error <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>"
-    >
-      <option value="" disabled <?php echo e(old('asset_id', $req->asset_id ?? '') === '' ? 'selected' : ''); ?> hidden>-- Choose Asset --</option>
-      <?php $__currentLoopData = $assets; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $a): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-        <option value="<?php echo e($a->id); ?>" <?php if((string)old('asset_id', (string)($req->asset_id ?? '')) === (string)$a->id): echo 'selected'; endif; ?>>
-          <?php echo e($a->code ? '#'.$a->code : '#'.$a->id); ?> — <?php echo e($a->name ?? $a->model ?? 'Asset'); ?>
+  <form method="GET" action="<?php echo e(route('maintenance.requests.index')); ?>"
+        class="rounded-2xl border border-zinc-200 bg-white p-3 md:p-4" role="search" aria-label="Filter maintenance requests">
+    <div class="grid grid-cols-1 gap-3 md:grid-cols-5">
+      <div class="md:col-span-2">
+        <label for="q" class="block text-sm text-zinc-600">Search</label>
+        <input id="q" type="text" name="q" value="<?php echo e(request('q')); ?>"
+               placeholder="Search title/description…"
+               class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 focus:border-emerald-500 focus:ring-emerald-500" />
+      </div>
 
-        </option>
-      <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-    </select>
-    <?php $__errorArgs = ['asset_id'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?>
-      <p id="asset_id_error" class="mt-1 text-sm text-rose-600"><?php echo e($message); ?></p>
-    <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>
+      <div>
+        <label for="status" class="block text-sm text-zinc-600">Status</label>
+        <select id="status" name="status"
+                class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 focus:border-emerald-500 focus:ring-emerald-500">
+          <option value="">All Status</option>
+          <?php $__currentLoopData = ['pending'=>'Pending','in_progress'=>'In progress','completed'=>'Completed','cancelled'=>'Cancelled']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $k=>$v): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+            <option value="<?php echo e($k); ?>" <?php if(request('status') === $k): echo 'selected'; endif; ?>><?php echo e($v); ?></option>
+          <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+        </select>
+      </div>
+
+      <div>
+        <label for="priority" class="block text-sm text-zinc-600">Priority</label>
+        <select id="priority" name="priority"
+                class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 focus:border-emerald-500 focus:ring-emerald-500">
+          <option value="">All Priority</option>
+          <?php $__currentLoopData = ['low'=>'Low','medium'=>'Medium','high'=>'High','urgent'=>'Urgent']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $k=>$v): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+            <option value="<?php echo e($k); ?>" <?php if(request('priority') === $k): echo 'selected'; endif; ?>><?php echo e($v); ?></option>
+          <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+        </select>
+      </div>
+
+      <div class="flex items-end gap-2">
+        <button type="submit"
+                class="w-full rounded-lg border border-zinc-300 px-3 py-2 hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+          Apply
+        </button>
+        <?php if(request()->hasAny(['q','status','priority'])): ?>
+          <a href="<?php echo e(route('maintenance.requests.index')); ?>"
+             class="hidden rounded-lg border border-zinc-300 px-3 py-2 text-zinc-700 hover:bg-zinc-50 md:inline-block">
+            Reset
+          </a>
+        <?php endif; ?>
+      </div>
+    </div>
+  </form>
+
+  
+  <div class="mt-4 hidden overflow-x-auto rounded-2xl border border-zinc-200 md:block">
+    <table class="min-w-full text-sm">
+      <thead class="sticky top-0 z-10 bg-zinc-50">
+        <tr class="text-left">
+          <th scope="col" class="p-2 font-semibold text-zinc-700 w-14">#</th>
+          <th scope="col" class="p-2 font-semibold text-zinc-700">Title</th>
+          <th scope="col" class="p-2 font-semibold text-zinc-700 w-28">Priority</th>
+          <th scope="col" class="p-2 font-semibold text-zinc-700 w-32">Status</th>
+          <th scope="col" class="p-2 font-semibold text-zinc-700 w-48">Reporter</th>
+          <th scope="col" class="p-2 font-semibold text-zinc-700 w-48">Technician</th>
+          <th scope="col" class="p-2 font-semibold text-zinc-700 w-44">Requested</th>
+          <th scope="col" class="p-2 font-semibold text-zinc-700 w-24"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody class="[&>tr:nth-child(even)]:bg-zinc-50/40">
+        <?php $__empty_1 = true; $__currentLoopData = $list; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+          <tr class="border-t hover:bg-emerald-50/30">
+            <td class="p-2 align-top text-zinc-700"><?php echo e($row->id); ?></td>
+
+            <td class="p-2 align-top">
+              <div class="font-medium text-zinc-900"><?php echo e($row->title); ?></div>
+              <?php if($row->description): ?>
+                <div class="max-w-[60ch] text-zinc-500 line-clamp-2"><?php echo e($row->description); ?></div>
+              <?php endif; ?>
+            </td>
+
+            <td class="p-2 align-top">
+              <span class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 capitalize
+                           class="<?php echo \Illuminate\Support\Arr::toCssClasses([
+                             'border-emerald-200 bg-emerald-50 text-emerald-700' => $row->priority === 'low',
+                             'border-sky-200 bg-sky-50 text-sky-700'             => $row->priority === 'medium',
+                             'border-amber-200 bg-amber-50 text-amber-700'       => $row->priority === 'high',
+                             'border-rose-200 bg-rose-50 text-rose-700'          => $row->priority === 'urgent',
+                           ]); ?>"">
+                <span class="h-2 w-2 rounded-full bg-current opacity-70"></span>
+                <?php echo e(str_replace('_',' ', $row->priority)); ?>
+
+              </span>
+            </td>
+
+            <td class="p-2 align-top">
+              <span class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 capitalize
+                           class="<?php echo \Illuminate\Support\Arr::toCssClasses([
+                             'border-zinc-300 bg-white text-zinc-700'            => $row->status === 'pending',
+                             'border-blue-200 bg-blue-50 text-blue-700'          => $row->status === 'in_progress',
+                             'border-emerald-200 bg-emerald-50 text-emerald-700' => $row->status === 'completed',
+                             'border-zinc-300 bg-zinc-50 text-zinc-700'          => $row->status === 'cancelled',
+                           ]); ?>"">
+                <span class="h-2 w-2 rounded-full bg-current opacity-70"></span>
+                <?php echo e(str_replace('_',' ', $row->status)); ?>
+
+              </span>
+            </td>
+
+            <td class="p-2 align-top text-zinc-800"><?php echo e($row->reporter->name ?? '-'); ?></td>
+            <td class="p-2 align-top text-zinc-800"><?php echo e($row->technician->name ?? '-'); ?></td>
+
+            <td class="p-2 align-top">
+              <?php $when = optional($row->request_date ?? $row->created_at); ?>
+              <?php if($when): ?>
+                <time datetime="<?php echo e($when->toIso8601String()); ?>"><?php echo e($when->format('Y-m-d H:i')); ?></time>
+              <?php else: ?>
+                -
+              <?php endif; ?>
+            </td>
+
+            <td class="p-2 align-top">
+              <a href="<?php echo e(route('maintenance.requests.show', $row)); ?>"
+                 class="text-emerald-700 hover:underline focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded">
+                View
+              </a>
+            </td>
+          </tr>
+        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+          <tr>
+            <td colspan="8" class="p-6 text-center text-zinc-500">No data</td>
+          </tr>
+        <?php endif; ?>
+      </tbody>
+    </table>
   </div>
 
   
-  <div>
-    <label for="reporter_id" class="block text-sm font-medium text-slate-700">
-      Reporter <span class="text-rose-600" aria-hidden="true">*</span>
-    </label>
-    <select
-      id="reporter_id"
-      name="reporter_id"
-      required
-      class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-emerald-600 focus:ring-emerald-600
-             <?php $__errorArgs = ['reporter_id'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> border-rose-400 ring-rose-200 <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>"
-      aria-invalid="<?php $__errorArgs = ['reporter_id'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> true <?php else: ?> false <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>"
-      aria-describedby="<?php $__errorArgs = ['reporter_id'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> reporter_id_error <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>"
-    >
-      <option value="" disabled <?php echo e($defaultReporter === '' ? 'selected' : ''); ?> hidden>-- Reporter --</option>
-      <?php $__currentLoopData = $users; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $u): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-        <option value="<?php echo e($u->id); ?>" <?php if((string)$defaultReporter === (string)$u->id): echo 'selected'; endif; ?>><?php echo e($u->name); ?></option>
-      <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-    </select>
-    <?php $__errorArgs = ['reporter_id'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?>
-      <p id="reporter_id_error" class="mt-1 text-sm text-rose-600"><?php echo e($message); ?></p>
-    <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>
+  <div class="mt-4 space-y-3 md:hidden">
+    <?php $__empty_1 = true; $__currentLoopData = $list; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+      <div class="rounded-2xl border border-zinc-200 bg-white p-3">
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <div class="text-xs text-zinc-500">#<?php echo e($row->id); ?></div>
+            <div class="font-medium text-zinc-900"><?php echo e($row->title); ?></div>
+          </div>
+          <div class="flex flex-col items-end gap-1">
+            <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-xs capitalize
+                         class="<?php echo \Illuminate\Support\Arr::toCssClasses([
+                           'border-emerald-200 bg-emerald-50 text-emerald-700' => $row->priority === 'low',
+                           'border-sky-200 bg-sky-50 text-sky-700'             => $row->priority === 'medium',
+                           'border-amber-200 bg-amber-50 text-amber-700'       => $row->priority === 'high',
+                           'border-rose-200 bg-rose-50 text-rose-700'          => $row->priority === 'urgent',
+                         ]); ?>"">
+              <?php echo e(str_replace('_',' ', $row->priority)); ?>
+
+            </span>
+            <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-xs capitalize
+                         class="<?php echo \Illuminate\Support\Arr::toCssClasses([
+                           'border-zinc-300 bg-white text-zinc-700'            => $row->status === 'pending',
+                           'border-blue-200 bg-blue-50 text-blue-700'          => $row->status === 'in_progress',
+                           'border-emerald-200 bg-emerald-50 text-emerald-700' => $row->status === 'completed',
+                           'border-zinc-300 bg-zinc-50 text-zinc-700'          => $row->status === 'cancelled',
+                         ]); ?>"">
+              <?php echo e(str_replace('_',' ', $row->status)); ?>
+
+            </span>
+          </div>
+        </div>
+
+        <?php if($row->description): ?>
+          <p class="mt-2 text-sm text-zinc-600 line-clamp-2"><?php echo e($row->description); ?></p>
+        <?php endif; ?>
+
+        <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-zinc-600">
+          <div><dt class="sr-only">Reporter</dt><dd><?php echo e($row->reporter->name ?? '-'); ?></dd></div>
+          <div><dt class="sr-only">Technician</dt><dd><?php echo e($row->technician->name ?? '-'); ?></dd></div>
+          <div class="col-span-2">
+            <dt class="sr-only">Requested</dt>
+            <dd>
+              <?php $when = optional($row->request_date ?? $row->created_at); ?>
+              <?php if($when): ?>
+                <time datetime="<?php echo e($when->toIso8601String()); ?>"><?php echo e($when->format('Y-m-d H:i')); ?></time>
+              <?php else: ?>
+                -
+              <?php endif; ?>
+            </dd>
+          </div>
+        </dl>
+
+        <div class="mt-3">
+          <a href="<?php echo e(route('maintenance.requests.show', $row)); ?>"
+             class="text-emerald-700 hover:underline">View</a>
+        </div>
+      </div>
+    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+      <div class="rounded-2xl border border-zinc-200 bg-white p-6 text-center text-zinc-500">
+        No data
+      </div>
+    <?php endif; ?>
   </div>
 
   
-  <div class="md:col-span-2">
-    <label for="title" class="block text-sm font-medium text-slate-700">
-      Title <span class="text-rose-600" aria-hidden="true">*</span>
-    </label>
-    <input
-      id="title"
-      name="title"
-      type="text"
-      required
-      maxlength="150"
-      autocomplete="off"
-      spellcheck="false"
-      value="<?php echo e(old('title', $req->title ?? '')); ?>"
-      class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm placeholder-slate-400 focus:border-emerald-600 focus:ring-emerald-600
-             <?php $__errorArgs = ['title'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> border-rose-400 ring-rose-200 <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>"
-      aria-invalid="<?php $__errorArgs = ['title'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> true <?php else: ?> false <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>"
-      aria-describedby="<?php $__errorArgs = ['title'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> title_error <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>"
-      placeholder="Short, clear summary (e.g., Aircon leaking in Room 302)"
-    />
-    <div class="mt-1 text-xs text-slate-500">Max 150 characters.</div>
-    <?php $__errorArgs = ['title'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?>
-      <p id="title_error" class="mt-1 text-sm text-rose-600"><?php echo e($message); ?></p>
-    <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>
-  </div>
+  <div class="mt-4">
+    <?php echo e($list->withQueryString()->links()); ?>
 
-  
-  <div class="md:col-span-2">
-    <label for="description" class="block text-sm font-medium text-slate-700">Description</label>
-    <textarea
-      id="description"
-      name="description"
-      rows="6"
-      spellcheck="false"
-      class="mt-1 w-full resize-y rounded-xl border border-slate-300 px-3 py-2 text-sm placeholder-slate-400 focus:border-emerald-600 focus:ring-emerald-600
-             <?php $__errorArgs = ['description'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> border-rose-400 ring-rose-200 <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>"
-      aria-invalid="<?php $__errorArgs = ['description'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> true <?php else: ?> false <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>"
-      aria-describedby="<?php $__errorArgs = ['description'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> description_error <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>"
-      placeholder="Add details to help triage (symptoms, when it occurs, photo links, etc.)"
-    ><?php echo e(old('description', $req->description ?? '')); ?></textarea>
-    <?php $__errorArgs = ['description'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?>
-      <p id="description_error" class="mt-1 text-sm text-rose-600"><?php echo e($message); ?></p>
-    <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>
   </div>
+<?php $__env->stopSection(); ?>
 
-  
-  <div>
-    <label for="priority" class="block text-sm font-medium text-slate-700">
-      Priority <span class="text-rose-600" aria-hidden="true">*</span>
-    </label>
-    <select
-      id="priority"
-      name="priority"
-      required
-      class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-emerald-600 focus:ring-emerald-600
-             <?php $__errorArgs = ['priority'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> border-rose-400 ring-rose-200 <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>"
-      aria-invalid="<?php $__errorArgs = ['priority'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> true <?php else: ?> false <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>"
-      aria-describedby="<?php $__errorArgs = ['priority'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> priority_error <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>"
-    >
-      <?php $priorityValue = old('priority', $req->priority ?? 'medium'); ?>
-      <?php $__currentLoopData = $priorities; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $k => $label): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-        <option value="<?php echo e($k); ?>" <?php if($priorityValue === $k): echo 'selected'; endif; ?>><?php echo e($label); ?></option>
-      <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-    </select>
-    <?php $__errorArgs = ['priority'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?>
-      <p id="priority_error" class="mt-1 text-sm text-rose-600"><?php echo e($message); ?></p>
-    <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>
-  </div>
-</div>
-<?php /**PATH C:\Users\Developer\development\Asset-Repair-Management-System\resources\views/maintenance/requests/form.blade.php ENDPATH**/ ?>
+<?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\Users\Developer\development\Asset-Repair-Management-System\resources\views/maintenance/requests/form.blade.php ENDPATH**/ ?>

@@ -9,20 +9,13 @@ use App\Http\Controllers\Auth\PasswordController;
 
 // App Modules (Web)
 use App\Http\Controllers\MaintenanceRequestController;
-use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\MaintenanceLogController;
 use App\Http\Controllers\Repair\DashboardController as RepairDashboardController;
 
-require __DIR__.'/auth.php';
+use App\Http\Controllers\ChatController;
+use App\Http\Controllers\AssetController;
 
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-| - หน้าเว็บ (Blade) ทั้งหมดอยู่ที่นี่
-| - API แยกไปที่ routes/api.php แล้ว
-*/
-
+// หน้าแรกชี้ไปหน้า login สำหรับ guest
 Route::redirect('/', '/login');
 
 // ---------------------
@@ -46,27 +39,20 @@ Route::middleware(['auth'])->group(function () {
     // Password
     Route::put('/password', [PasswordController::class, 'update'])->name('password.update');
 
-    // Dashboard (ซ่อนของเดิม ชี้เข้า Repair Dashboard)
+    // Repair Dashboard
     Route::get('/repair/dashboard', [RepairDashboardController::class, 'index'])->name('repair.dashboard');
+    // Dashboard ของระบบเดิมให้รีไดเรกต์มาหน้านี้ (สลับเป็น assets.index ได้ตามต้องการ)
     Route::get('/dashboard', fn () => redirect()->route('repair.dashboard'))->name('dashboard');
 
-    /*
-    |--------------------------------------------------------------------------
-    | Maintenance Requests (WEB)
-    |--------------------------------------------------------------------------
-    | NOTE:
-    | - ชื่อ route ต้องตรงกับที่ Blade ใช้: maintenance.requests.*
-    | - Controller method ใช้เมธอดมาตรฐาน + 2 เมธอดพิเศษสำหรับหน้าเว็บ
-    |     - transition()         : โพสต์เปลี่ยนสถานะจากฟอร์ม
-    |     - AttachmentController@storeForRequest : อัปโหลดไฟล์จากฟอร์ม
-    */
+    // ---------------------
+    // Maintenance Requests (Blade)
+    // ---------------------
     Route::prefix('maintenance')->name('maintenance.')->group(function () {
         Route::prefix('requests')->name('requests.')->group(function () {
-
             // หน้าเว็บ (Blade)
-            Route::get('/',        [MaintenanceRequestController::class, 'indexPage'])->name('index');
-            Route::get('/create',  [MaintenanceRequestController::class, 'createPage'])->name('create');
-            Route::get('/{req}',   [MaintenanceRequestController::class, 'showPage'])->name('show');
+            Route::get('/',       [MaintenanceRequestController::class, 'indexPage'])->name('index');
+            Route::get('/create', [MaintenanceRequestController::class, 'createPage'])->name('create');
+            Route::get('/{req}',  [MaintenanceRequestController::class, 'showPage'])->name('show');
 
             // submit จากฟอร์ม create
             Route::post('/', [MaintenanceRequestController::class, 'store'])->name('store');
@@ -75,17 +61,35 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/{req}/transition',  [MaintenanceRequestController::class, 'transitionFromBlade'])->name('transition');
             Route::post('/{req}/attachments', [MaintenanceRequestController::class, 'uploadAttachmentFromBlade'])->name('attachments');
 
-            // (ถ้าจะมีหน้า logs บนเว็บ)
+            // (ถ้ามีหน้า logs)
             Route::get('/{req}/logs', [MaintenanceLogController::class, 'index'])->name('logs');
         });
     });
 
-    // (ทางเลือก) เมนูอื่น ๆ ให้มีปลายทางก่อน จะค่อยทำภายหลังก็ได้
-    Route::prefix('assets')->name('assets.')->group(function () {
-        Route::view('/', 'assets.index')->name('index'); // สร้างไฟล์ resources/views/assets/index.blade.php ไว้ก่อน
-    });
+    // ---------------------
+    // Chat (Blade + polling JSON แบบง่าย)
+    // ---------------------
+    Route::get('/chat',                           [ChatController::class, 'index'])->name('chat.index');
+    Route::post('/chat/threads',                  [ChatController::class, 'storeThread'])->name('chat.store');
+    Route::get('/chat/threads/{thread}',          [ChatController::class, 'show'])->name('chat.show');
+    Route::get('/chat/threads/{thread}/messages', [ChatController::class, 'messages'])->name('chat.messages');
+    Route::post('/chat/threads/{thread}/messages',[ChatController::class, 'storeMessage'])->name('chat.messages.store');
 
+    // ---------------------
+    // Assets (Blade) — resource ครบ: index/create/store/show/edit/update/destroy
+    // ---------------------
+    Route::get('/assets', [AssetController::class, 'index'])->name('assets.index');
+    Route::post('/assets', [AssetController::class, 'store'])->name('assets.store');
+    Route::get('/assets/{asset}', [AssetController::class, 'show'])->name('assets.show');
+    Route::put('/assets/{asset}', [AssetController::class, 'update'])->name('assets.update');
+    Route::delete('/assets/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
+    // ---------------------
+    // Users (placeholder สำหรับหน้า Users)
+    // ---------------------
     Route::prefix('users')->name('users.')->group(function () {
-        Route::view('/', 'users.index')->name('index');   // สร้างไฟล์ resources/views/users/index.blade.php ไว้ก่อน
+        Route::view('/', 'users.index')->name('index'); // สร้าง resources/views/users/index.blade.php ไว้ก่อน
     });
 });
+
+// auth routes (login/logout/forgot...) จาก Breeze/Fortify/Jetstream ฯลฯ
+require __DIR__ . '/auth.php';
