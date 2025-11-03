@@ -8,47 +8,60 @@ use Illuminate\Validation\Rule;
 
 class AssetController extends Controller
 {
+    private function jsonOptions(Request $request): int
+    {
+        return JSON_UNESCAPED_UNICODE
+             | JSON_UNESCAPED_SLASHES
+             | ($request->boolean('pretty') ? JSON_PRETTY_PRINT : 0);
+    }
+
     public function index(Request $request)
     {
-        $q            = trim($request->string('q')->toString());
-        $status       = $request->string('status')->toString();
-        $type         = $request->string('type')->toString();
-        $category     = $request->string('category')->toString();        // legacy string
-        $categoryId   = $request->integer('category_id');                // FK
-        $deptId       = $request->integer('department_id');
-        $location     = $request->string('location')->toString();
+        $q          = trim($request->string('q')->toString());
+        $status     = $request->string('status')->toString();
+        $type       = $request->string('type')->toString();
+        $category   = $request->string('category')->toString();    // legacy string
+        $categoryId = $request->integer('category_id');            // FK
+        $deptId     = $request->integer('department_id');
+        $location   = $request->string('location')->toString();
 
         $perPageInput = (int) $request->integer('per_page', 20);
         $perPage      = max(1, min($perPageInput, 100));
 
-        $sortBy  = $request->string('sort_by', 'id')->toString();
-        $sortDir = strtolower($request->string('sort_dir', 'desc')->toString()) === 'asc' ? 'asc' : 'desc';
-
-        $allowedSort = ['id','asset_code','name','purchase_date','warranty_expire','status','created_at'];
-        if (!in_array($sortBy, $allowedSort, true)) {
-            $sortBy = 'id';
-        }
+        // map คอลัมน์ให้ชัดเจน
+        $sortMap = [
+            'id'              => 'id',
+            'asset_code'      => 'asset_code',
+            'name'            => 'name',
+            'purchase_date'   => 'purchase_date',
+            'warranty_expire' => 'warranty_expire',
+            'status'          => 'status',
+            'created_at'      => 'created_at',
+        ];
+        $sortByReq = $request->string('sort_by', 'id')->toString();
+        $sortBy    = $sortMap[$sortByReq] ?? 'id';
+        $sortDir   = strtolower($request->string('sort_dir', 'desc')->toString()) === 'asc' ? 'asc' : 'desc';
 
         $assets = Asset::query()
             ->with(['categoryRef','department'])
-            ->when($q, fn($s) =>
+            ->when($q !== '', fn($s) =>
                 $s->where(function ($w) use ($q) {
                     $w->where('asset_code', 'like', "%{$q}%")
                       ->orWhere('name', 'like', "%{$q}%")
                       ->orWhere('serial_number', 'like', "%{$q}%");
                 })
             )
-            ->when($status, fn($s) => $s->where('status', $status))
-            ->when($type, fn($s) => $s->where('type', $type))
-            ->when($category, fn($s) => $s->where('category', $category))
-            ->when($categoryId, fn($s) => $s->where('category_id', $categoryId))
-            ->when($deptId, fn($s) => $s->where('department_id', $deptId))
-            ->when($location, fn($s) => $s->where('location', $location))
+            ->when($status !== '', fn($s) => $s->where('status', $status))
+            ->when($type !== '', fn($s) => $s->where('type', $type))
+            ->when($category !== '', fn($s) => $s->where('category', $category))
+            ->when(filled($categoryId), fn($s) => $s->where('category_id', $categoryId))
+            ->when(filled($deptId), fn($s) => $s->where('department_id', $deptId))
+            ->when($location !== '', fn($s) => $s->where('location', $location))
             ->orderBy($sortBy, $sortDir)
-            ->paginate($perPage);
+            ->paginate($perPage)
+            ->withQueryString(); // คง query เดิมในลิงก์ถัดไป
 
-        $options = JSON_UNESCAPED_UNICODE | ($request->boolean('pretty') ? JSON_PRETTY_PRINT : 0);
-        return response()->json($assets, 200, [], $options);
+        return response()->json($assets, 200, [], $this->jsonOptions($request));
     }
 
     public function store(Request $request)
@@ -57,7 +70,7 @@ class AssetController extends Controller
             'asset_code'      => ['required','string','max:100','unique:assets,asset_code'],
             'name'            => ['required','string','max:255'],
             'type'            => ['nullable','string','max:100'],
-            'category'        => ['nullable','string','max:100'],               // legacy string
+            'category'        => ['nullable','string','max:100'], // legacy
             'category_id'     => ['nullable','integer','exists:asset_categories,id'],
             'brand'           => ['nullable','string','max:100'],
             'model'           => ['nullable','string','max:100'],
@@ -69,20 +82,18 @@ class AssetController extends Controller
             'status'          => ['nullable', Rule::in(['active','in_repair','disposed'])],
         ]);
 
-        $asset = Asset::create($data);
+        $asset = Asset::create($data)->load(['categoryRef','department']);
 
-        $options = JSON_UNESCAPED_UNICODE | ($request->boolean('pretty') ? JSON_PRETTY_PRINT : 0);
         return response()->json([
             'message' => 'created',
-            'data'    => $asset->load(['categoryRef','department']),
-        ], 201, [], $options);
+            'data'    => $asset,
+        ], 201, [], $this->jsonOptions($request));
     }
 
     public function show(Asset $asset)
     {
         $asset->load(['categoryRef','department']);
-        $options = JSON_UNESCAPED_UNICODE | (request()->boolean('pretty') ? JSON_PRETTY_PRINT : 0);
-        return response()->json($asset, 200, [], $options);
+        return response()->json($asset, 200, [], $this->jsonOptions(request()));
     }
 
     public function update(Request $request, Asset $asset)
@@ -91,7 +102,7 @@ class AssetController extends Controller
             'asset_code'      => ['sometimes','string','max:100','unique:assets,asset_code,'.$asset->id],
             'name'            => ['sometimes','string','max:255'],
             'type'            => ['nullable','string','max:100'],
-            'category'        => ['nullable','string','max:100'],               // legacy string
+            'category'        => ['nullable','string','max:100'], // legacy
             'category_id'     => ['nullable','integer','exists:asset_categories,id'],
             'brand'           => ['nullable','string','max:100'],
             'model'           => ['nullable','string','max:100'],
@@ -105,17 +116,71 @@ class AssetController extends Controller
 
         $asset->update($data);
 
-        $options = JSON_UNESCAPED_UNICODE | ($request->boolean('pretty') ? JSON_PRETTY_PRINT : 0);
         return response()->json([
             'message' => 'updated',
             'data'    => $asset->load(['categoryRef','department']),
-        ], 200, [], $options);
+        ], 200, [], $this->jsonOptions($request));
     }
 
     public function destroy(Asset $asset)
     {
         $asset->delete();
-        $options = JSON_UNESCAPED_UNICODE | (request()->boolean('pretty') ? JSON_PRETTY_PRINT : 0);
-        return response()->json(['message' => 'deleted'], 200, [], $options);
+        return response()->json(['message' => 'deleted'], 200, [], $this->jsonOptions(request()));
     }
+
+    // === ส่วนหน้าเว็บ (Blade Pages) ===
+    public function indexPage(Request $request)
+    {
+        $q = trim($request->string('q')->toString());
+        $status   = $request->string('status')->toString();
+        $category = $request->string('category')->toString();
+        $sortBy   = $request->string('sort_by', 'id')->toString();
+        $sortDir  = strtolower($request->string('sort_dir', 'desc')->toString()) === 'asc' ? 'asc' : 'desc';
+
+        // map คอลัมน์ที่อนุญาต
+        $sortMap = [
+            'id'         => 'id',
+            'asset_code' => 'asset_code',
+            'name'       => 'name',
+            'category'   => 'category',
+            'status'     => 'status',
+        ];
+        $sortCol = $sortMap[$sortBy] ?? 'id';
+
+        $assets = \App\Models\Asset::query()
+            ->with(['categoryRef','department'])
+            ->when($q !== '', fn($s) =>
+                $s->where(function ($w) use ($q) {
+                    $w->where('asset_code', 'like', "%{$q}%")
+                    ->orWhere('name', 'like', "%{$q}%")
+                    ->orWhere('serial_number', 'like', "%{$q}%");
+                })
+            )
+            ->when($status !== '', fn($s) => $s->where('status', $status))
+            ->when($category !== '', fn($s) => $s->where('category', $category))
+            ->orderBy($sortCol, $sortDir)
+            ->paginate(20)
+            ->withQueryString();
+
+    return view('assets.index', compact('assets'));
+    }
+
+    public function createPage()
+    {
+        // ถ้าต้องการ dropdown category/department ก็โหลดมาเพิ่มตรงนี้ได้
+        return view('assets.create');
+    }
+
+    public function showPage(\App\Models\Asset $asset)
+    {
+        $asset->load(['categoryRef','department']);
+        return view('assets.show', compact('asset'));
+    }
+
+    public function editPage(\App\Models\Asset $asset)
+    {
+        $asset->load(['categoryRef','department']);
+        return view('assets.edit', compact('asset'));
+    }
+
 }

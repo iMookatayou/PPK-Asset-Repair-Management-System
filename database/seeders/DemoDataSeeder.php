@@ -16,7 +16,7 @@ class DemoDataSeeder extends Seeder
     {
         // ============= Tuning =============
         DB::connection()->disableQueryLog();          // กันเมมบวม
-        $countRequests = (int) env('DEMO_SEED_COUNT', 300);
+        $countRequests = (int) env('DEMO_SEED_COUNT', 100);
         $assetCount    = (int) env('DEMO_ASSET_COUNT', rand(80,120));
         $chunkSize     = 500;                         // ปรับได้: 200–1000
         // ==================================

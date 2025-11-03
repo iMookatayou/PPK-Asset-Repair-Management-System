@@ -3,7 +3,6 @@
 
 @section('page-header')
   <div class="flex items-center justify-between">
-    <h1 class="text-xl font-semibold">Assets</h1>
     <a href="{{ route('assets.create') }}"
        class="inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500">
       + New Asset

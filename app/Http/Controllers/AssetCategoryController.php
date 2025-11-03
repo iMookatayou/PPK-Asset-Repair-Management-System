@@ -50,7 +50,6 @@ class AssetCategoryController extends Controller
             'is_active' => 'boolean',
         ]);
         $data['slug'] = $data['slug'] ?: Str::slug($data['name']);
-
         $asset_category->update($data);
 
         return redirect()->route('asset-categories.index')->with('status', 'Category updated.');
