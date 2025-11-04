@@ -57,4 +57,12 @@ class ProfileController extends Controller
 
         return Redirect::to('/');
     }
+    public function show(Request $request): View
+    {
+        $user = $request->user();
+
+        // ถ้ายังไม่มีสถิติอื่น ใช้แค่ user ไปก่อน
+        // (ภายหลังจะใส่สถิติ my-jobs / created-requests ได้)
+        return view('profile.show', compact('user'));
+    }
 }

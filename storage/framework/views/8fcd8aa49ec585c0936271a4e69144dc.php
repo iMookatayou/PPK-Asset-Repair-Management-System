@@ -36,7 +36,16 @@ unset($__defined_vars, $__key, $__value); ?>
     'briefcase'   => '<path d="M3 7h18v13H3z"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/>',
     'users'       => '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 1 1 0 7.75"/>',
     'user'        => '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+
+    'inbox' => '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 12h6l2 3h4l2-3h6"/>',
+
+    'clipboard-list' => '<rect x="6" y="6" width="12" height="14" rx="2"/><path d="M9 6h6v4H9z"/><path d="M9 13h6"/><path d="M9 17h6"/>',
+
+    'hard-hat' => '<path d="M2 18h20"/><path d="M10 18v-2a2 2 0 0 1 2-2 2 2 0 0 1 2 2v2"/><path d="M4 18v-4a8 8 0 1 1 16 0v4"/><path d="M10 10V5a2 2 0 1 1 4 0v5"/>',
+
+    'hammer' => '<path d="M15 12l-8.6-8.6a2 2 0 0 1 2.8-2.8L17 9l-2 2 6 6-2 2-6-6-2 2z"/><path d="M2 22h6"/>',
   ];
+
   $paths = $icons[$name] ?? null;
 ?>
 

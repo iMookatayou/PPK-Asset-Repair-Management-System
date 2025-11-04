@@ -1,11 +1,11 @@
-{{-- resources/views/chat/index.blade.php --}}
-@extends('layouts.app')
-@section('title','Community Chat')
 
-@section('content')
+
+<?php $__env->startSection('title','Community Chat'); ?>
+
+<?php $__env->startSection('content'); ?>
 <div class="max-w-5xl mx-auto py-6 space-y-5">
 
-  {{-- Header --}}
+  
   <div class="rounded-xl border bg-base-100/80 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-base-100/60">
     <div class="px-4 md:px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
       <div class="flex items-center gap-3">
@@ -21,12 +21,12 @@
         </div>
       </div>
 
-      {{-- Search --}}
+      
       <form method="GET"
             class="group flex items-stretch rounded-xl border border-slate-300 bg-white shadow-sm
                     focus-within:ring-2 focus-within:ring-[#0E2B51]">
         <input name="q"
-                value="{{ request('q','') }}"
+                value="<?php echo e(request('q','')); ?>"
                 placeholder="ค้นหากระทู้..."
                 class="flex-1 px-3 h-10 text-sm bg-transparent outline-none border-0 rounded-l-xl">
 
@@ -40,25 +40,32 @@
         <div class="h-px bg-gradient-to-r from-transparent via-base-200 to-transparent"></div>
     </div>
 
-  {{-- Create Thread --}}
+  
   <div class="card bg-base-100 border">
     <div class="card-body gap-3">
       <div class="flex items-center justify-between">
         <div class="text-sm text-base-content/70">Create a new thread</div>
       </div>
-      <form method="POST" action="{{ route('chat.store') }}" class="space-y-3">
-        @csrf
+      <form method="POST" action="<?php echo e(route('chat.store')); ?>" class="space-y-3">
+        <?php echo csrf_field(); ?>
         <input
           name="title"
           required
           maxlength="180"
           class="input input-bordered w-full"
           placeholder='Ask anything, e.g. "How to choose a reliable night-shift printer?"'
-          value="{{ old('title') }}"
+          value="<?php echo e(old('title')); ?>"
         >
-        @error('title')
-          <p class="text-sm text-error">{{ $message }}</p>
-        @enderror
+        <?php $__errorArgs = ['title'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+          <p class="text-sm text-error"><?php echo e($message); ?></p>
+        <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
         <div class="text-right">
           <button class="btn btn-success text-white">Post</button>
         </div>
@@ -66,19 +73,20 @@
     </div>
   </div>
 
-  {{-- Threads List --}}
+  
   <div class="card bg-base-100 border">
     <div class="card-body p-0">
       <div class="px-4 py-3 border-b text-sm font-medium">Latest Threads</div>
 
       <div class="divide-y">
-        @forelse($threads as $th)
-          <a href="{{ route('chat.show',$th) }}" class="block px-4 py-3 hover:bg-base-200/40">
+        <?php $__empty_1 = true; $__currentLoopData = $threads; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $th): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+          <a href="<?php echo e(route('chat.show',$th)); ?>" class="block px-4 py-3 hover:bg-base-200/40">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
-                <div class="font-medium line-clamp-1">{{ $th->title }}</div>
+                <div class="font-medium line-clamp-1"><?php echo e($th->title); ?></div>
                 <div class="text-xs opacity-70">
-                  by {{ $th->author->name }} • {{ $th->created_at->diffForHumans() }}
+                  by <?php echo e($th->author->name); ?> • <?php echo e($th->created_at->diffForHumans()); ?>
+
                 </div>
               </div>
               <div class="shrink-0 text-base-content/50">
@@ -88,7 +96,7 @@
               </div>
             </div>
           </a>
-        @empty
+        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
           <div class="p-8 text-center">
             <div class="mx-auto mb-3 size-10 grid place-items-center rounded-full bg-base-200/60">
               <svg xmlns="http://www.w3.org/2000/svg" class="size-5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -99,16 +107,19 @@
             <div class="font-medium">No threads yet</div>
             <p class="text-sm opacity-70">Be the first to start a conversation.</p>
           </div>
-        @endforelse
+        <?php endif; ?>
       </div>
 
       <div class="p-3">
         <div class="flex justify-center">
-          {{ $threads->withQueryString()->links() }}
+          <?php echo e($threads->withQueryString()->links()); ?>
+
         </div>
       </div>
     </div>
   </div>
 
 </div>
-@endsection
+<?php $__env->stopSection(); ?>
+
+<?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\Users\Developer\development\Asset-Repair-Management-System\resources\views/chat/index.blade.php ENDPATH**/ ?>

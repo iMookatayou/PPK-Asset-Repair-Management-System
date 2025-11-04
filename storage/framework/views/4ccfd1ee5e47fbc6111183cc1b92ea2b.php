@@ -1,180 +1,113 @@
 
 <?php
-  $is = fn($p) => request()->routeIs($p);
+  use Illuminate\Support\Facades\Route;
 
-  $base = 'flex items-center gap-3 pl-1 pr-2 h-10 rounded-md transition-all duration-150 font-medium relative';
+  $is   = fn($p) => request()->routeIs($p);
+
+  $base = 'group flex items-center gap-3 pl-1 pr-2 h-10 rounded-md transition-all duration-150 font-medium relative';
   $off  = 'text-zinc-600 hover:text-emerald-600';
   $on   = 'text-emerald-600 font-semibold';
+
+  $dot  = fn($active) => 'w-1.5 h-7 rounded-full bg-emerald-500 transition-all '.($active ? 'opacity-100' : 'opacity-0 group-hover:opacity-60');
+  $ico  = fn($active) => 'w-4 h-4 '.($active ? 'text-emerald-600' : 'text-zinc-500 group-hover:text-emerald-600');
+
+  // helper: safe link (render <a> เฉพาะเมื่อมี route ชื่อนั้น)
+  $rl = function(string $name, string $fallbackUrl = '#') {
+    return Route::has($name) ? route($name) : $fallbackUrl;
+  };
 ?>
 
 <nav class="px-3 py-4 space-y-1 overflow-hidden">
 
   
   <?php $active = $is('repair.dashboard'); ?>
-  <a href="<?php echo e(route('repair.dashboard')); ?>" class="<?php echo e($base); ?> <?php echo e($active ? $on : $off); ?>">
-    <span class="w-1.5 h-7 rounded-full bg-emerald-500 transition-all
-      <?php echo e($active ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'); ?>"></span>
-
+  <a href="<?php echo e($rl('repair.dashboard', url('/'))); ?>" class="<?php echo e($base); ?> <?php echo e($active ? $on : $off); ?>">
+    <span class="<?php echo e($dot($active)); ?>"></span>
     <span class="w-8 h-8 flex items-center justify-center">
-      <?php if (isset($component)) { $__componentOriginalbb2de5a19350412a96a4922f84030513 = $component; } ?>
-<?php if (isset($attributes)) { $__attributesOriginalbb2de5a19350412a96a4922f84030513 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.app-icon','data' => ['name' => 'bar-chart-3','class' => 'w-4 h-4 
-      '.e($active ? 'text-emerald-600' : 'text-zinc-500 group-hover:text-emerald-600').'']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
-<?php $component->withName('app-icon'); ?>
-<?php if ($component->shouldRender()): ?>
-<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
-<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
-<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
-<?php endif; ?>
-<?php $component->withAttributes(['name' => 'bar-chart-3','class' => 'w-4 h-4 
-      '.e($active ? 'text-emerald-600' : 'text-zinc-500 group-hover:text-emerald-600').'']); ?>
-<?php echo $__env->renderComponent(); ?>
-<?php endif; ?>
-<?php if (isset($__attributesOriginalbb2de5a19350412a96a4922f84030513)): ?>
-<?php $attributes = $__attributesOriginalbb2de5a19350412a96a4922f84030513; ?>
-<?php unset($__attributesOriginalbb2de5a19350412a96a4922f84030513); ?>
-<?php endif; ?>
-<?php if (isset($__componentOriginalbb2de5a19350412a96a4922f84030513)): ?>
-<?php $component = $__componentOriginalbb2de5a19350412a96a4922f84030513; ?>
-<?php unset($__componentOriginalbb2de5a19350412a96a4922f84030513); ?>
-<?php endif; ?>
+      
+      <svg class="<?php echo e($ico($active)); ?>" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7" rx="1"/><rect x="12" y="6" width="3" height="11" rx="1"/><rect x="17" y="13" width="3" height="4" rx="1"/></svg>
     </span>
-
-    <span class="truncate"><?php echo e($active ? 'Dashboard' : 'Dashboard'); ?></span>
+    <span class="truncate">Dashboard</span>
   </a>
 
   
   <?php $active = $is('maintenance.requests*'); ?>
-  <a href="<?php echo e(route('maintenance.requests.index')); ?>" class="<?php echo e($base); ?> <?php echo e($active ? $on : $off); ?>">
-    <span class="w-1.5 h-7 rounded-full bg-emerald-500 
-      <?php echo e($active ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'); ?>"></span>
-
+  <a href="<?php echo e($rl('maintenance.requests.index', url('/maintenance/requests'))); ?>" class="<?php echo e($base); ?> <?php echo e($active ? $on : $off); ?>">
+    <span class="<?php echo e($dot($active)); ?>"></span>
     <span class="w-8 h-8 flex items-center justify-center">
-      <?php if (isset($component)) { $__componentOriginalbb2de5a19350412a96a4922f84030513 = $component; } ?>
-<?php if (isset($attributes)) { $__attributesOriginalbb2de5a19350412a96a4922f84030513 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.app-icon','data' => ['name' => 'wrench','class' => 'w-4 h-4 
-      '.e($active ? 'text-emerald-600' : 'text-zinc-500 group-hover:text-emerald-600').'']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
-<?php $component->withName('app-icon'); ?>
-<?php if ($component->shouldRender()): ?>
-<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
-<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
-<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
-<?php endif; ?>
-<?php $component->withAttributes(['name' => 'wrench','class' => 'w-4 h-4 
-      '.e($active ? 'text-emerald-600' : 'text-zinc-500 group-hover:text-emerald-600').'']); ?>
-<?php echo $__env->renderComponent(); ?>
-<?php endif; ?>
-<?php if (isset($__attributesOriginalbb2de5a19350412a96a4922f84030513)): ?>
-<?php $attributes = $__attributesOriginalbb2de5a19350412a96a4922f84030513; ?>
-<?php unset($__attributesOriginalbb2de5a19350412a96a4922f84030513); ?>
-<?php endif; ?>
-<?php if (isset($__componentOriginalbb2de5a19350412a96a4922f84030513)): ?>
-<?php $component = $__componentOriginalbb2de5a19350412a96a4922f84030513; ?>
-<?php unset($__componentOriginalbb2de5a19350412a96a4922f84030513); ?>
-<?php endif; ?>
+      
+      <svg class="<?php echo e($ico($active)); ?>" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a4.5 4.5 0 1 0-6.36 6.36l8.49 8.49a2 2 0 0 0 2.83-2.83l-8.49-8.49z"/><path d="m8 8 3 3"/></svg>
     </span>
-
     <span class="truncate">Repair Jobs</span>
   </a>
 
   
-  <?php $active = request()->routeIs('assets.*'); ?>
-  <a href="<?php echo e(route('assets.index')); ?>" class="<?php echo e($base); ?> <?php echo e($active ? $on : $off); ?>">
-    <span class="w-1.5 h-7 rounded-full bg-emerald-500 
-      <?php echo e($active ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'); ?>"></span>
-
+  <?php $active = $is('repairs.queue'); ?>
+  <a href="<?php echo e($rl('repairs.queue', url('/repairs/queue'))); ?>" class="<?php echo e($base); ?> <?php echo e($active ? $on : $off); ?>">
+    <span class="<?php echo e($dot($active)); ?>"></span>
     <span class="w-8 h-8 flex items-center justify-center">
-      <?php if (isset($component)) { $__componentOriginalbb2de5a19350412a96a4922f84030513 = $component; } ?>
-<?php if (isset($attributes)) { $__attributesOriginalbb2de5a19350412a96a4922f84030513 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.app-icon','data' => ['name' => 'briefcase','class' => 'w-4 h-4 
-      '.e($active ? 'text-emerald-600' : 'text-zinc-500 group-hover:text-emerald-600').'']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
-<?php $component->withName('app-icon'); ?>
-<?php if ($component->shouldRender()): ?>
-<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
-<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
-<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
-<?php endif; ?>
-<?php $component->withAttributes(['name' => 'briefcase','class' => 'w-4 h-4 
-      '.e($active ? 'text-emerald-600' : 'text-zinc-500 group-hover:text-emerald-600').'']); ?>
-<?php echo $__env->renderComponent(); ?>
-<?php endif; ?>
-<?php if (isset($__attributesOriginalbb2de5a19350412a96a4922f84030513)): ?>
-<?php $attributes = $__attributesOriginalbb2de5a19350412a96a4922f84030513; ?>
-<?php unset($__attributesOriginalbb2de5a19350412a96a4922f84030513); ?>
-<?php endif; ?>
-<?php if (isset($__componentOriginalbb2de5a19350412a96a4922f84030513)): ?>
-<?php $component = $__componentOriginalbb2de5a19350412a96a4922f84030513; ?>
-<?php unset($__componentOriginalbb2de5a19350412a96a4922f84030513); ?>
-<?php endif; ?>
+      
+      <svg class="<?php echo e($ico($active)); ?>" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5h13.1a2 2 0 0 1 1.93 1.52L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6l1.52-5.48A2 2 0 0 1 5.45 5z"/></svg>
     </span>
+    <span class="truncate">Repair Queue</span>
+  </a>
 
+  
+  <?php $active = $is('repairs.my_jobs'); ?>
+  <a href="<?php echo e($rl('repairs.my_jobs', url('/repairs/my-jobs'))); ?>" class="<?php echo e($base); ?> <?php echo e($active ? $on : $off); ?>">
+    <span class="<?php echo e($dot($active)); ?>"></span>
+    <span class="w-8 h-8 flex items-center justify-center">
+      
+      <svg class="<?php echo e($ico($active)); ?>" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="4" width="8" height="4" rx="1"/><path d="M9 12h6M9 16h6"/><rect x="4" y="4" width="16" height="18" rx="2"/></svg>
+    </span>
+    <span class="truncate">My Jobs</span>
+  </a>
+
+  
+  <?php $active = $is('assets.*'); ?>
+  <a href="<?php echo e($rl('assets.index', url('/assets'))); ?>" class="<?php echo e($base); ?> <?php echo e($active ? $on : $off); ?>">
+    <span class="<?php echo e($dot($active)); ?>"></span>
+    <span class="w-8 h-8 flex items-center justify-center">
+      
+      <svg class="<?php echo e($ico($active)); ?>" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><path d="M2 13h20"/></svg>
+    </span>
     <span class="truncate">Assets</span>
   </a>
 
   
-  <?php $active = $is('users.*'); ?>
-  <a href="<?php echo e(route('users.index')); ?>" class="<?php echo e($base); ?> <?php echo e($active ? $on : $off); ?>">
-    <span class="w-1.5 h-7 rounded-full bg-emerald-500 
-      <?php echo e($active ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'); ?>"></span>
-
+  <?php $active = $is('chat.*'); ?>
+  <a href="<?php echo e($rl('chat.index', url('/chat'))); ?>" class="<?php echo e($base); ?> <?php echo e($active ? $on : $off); ?>">
+    <span class="<?php echo e($dot($active)); ?>"></span>
     <span class="w-8 h-8 flex items-center justify-center">
-      <?php if (isset($component)) { $__componentOriginalbb2de5a19350412a96a4922f84030513 = $component; } ?>
-<?php if (isset($attributes)) { $__attributesOriginalbb2de5a19350412a96a4922f84030513 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.app-icon','data' => ['name' => 'users','class' => 'w-4 h-4 
-      '.e($active ? 'text-emerald-600' : 'text-zinc-500 group-hover:text-emerald-600').'']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
-<?php $component->withName('app-icon'); ?>
-<?php if ($component->shouldRender()): ?>
-<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
-<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
-<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
-<?php endif; ?>
-<?php $component->withAttributes(['name' => 'users','class' => 'w-4 h-4 
-      '.e($active ? 'text-emerald-600' : 'text-zinc-500 group-hover:text-emerald-600').'']); ?>
-<?php echo $__env->renderComponent(); ?>
-<?php endif; ?>
-<?php if (isset($__attributesOriginalbb2de5a19350412a96a4922f84030513)): ?>
-<?php $attributes = $__attributesOriginalbb2de5a19350412a96a4922f84030513; ?>
-<?php unset($__attributesOriginalbb2de5a19350412a96a4922f84030513); ?>
-<?php endif; ?>
-<?php if (isset($__componentOriginalbb2de5a19350412a96a4922f84030513)): ?>
-<?php $component = $__componentOriginalbb2de5a19350412a96a4922f84030513; ?>
-<?php unset($__componentOriginalbb2de5a19350412a96a4922f84030513); ?>
-<?php endif; ?>
+      
+      <svg class="<?php echo e($ico($active)); ?>" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 0 1-4 4H7l-4 4V5a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
     </span>
+    <span class="truncate">Livechat</span>
+  </a>
 
+  
+  <?php $active = $is('admin.users.*'); ?>
+  <a href="<?php echo e($rl('admin.users.index', url('/admin/users'))); ?>" class="<?php echo e($base); ?> <?php echo e($active ? $on : $off); ?>">
+    <span class="<?php echo e($dot($active)); ?>"></span>
+    <span class="w-8 h-8 flex items-center justify-center">
+      
+      <svg class="<?php echo e($ico($active)); ?>" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </span>
     <span class="truncate">Users</span>
   </a>
 
   
-  <?php $active = $is('chat.*'); ?>
-    <a href="<?php echo e(route('chat.index')); ?>" class="<?php echo e($base); ?> <?php echo e($active ? $on : $off); ?>">
-      <span class="w-1.5 h-7 rounded-full bg-emerald-500 
-        <?php echo e($active ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'); ?>"></span>
+  <?php $active = $is('users.*'); ?>
+  <a href="<?php echo e($rl('users.index', url('/users'))); ?>" class="<?php echo e($base); ?> <?php echo e($active ? $on : $off); ?>">
+    <span class="<?php echo e($dot($active)); ?>"></span>
+    <span class="w-8 h-8 flex items-center justify-center">
+      <svg class="<?php echo e($ico($active)); ?>" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        <path d="M9 11l2 2 4-4"/>
+      </svg>
+    </span>
+    <span class="truncate">Manage Users</span>
+  </a>
 
-      <span class="w-8 h-8 flex items-center justify-center">
-        <?php if (isset($component)) { $__componentOriginal643fe1b47aec0b76658e1a0200b34b2c = $component; } ?>
-<?php if (isset($attributes)) { $__attributesOriginal643fe1b47aec0b76658e1a0200b34b2c = $attributes; } ?>
-<?php $component = BladeUI\Icons\Components\Svg::resolve([] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
-<?php $component->withName('si-codenewbie'); ?>
-<?php if ($component->shouldRender()): ?>
-<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
-<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
-<?php $attributes = $attributes->except(\BladeUI\Icons\Components\Svg::ignoredParameterNames()); ?>
-<?php endif; ?>
-<?php $component->withAttributes(['class' => 'w-4 h-4 
-          '.e($active ? 'text-emerald-600' : 'text-zinc-500 group-hover:text-emerald-600').'']); ?>
-<?php echo $__env->renderComponent(); ?>
-<?php endif; ?>
-<?php if (isset($__attributesOriginal643fe1b47aec0b76658e1a0200b34b2c)): ?>
-<?php $attributes = $__attributesOriginal643fe1b47aec0b76658e1a0200b34b2c; ?>
-<?php unset($__attributesOriginal643fe1b47aec0b76658e1a0200b34b2c); ?>
-<?php endif; ?>
-<?php if (isset($__componentOriginal643fe1b47aec0b76658e1a0200b34b2c)): ?>
-<?php $component = $__componentOriginal643fe1b47aec0b76658e1a0200b34b2c; ?>
-<?php unset($__componentOriginal643fe1b47aec0b76658e1a0200b34b2c); ?>
-<?php endif; ?>
-      </span>
-
-      <span class="truncate">Livechat</span>
-    </a>
-</nav><?php /**PATH C:\Users\Developer\development\Asset-Repair-Management-System\resources\views/components/sidebar.blade.php ENDPATH**/ ?>
+</nav>
+<?php /**PATH C:\Users\Developer\development\Asset-Repair-Management-System\resources\views/components/sidebar.blade.php ENDPATH**/ ?>
