@@ -1,135 +1,216 @@
-{{-- resources/views/chat/index.blade.php --}}
+{{-- resources/views/repairs/my_jobs.blade.php --}}
 @extends('layouts.app')
-@section('title','Community Chat')
+@section('title','My Repair Jobs')
 
 @section('content')
-<div class="max-w-5xl mx-auto py-6 space-y-5">
+@php
+  use Illuminate\Support\Str;
 
-  {{-- Header --}}
-  <div class="rounded-xl border bg-white/80 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/60">
-    <div class="px-4 md:px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-      <div class="flex items-center gap-3">
-        <div class="size-10 grid place-items-center rounded-lg bg-indigo-50 text-indigo-600">
-          <svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                  d="M8 10h8M8 14h5M4 6h16M6 18h8l4 4v-4h2V4a2 2 0 0 0-2-2H6A2 2 0 0 0 4 4v12a2 2 0 0 0 2 2Z"/>
-          </svg>
-        </div>
-        <div>
-          <h1 class="text-xl font-semibold leading-tight text-slate-900">Community Chat</h1>
-          <p class="text-sm text-slate-600">Ask questions, share tips, and learn from others</p>
-        </div>
-      </div>
+  $current = request('status');
+  $isActive = fn(string $s = null) => ($current === $s) ? 'btn-primary' : 'btn-ghost';
 
-      {{-- Search (pure Tailwind so it works even if DaisyUI isn’t loaded) --}}
-      <form method="GET"
-            class="group flex items-stretch rounded-xl border border-slate-300 bg-white shadow-sm
-                   focus-within:ring-2 focus-within:ring-[#0E2B51] w-full md:w-auto">
-        <input
-          type="text"
-          name="q"
-          value="{{ request('q','') }}"
-          placeholder="Search threads..."
-          class="flex-1 px-3 h-10 text-sm bg-transparent outline-none border-0 rounded-l-xl"
-          aria-label="Search threads"
-        >
-        <button type="submit"
-                class="px-4 h-10 text-sm font-medium text-white bg-[#0E2B51]
-                       rounded-r-xl shadow-sm hover:shadow-md hover:bg-[#0c2342] active:translate-y-[0.5px]">
-          Search
-        </button>
-        @if(request('q'))
-          <a href="{{ route('chat.index') }}"
-             class="ml-2 px-3 h-10 grid place-items-center text-sm text-slate-600 hover:text-slate-800">
-            Clear
-          </a>
-        @endif
-      </form>
+  $statusStyles = [
+    'pending'     => 'badge-warning badge-outline',
+    'accepted'    => 'badge-info badge-outline',
+    'in_progress' => 'badge-info',
+    'on_hold'     => 'badge-ghost',
+    'resolved'    => 'badge-success',
+    'closed'      => 'badge-neutral',
+    'cancelled'   => 'badge-neutral badge-outline',
+  ];
+
+  $humanize = fn($s) => Str::of($s)->replace('_',' ')->title();
+@endphp
+
+<div class="max-w-6xl mx-auto py-6 space-y-5">
+  {{-- Filters --}}
+  <div class="flex items-center justify-between gap-3">
+    <div class="join hidden md:inline-flex">
+      <a href="{{ route('repairs.my_jobs', ['status'=>'in_progress']) }}"
+         class="btn btn-sm join-item {{ $isActive('in_progress') }}">In Progress</a>
+      <a href="{{ route('repairs.my_jobs', ['status'=>'resolved']) }}"
+         class="btn btn-sm join-item {{ $isActive('resolved') }}">Resolved</a>
+      <a href="{{ route('repairs.my_jobs') }}"
+         class="btn btn-sm join-item {{ $isActive(null) }}">All</a>
     </div>
-    <div class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"></div>
-  </div>
 
-  {{-- Create Thread --}}
-  <div class="rounded-xl border bg-white shadow-sm">
-    <div class="p-5 space-y-3">
-      <div class="flex items-center justify-between">
-        <div class="text-sm text-slate-600">Create a new thread</div>
-      </div>
-
-      <form method="POST" action="{{ route('chat.store') }}" class="space-y-3">
-        @csrf
-        <input
-          name="title"
-          required
-          maxlength="180"
-          class="w-full rounded-lg border border-slate-300 px-3 h-11 text-sm
-                 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          placeholder='Ask anything, e.g. "How to choose a reliable night-shift printer?"'
-          value="{{ old('title') }}"
-          aria-label="Thread title"
-        >
-        @error('title')
-          <p class="text-sm text-rose-600">{{ $message }}</p>
-        @enderror
-
-        <div class="text-right">
-          {{-- Pure Tailwind button to avoid DaisyUI dependency issues --}}
-          <button type="submit"
-                  class="inline-flex items-center justify-center px-4 h-10 rounded-lg
-                         bg-emerald-600 text-white font-medium
-                         hover:bg-emerald-700 active:translate-y-[0.5px]
-                         focus:outline-none focus:ring-2 focus:ring-emerald-500">
-            Post
-          </button>
-        </div>
-      </form>
+    <div class="md:hidden dropdown dropdown-end">
+      <label tabindex="0" class="btn btn-sm btn-ghost">Filter</label>
+      <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-40">
+        <li><a class="{{ $current === 'in_progress' ? 'active' : '' }}"
+               href="{{ route('repairs.my_jobs', ['status'=>'in_progress']) }}">In Progress</a></li>
+        <li><a class="{{ $current === 'resolved' ? 'active' : '' }}"
+               href="{{ route('repairs.my_jobs', ['status'=>'resolved']) }}">Resolved</a></li>
+        <li><a class="{{ is_null($current) ? 'active' : '' }}"
+               href="{{ route('repairs.my_jobs') }}">All</a></li>
+      </ul>
     </div>
   </div>
 
-  {{-- Threads List --}}
-  <div class="rounded-xl border bg-white shadow-sm">
-    <div class="p-0">
-      <div class="px-4 py-3 border-b text-sm font-medium text-slate-800">Latest Threads</div>
-
-      <div class="divide-y">
-        @forelse($threads as $th)
-          <a href="{{ route('chat.show',$th) }}"
-             class="block px-4 py-3 hover:bg-slate-50">
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <div class="font-medium text-slate-900 line-clamp-1">{{ $th->title }}</div>
-                <div class="text-xs text-slate-500">
-                  by {{ $th->author->name }} • {{ $th->created_at->diffForHumans() }}
+  {{-- Desktop Table --}}
+  <div class="card bg-base-100 shadow-sm border hidden md:block">
+    <div class="overflow-x-auto">
+      <table class="table table-sm md:table-md">
+        <thead class="sticky top-0 z-10 bg-base-100/95 backdrop-blur supports-[backdrop-filter]:bg-base-100/70">
+          <tr class="text-xs text-base-content/70 border-b">
+            <th class="w-[30%]">Subject</th>
+            <th>Asset</th>
+            <th>Reporter</th>
+            <th>Status</th>
+            <th>Updated</th>
+            <th class="text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+        @forelse($list as $r)
+          <tr class="hover:bg-base-200/40">
+            <td>
+              <a href="{{ route('maintenance.requests.show', $r) }}" class="link link-hover font-medium">
+                {{ $r->title }}
+              </a>
+              <div class="text-xs opacity-70">{{ Str::limit($r->description ?? '', 90) }}</div>
+            </td>
+            <td class="whitespace-nowrap">#{{ $r->asset_id }} — {{ $r->asset->name ?? '-' }}</td>
+            <td class="whitespace-nowrap">{{ $r->reporter->name ?? '-' }}</td>
+            <td>
+              @php $style = $statusStyles[$r->status] ?? 'badge-ghost'; @endphp
+              <span class="badge {{ $style }}">{{ $humanize($r->status) }}</span>
+            </td>
+            <td class="whitespace-nowrap text-sm opacity-80">
+              {{ optional($r->updated_at)->format('Y-m-d H:i') }}
+            </td>
+            <td>
+              @can('tech-only')
+                <div class="flex justify-end gap-2">
+                  @if($r->status==='pending')
+                    <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}">
+                      @csrf <input type="hidden" name="action" value="accept">
+                      <button class="btn btn-xs md:btn-sm btn-info text-white">Queue</button>
+                    </form>
+                    <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}">
+                      @csrf <input type="hidden" name="action" value="start">
+                      <button class="btn btn-xs md:btn-sm btn-accent text-white">Start</button>
+                    </form>
+                  @elseif($r->status==='accepted')
+                    <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}">
+                      @csrf <input type="hidden" name="action" value="start">
+                      <button class="btn btn-xs md:btn-sm btn-accent text-white">Start</button>
+                    </form>
+                  @elseif($r->status==='in_progress')
+                    <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}">
+                      @csrf <input type="hidden" name="action" value="hold">
+                      <button class="btn btn-xs md:btn-sm btn-warning text-white">Hold</button>
+                    </form>
+                    <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}">
+                      @csrf <input type="hidden" name="action" value="resolve">
+                      <button class="btn btn-xs md:btn-sm btn-success text-white">Resolve</button>
+                    </form>
+                  @elseif($r->status==='resolved')
+                    @can('admin-only')
+                      <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}">
+                        @csrf <input type="hidden" name="action" value="close">
+                        <button class="btn btn-xs md:btn-sm btn-neutral text-white">Close</button>
+                      </form>
+                    @endcan
+                  @endif
                 </div>
-              </div>
-              <div class="shrink-0 text-slate-400">
-                <svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5l7 7-7 7"/>
-                </svg>
-              </div>
-            </div>
-          </a>
+              @endcan
+            </td>
+          </tr>
         @empty
-          <div class="p-10 text-center">
-            <div class="mx-auto mb-3 size-10 grid place-items-center rounded-full bg-slate-100">
-              <svg xmlns="http://www.w3.org/2000/svg" class="size-5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                      d="M7 8h10M7 12h7M5 4h14a2 2 0 012 2v10l-4 4H5a2 2 0 01-2-2V6a2 2 0 012-2z"/>
-              </svg>
-            </div>
-            <div class="font-medium text-slate-800">No threads yet</div>
-            <p class="text-sm text-slate-500">Be the first to start a conversation.</p>
-          </div>
+          <tr><td colspan="6">
+            <div class="py-10 text-center text-base-content/60">No jobs found.</div>
+          </td></tr>
         @endforelse
-      </div>
+        </tbody>
+      </table>
+    </div>
 
-      <div class="p-3">
-        <div class="flex justify-center">
-          {{ $threads->withQueryString()->links() }}
-        </div>
+    <div class="card-body pt-0">
+      <div class="flex justify-center">
+        {{ $list->withQueryString()->links() }}
       </div>
     </div>
   </div>
 
+  {{-- Mobile Cards --}}
+  <div class="grid grid-cols-1 gap-3 md:hidden">
+    @forelse($list as $r)
+      <div class="card bg-base-100 border">
+        <div class="card-body p-4">
+          <div class="flex items-start justify-between gap-3">
+            <div class="space-y-1">
+              <a href="{{ route('maintenance.requests.show', $r) }}" class="link link-hover font-semibold">
+                {{ $r->title }}
+              </a>
+              <p class="text-sm opacity-70">{{ Str::limit($r->description ?? '', 120) }}</p>
+            </div>
+            @php $style = $statusStyles[$r->status] ?? 'badge-ghost'; @endphp
+            <span class="badge {{ $style }}">{{ $humanize($r->status) }}</span>
+          </div>
+
+          <div class="mt-3 grid grid-cols-2 gap-2 text-sm">
+            <div class="opacity-70">Asset</div>
+            <div>#{{ $r->asset_id }} — {{ $r->asset->name ?? '-' }}</div>
+            <div class="opacity-70">Reporter</div>
+            <div>{{ $r->reporter->name ?? '-' }}</div>
+            <div class="opacity-70">Updated</div>
+            <div>{{ optional($r->updated_at)->format('Y-m-d H:i') }}</div>
+          </div>
+
+          @can('tech-only')
+            <div class="mt-4">
+              @if(in_array($r->status, ['pending','accepted','in_progress','resolved']))
+                <div class="join join-vertical w-full">
+                  @if($r->status==='pending')
+                    <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}" class="join-item">
+                      @csrf <input type="hidden" name="action" value="accept">
+                      <button class="btn btn-sm btn-info text-white w-full">Queue</button>
+                    </form>
+                    <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}" class="join-item">
+                      @csrf <input type="hidden" name="action" value="start">
+                      <button class="btn btn-sm btn-accent text-white w-full">Start</button>
+                    </form>
+                  @elseif($r->status==='accepted')
+                    <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}" class="join-item">
+                      @csrf <input type="hidden" name="action" value="start">
+                      <button class="btn btn-sm btn-accent text-white w-full">Start</button>
+                    </form>
+                  @elseif($r->status==='in_progress')
+                    <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}" class="join-item">
+                      @csrf <input type="hidden" name="action" value="hold">
+                      <button class="btn btn-sm btn-warning text-white w-full">Hold</button>
+                    </form>
+                    <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}" class="join-item">
+                      @csrf <input type="hidden" name="action" value="resolve">
+                      <button class="btn btn-sm btn-success text-white w-full">Resolve</button>
+                    </form>
+                  @elseif($r->status==='resolved')
+                    @can('admin-only')
+                      <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}" class="join-item">
+                        @csrf <input type="hidden" name="action" value="close">
+                        <button class="btn btn-sm btn-neutral text-white w-full">Close</button>
+                      </form>
+                    @endcan
+                  @endif
+                </div>
+              @endif
+            </div>
+          @endcan
+        </div>
+      </div>
+    @empty
+      <div class="card bg-base-100 border">
+        <div class="card-body items-center text-center">
+          <h3 class="font-medium">No jobs found</h3>
+          <p class="text-sm opacity-70">Try switching the filter to see more.</p>
+        </div>
+      </div>
+    @endforelse
+
+    <div class="flex justify-center">
+      {{ $list->withQueryString()->links() }}
+    </div>
+  </div>
 </div>
 @endsection

@@ -8,85 +8,86 @@
   /** @var \Illuminate\Pagination\LengthAwarePaginator $list */
   $q = request('q');
   $status = request('status'); // null|pending|in_progress|completed
+
+  // Tabs class (ชัดๆ ไม่ใช้ concat สีแบบสุ่ม เพื่อให้ Tailwind ไม่ purge)
+  $tab = function(?string $key) use ($status) {
+    $active = ($status === $key) || (is_null($key) && empty($status));
+    return $active
+      ? 'bg-zinc-900 text-white border-zinc-900'
+      : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50';
+  };
+
+  // Priority badge โทนเดียวกัน
+  $priBadge = function(?string $p) {
+    $p = strtolower((string)$p);
+    return match (true) {
+      in_array($p, ['urgent','high']) => 'bg-rose-50 text-rose-700 ring-rose-200',
+      $p === 'medium'                 => 'bg-amber-50 text-amber-700 ring-amber-200',
+      default                         => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    };
+  };
 @endphp
 
 <div class="mx-auto max-w-7xl py-6 space-y-5">
 
-  {{-- ===== Summary / toolbar (sticky) ===== --}}
-  <div class="sticky top-0 z-20 -mt-2 rounded-xl border border-slate-200 bg-white/90 backdrop-blur">
-    <div class="flex flex-wrap items-center gap-2 px-5 py-3">
+  {{-- Header / toolbar (sticky + ชัด) --}}
+  <div class="sticky top-0 z-20 -mt-2 rounded-xl border border-zinc-200 bg-white/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80">
+    <div class="px-5 py-4 flex flex-wrap items-center gap-3">
       <div class="mr-auto flex items-center gap-3">
-        <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-sky-100 bg-sky-50 text-sky-700">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                  d="M7 8l-2 2 9 9 2-2-9-9zM16 3l5 5-3 3-5-5 3-3z"/>
+        <div class="size-10 grid place-items-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
+          <svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 8l-2 2 9 9 2-2-9-9zM16 3l5 5-3 3-5-5 3-3z"/>
           </svg>
-        </span>
+        </div>
         <div>
-          <h1 class="text-base font-semibold text-slate-900">Pending Repair Requests</h1>
-          <p class="text-xs text-slate-500">รายการรอรับเข้าคิว / มอบหมาย / เริ่มทำงาน</p>
+          <h1 class="text-lg font-semibold text-zinc-900">Pending Repair Requests</h1>
+          <p class="text-xs text-zinc-500">รอรับเข้าคิว / มอบหมาย / เริ่มทำงาน</p>
         </div>
       </div>
 
+      {{-- Counters ชัดเจน --}}
       <div class="flex items-center gap-2 text-sm">
-        <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
-          Total: <b>{{ $stats['total'] ?? $list->total() }}</b>
-        </span>
-        <span class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1">
-          Pending: <b>{{ $stats['pending'] ?? '-' }}</b>
-        </span>
-        <span class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1">
-          In progress: <b>{{ $stats['in_progress'] ?? '-' }}</b>
-        </span>
-        <span class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1">
-          Completed: <b>{{ $stats['completed'] ?? '-' }}</b>
-        </span>
+        <span class="rounded-full px-3 py-1 bg-zinc-900 text-white">Total: <b>{{ $stats['total'] ?? $list->total() }}</b></span>
+        <span class="rounded-full px-3 py-1 bg-amber-600/10 text-amber-800 ring-1 ring-amber-200">Pending: <b>{{ $stats['pending'] ?? '-' }}</b></span>
+        <span class="rounded-full px-3 py-1 bg-sky-600/10 text-sky-800 ring-1 ring-sky-200">In progress: <b>{{ $stats['in_progress'] ?? '-' }}</b></span>
+        <span class="rounded-full px-3 py-1 bg-emerald-600/10 text-emerald-800 ring-1 ring-emerald-200">Completed: <b>{{ $stats['completed'] ?? '-' }}</b></span>
       </div>
 
       <a href="{{ route('repairs.my_jobs') }}"
-         class="ml-2 inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+         class="ml-2 inline-flex items-center gap-2 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-emerald-500">
         ← My Jobs
       </a>
     </div>
 
-    {{-- Quick filters + Search (core utilities only) --}}
-    <div class="border-t border-slate-200 px-5 py-3">
+    {{-- Tabs + Search --}}
+    <div class="border-t border-zinc-200 px-5 py-3">
       <form method="GET" class="grid grid-cols-1 gap-3 md:grid-cols-12">
-        {{-- Tabs --}}
+        {{-- Tabs (โทนเดียว/Active เข้มชัด) --}}
         <div class="md:col-span-7">
           <div class="flex flex-wrap gap-2">
-            @php
-              $tabs = [
-                ['key'=>null,          'label'=>'All',        'active'=>empty($status),          'cls'=>'slate'],
-                ['key'=>'pending',     'label'=>'Pending',    'active'=>$status==='pending',     'cls'=>'amber'],
-                ['key'=>'in_progress', 'label'=>'In progress','active'=>$status==='in_progress', 'cls'=>'sky'],
-                ['key'=>'completed',   'label'=>'Completed',  'active'=>$status==='completed',   'cls'=>'emerald'],
-              ];
-            @endphp
-            @foreach($tabs as $t)
-              @php $href = request()->fullUrlWithQuery(['status' => $t['key'] ?: null]); @endphp
-              <a href="{{ $href }}"
-                 class="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm
-                 {{ $t['active']
-                    ? 'border-'.$t['cls'].'-200 bg-'.$t['cls'].'-50 text-'.$t['cls'].'-800'
-                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50' }}">
-                {{ $t['label'] }}
-              </a>
-            @endforeach
+            @php $base = request()->except(['status','page']); @endphp
+            <a href="{{ url()->current() . '?' . http_build_query($base) }}"
+               class="inline-flex items-center rounded-lg border px-3 py-1.5 text-sm {{ $tab(null) }}">All</a>
+            <a href="{{ request()->fullUrlWithQuery(array_merge($base,['status'=>'pending'])) }}"
+               class="inline-flex items-center rounded-lg border px-3 py-1.5 text-sm {{ $tab('pending') }}">Pending</a>
+            <a href="{{ request()->fullUrlWithQuery(array_merge($base,['status'=>'in_progress'])) }}"
+               class="inline-flex items-center rounded-lg border px-3 py-1.5 text-sm {{ $tab('in_progress') }}">In progress</a>
+            <a href="{{ request()->fullUrlWithQuery(array_merge($base,['status'=>'completed'])) }}"
+               class="inline-flex items-center rounded-lg border px-3 py-1.5 text-sm {{ $tab('completed') }}">Completed</a>
           </div>
         </div>
 
-        {{-- Search --}}
+        {{-- Search (เรียบ ชัด) --}}
         <div class="md:col-span-5">
           <div class="flex gap-2">
             <div class="relative grow">
               <input id="q" name="q" value="{{ $q }}"
                      placeholder="ค้นหา: ชื่องาน, รายละเอียด, ผู้แจ้ง, หมายเลขทรัพย์สิน…"
-                     class="w-full rounded-lg border border-slate-300 pl-9 pr-3 py-2 text-sm placeholder:text-slate-400 focus:border-emerald-500 focus:ring-emerald-500">
-              <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                        d="M21 21l-4.3-4.3M17 10a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                     class="w-full rounded-lg border border-zinc-300 pl-9 pr-3 py-2 text-sm placeholder:text-zinc-400
+                            focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-4.3-4.3M17 10a7 7 0 11-14 0 7 7 0 0114 0z"/>
                 </svg>
               </span>
             </div>
@@ -95,7 +96,7 @@
               ค้นหา
             </button>
             <a href="{{ request()->url() }}"
-               class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300">
+               class="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-300">
               ล้าง
             </a>
           </div>
@@ -104,150 +105,155 @@
     </div>
   </div>
 
-  {{-- ==== Table card (ใหม่) ==== --}}
-    <div class="rounded-xl border border-slate-200 bg-white shadow-sm">
+  {{-- Table card --}}
+  <div class="rounded-xl border border-zinc-200 bg-white shadow-sm">
     <div class="relative overflow-x-auto">
-        <table class="min-w-full text-sm border-separate border-spacing-0">
-        <thead class="sticky top-0 z-10 bg-white">
-            <tr>
-            <th class="p-3 text-left font-semibold text-slate-700 sticky top-0 bg-white shadow-[inset_0_-1px_0_0_rgba(0,0,0,0.06)] w-[40%]">Subject</th>
-            <th class="p-3 text-left font-semibold text-slate-700 sticky top-0 bg-white shadow-[inset_0_-1px_0_0_rgba(0,0,0,0.06)] w-[20%]">Asset</th>
-            <th class="p-3 text-left font-semibold text-slate-700 sticky top-0 bg-white shadow-[inset_0_-1px_0_0_rgba(0,0,0,0.06)] w-[18%]">Reporter</th>
-            <th class="p-3 text-left font-semibold text-slate-700 sticky top-0 bg-white shadow-[inset_0_-1px_0_0_rgba(0,0,0,0.06)] w-[14%]">Reported</th>
-            <th class="p-3 text-right font-semibold text-slate-700 sticky top-0 bg-white shadow-[inset_0_-1px_0_0_rgba(0,0,0,0.06)] w-[8%]">Actions</th>
-            </tr>
+      <table class="min-w-full text-sm border-separate border-spacing-0">
+        <thead class="sticky top-0 z-10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/70">
+          <tr class="text-zinc-700">
+            <th class="p-3 text-left font-semibold shadow-[inset_0_-1px_0_rgba(0,0,0,0.06)] w-[40%]">Subject</th>
+            <th class="p-3 text-left font-semibold shadow-[inset_0_-1px_0_rgba(0,0,0,0.06)] w-[20%]">Asset</th>
+            <th class="p-3 text-left font-semibold shadow-[inset_0_-1px_0_rgba(0,0,0,0.06)] w-[18%]">Reporter</th>
+            <th class="p-3 text-left font-semibold shadow-[inset_0_-1px_0_rgba(0,0,0,0.06)] w-[14%]">Reported</th>
+            <th class="p-3 text-right font-semibold shadow-[inset_0_-1px_0_rgba(0,0,0,0.06)] w-[8%]">Actions</th>
+          </tr>
         </thead>
 
         <tbody>
         @forelse($list as $r)
-            <tr class="align-top hover:bg-slate-50/70">
+          <tr class="align-top hover:bg-zinc-50/70">
             {{-- Subject --}}
-            <td class="p-3 border-t border-slate-100">
-                <a href="{{ route('maintenance.requests.show', $r) }}"
-                class="block max-w-full truncate font-medium text-slate-900 hover:underline">
-                {{ \Illuminate\Support\Str::limit($r->title, 90) }}
-                </a>
-                @if(!empty($r->description))
-                <p class="mt-1 text-xs leading-relaxed text-slate-500">
-                    {{ \Illuminate\Support\Str::limit($r->description, 140) }}
+            <td class="p-3 border-t border-zinc-100">
+              <a href="{{ route('maintenance.requests.show', $r) }}"
+                 class="block max-w-full truncate font-medium text-zinc-900 hover:underline">
+                {{ Str::limit($r->title, 90) }}
+              </a>
+              @if(!empty($r->description))
+                <p class="mt-1 text-xs leading-relaxed text-zinc-500">
+                  {{ Str::limit($r->description, 140) }}
                 </p>
-                @endif
+              @endif
 
-                <div class="mt-2 flex flex-wrap gap-2">
+              <div class="mt-2 flex flex-wrap gap-2">
                 @if(!empty($r->priority))
-                    @php
-                    $pri = strtolower($r->priority);
-                    $priCls = match(true) {
-                        in_array($pri,['urgent','high']) => 'badge-error',
-                        $pri === 'medium' => 'badge-warning',
-                        default => 'badge-info',
-                    };
-                    @endphp
-                    <span class="badge {{ $priCls }} badge-sm">{{ ucfirst($pri) }}</span>
+                  <span class="rounded-full px-2 py-1 text-[11px] ring-1 {{ $priBadge($r->priority) }}">
+                    {{ ucfirst(strtolower($r->priority)) }}
+                  </span>
                 @endif
                 @if(!empty($r->category))
-                    <span class="badge badge-ghost badge-sm">{{ $r->category }}</span>
+                  <span class="rounded-full px-2 py-1 text-[11px] ring-1 bg-zinc-50 text-zinc-700 ring-zinc-200">
+                    {{ $r->category }}
+                  </span>
                 @endif
-                </div>
+              </div>
             </td>
 
             {{-- Asset --}}
-            <td class="p-3 border-t border-slate-100">
-                <div class="font-medium text-slate-800">#{{ $r->asset_id }}</div>
-                <div class="max-w-full truncate text-xs text-slate-500">{{ $r->asset->name ?? '—' }}</div>
-                @if(!empty($r->asset?->location))
-                <div class="mt-0.5 max-w-full truncate text-[11px] text-slate-400">{{ $r->asset->location }}</div>
-                @endif
+            <td class="p-3 border-t border-zinc-100">
+              <div class="font-medium text-zinc-800">#{{ $r->asset_id }}</div>
+              <div class="max-w-full truncate text-xs text-zinc-500">{{ $r->asset->name ?? '—' }}</div>
+              @if(!empty($r->asset?->location))
+                <div class="mt-0.5 max-w-full truncate text-[11px] text-zinc-400">{{ $r->asset->location }}</div>
+              @endif
             </td>
 
             {{-- Reporter --}}
-            <td class="p-3 border-t border-slate-100">
-                <div class="max-w-full truncate text-slate-800">{{ $r->reporter->name ?? '—' }}</div>
-                @if(!empty($r->reporter?->department))
-                <div class="max-w-full truncate text-[11px] text-slate-400">{{ $r->reporter->department }}</div>
-                @endif
+            <td class="p-3 border-t border-zinc-100">
+              <div class="max-w-full truncate text-zinc-800">{{ $r->reporter->name ?? '—' }}</div>
+              @if(!empty($r->reporter?->department))
+                <div class="max-w-full truncate text-[11px] text-zinc-400">{{ $r->reporter->department }}</div>
+              @endif
             </td>
 
             {{-- Reported --}}
-            <td class="p-3 border-t border-slate-100">
-                <div class="font-medium text-slate-700">
+            <td class="p-3 border-t border-zinc-100">
+              <div class="font-medium text-zinc-700">
                 {{ optional($r->request_date)->format('Y-m-d H:i') }}
-                </div>
-                @if($r->request_date)
-                <div class="text-[11px] text-slate-400">{{ $r->request_date->diffForHumans() }}</div>
-                @endif
+              </div>
+              @if($r->request_date)
+                <div class="text-[11px] text-zinc-400">{{ $r->request_date->diffForHumans() }}</div>
+              @endif
             </td>
 
-            {{-- Actions --}}
-            <td class="p-3 border-t border-slate-100">
-                @can('tech-only')
+            {{-- Actions — แยกปุ่มชัดเจน โทนเดียว --}}
+            <td class="p-3 border-t border-zinc-100">
+              @can('tech-only')
                 <div class="hidden justify-end gap-2 sm:flex">
-                    <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}">
+                  <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}">
                     @csrf <input type="hidden" name="action" value="accept">
-                    <button class="btn btn-xs btn-primary">Accept</button>
-                    </form>
+                    <button class="inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-medium
+                                   bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                      Accept
+                    </button>
+                  </form>
 
-                    <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}">
+                  <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}">
                     @csrf
                     <input type="hidden" name="action" value="assign">
                     <input type="hidden" name="technician_id" value="{{ auth()->id() }}">
-                    <button class="btn btn-xs btn-info">Assign</button>
-                    </form>
+                    <button class="inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-medium
+                                   bg-sky-600 text-white hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-400">
+                      Assign
+                    </button>
+                  </form>
 
-                    <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}">
+                  <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}">
                     @csrf <input type="hidden" name="action" value="start">
-                    <button class="btn btn-xs btn-success">Start</button>
-                    </form>
+                    <button class="inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-medium
+                                   bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                      Start
+                    </button>
+                  </form>
                 </div>
 
-                {{-- Mobile menu --}}
+                {{-- Mobile dropdown --}}
                 <div class="relative sm:hidden">
-                    <details class="group">
+                  <details class="group">
                     <summary class="flex cursor-pointer list-none justify-end">
-                        <span class="btn btn-xs">Actions ▾</span>
+                      <span class="inline-flex items-center rounded-lg px-2.5 py-1.5 text-xs border border-zinc-300">Actions ▾</span>
                     </summary>
-                    <div class="absolute right-0 mt-1 w-40 rounded-lg border border-slate-200 bg-white p-2 shadow">
-                        <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}" class="block">
+                    <div class="absolute right-0 mt-1 w-44 rounded-lg border border-zinc-200 bg-white p-2 shadow">
+                      <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}" class="block">
                         @csrf <input type="hidden" name="action" value="accept">
-                        <button class="btn btn-xs btn-primary w-full">Accept</button>
-                        </form>
-                        <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}" class="mt-1 block">
+                        <button class="w-full rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700">Accept</button>
+                      </form>
+                      <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}" class="mt-1 block">
                         @csrf
                         <input type="hidden" name="action" value="assign">
                         <input type="hidden" name="technician_id" value="{{ auth()->id() }}">
-                        <button class="btn btn-xs btn-info w-full">Assign</button>
-                        </form>
-                        <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}" class="mt-1 block">
+                        <button class="w-full rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700">Assign</button>
+                      </form>
+                      <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}" class="mt-1 block">
                         @csrf <input type="hidden" name="action" value="start">
-                        <button class="btn btn-xs btn-success w-full">Start</button>
-                        </form>
+                        <button class="w-full rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700">Start</button>
+                      </form>
                     </div>
-                    </details>
+                  </details>
                 </div>
-                @endcan
+              @endcan
             </td>
-            </tr>
+          </tr>
         @empty
-            <tr>
-            <td colspan="5" class="p-12 text-center text-slate-500">No pending requests</td>
-            </tr>
+          <tr>
+            <td colspan="5" class="p-12 text-center text-zinc-500">No pending requests</td>
+          </tr>
         @endforelse
         </tbody>
-        </table>
+      </table>
     </div>
 
     {{-- Footer / pagination --}}
-    <div class="border-t border-slate-200 px-4 py-3">
-        <div class="flex items-center justify-between">
-        <p class="text-xs text-slate-500">
-            Showing <span class="font-medium text-slate-700">{{ $list->firstItem() ?? 0 }}</span>
-            to <span class="font-medium text-slate-700">{{ $list->lastItem() ?? 0 }}</span>
-            of <span class="font-medium text-slate-700">{{ $list->total() }}</span> results
+    <div class="border-t border-zinc-200 px-4 py-3">
+      <div class="flex items-center justify-between">
+        <p class="text-xs text-zinc-500">
+          Showing <span class="font-medium text-zinc-800">{{ $list->firstItem() ?? 0 }}</span>
+          to <span class="font-medium text-zinc-800">{{ $list->lastItem() ?? 0 }}</span>
+          of <span class="font-medium text-zinc-800">{{ $list->total() }}</span> results
         </p>
         <div class="shrink-0">{{ $list->appends(request()->query())->links() }}</div>
-        </div>
-    </div>
+      </div>
     </div>
   </div>
+
 </div>
 @endsection

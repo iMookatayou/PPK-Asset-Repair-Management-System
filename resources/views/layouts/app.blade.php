@@ -313,11 +313,23 @@
     window.addEventListener('beforeunload', () => Loader.show());
   </script>
 
-  @stack('scripts')
+   @stack('scripts')
 
-  {{-- Global Loader --}}
+  {{-- Global Loader (เหลืออันเดียว) --}}
   <div id="loaderOverlay" class="loader-overlay" aria-hidden="true">
     <div class="loader-spinner" role="status" aria-label="กำลังโหลด"></div>
   </div>
+
+  <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js" defer></script>
+<x-toast />
+
+  @if (session('toast'))
+    <script>
+      const t = @json(session('toast'));
+      t.position = 'tc'; // บังคับบนกึ่งกลางจากฝั่ง layout อีกชั้น
+      if (window.showToast) { window.showToast(t); }
+      else { window.dispatchEvent(new CustomEvent('app:toast', { detail: t })); }
+    </script>
+  @endif
 </body>
 </html>

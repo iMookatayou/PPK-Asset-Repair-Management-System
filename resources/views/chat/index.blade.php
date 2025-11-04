@@ -3,6 +3,19 @@
 @section('title','Community Chat')
 
 @section('content')
+
+{{-- Local hard styles to ensure the green button always shows even if global CSS resets stuff --}}
+<style>
+  .btn-hard{
+    display:inline-flex;align-items:center;justify-content:center;
+    height:44px;min-width:110px;padding:0 16px;border-radius:8px;
+    font-weight:600;background:#059669;color:#fff; /* emerald-600 */
+  }
+  .btn-hard:hover{background:#047857;} /* emerald-700 */
+  .btn-hard:active{transform:translateY(0.5px);}
+  .btn-hard:focus{outline:2px solid #34d399;outline-offset:1px;} /* ring-emerald-400 */
+</style>
+
 <div class="max-w-5xl mx-auto py-6 space-y-5">
 
   {{-- Header --}}
@@ -24,21 +37,30 @@
       {{-- Search --}}
       <form method="GET"
             class="group flex items-stretch rounded-xl border border-slate-300 bg-white shadow-sm
-                    focus-within:ring-2 focus-within:ring-[#0E2B51]">
-        <input name="q"
-                value="{{ request('q','') }}"
-                placeholder="ค้นหากระทู้..."
-                class="flex-1 px-3 h-10 text-sm bg-transparent outline-none border-0 rounded-l-xl">
-
+                   focus-within:ring-2 focus-within:ring-[#0E2B51] w-full md:w-auto">
+        <input
+          type="text"
+          name="q"
+          value="{{ request('q','') }}"
+          placeholder="Search threads..."
+          class="flex-1 px-3 h-10 text-sm bg-transparent outline-none border-0 rounded-l-xl"
+          aria-label="Search threads"
+        >
         <button type="submit"
                 class="px-4 h-10 text-sm font-medium text-white bg-[#0E2B51]
-                        rounded-r-xl shadow-sm hover:shadow-md hover:bg-[#0c2342] active:translate-y-[0.5px]">
-            Search
+                       rounded-r-xl shadow-sm hover:shadow-md hover:bg-[#0c2342] active:translate-y-[0.5px]">
+          Search
         </button>
-        </form>
-        </div>
-        <div class="h-px bg-gradient-to-r from-transparent via-base-200 to-transparent"></div>
+        @if(request('q'))
+          <a href="{{ route('chat.index') }}"
+             class="ml-2 px-3 h-10 grid place-items-center text-sm text-slate-600 hover:text-slate-800">
+            Clear
+          </a>
+        @endif
+      </form>
     </div>
+    <div class="h-px bg-gradient-to-r from-transparent via-base-200 to-transparent"></div>
+  </div>
 
   {{-- Create Thread --}}
   <div class="card bg-base-100 border">
@@ -46,22 +68,29 @@
       <div class="flex items-center justify-between">
         <div class="text-sm text-base-content/70">Create a new thread</div>
       </div>
+
       <form method="POST" action="{{ route('chat.store') }}" class="space-y-3">
         @csrf
-        <input
-          name="title"
-          required
-          maxlength="180"
-          class="input input-bordered w-full"
-          placeholder='Ask anything, e.g. "How to choose a reliable night-shift printer?"'
-          value="{{ old('title') }}"
-        >
+
+        <div class="flex flex-col sm:flex-row gap-3">
+          <input
+            name="title"
+            required
+            maxlength="180"
+            class="w-full sm:flex-1 rounded-lg border border-slate-300 px-3 h-11 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            placeholder='Ask anything, e.g. "How to choose a reliable night-shift printer?"'
+            value="{{ old('title') }}"
+            aria-label="Thread title"
+          >
+
+          {{-- Post button (guaranteed visible) --}}
+          <button type="submit" class="btn-hard" aria-label="Post thread">Post</button>
+        </div>
+
         @error('title')
           <p class="text-sm text-error">{{ $message }}</p>
         @enderror
-        <div class="text-right">
-          <button class="btn btn-success text-white">Post</button>
-        </div>
       </form>
     </div>
   </div>

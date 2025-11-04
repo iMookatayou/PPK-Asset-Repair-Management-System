@@ -335,12 +335,42 @@
     window.addEventListener('beforeunload', () => Loader.show());
   </script>
 
-  <?php echo $__env->yieldPushContent('scripts'); ?>
+   <?php echo $__env->yieldPushContent('scripts'); ?>
 
   
   <div id="loaderOverlay" class="loader-overlay" aria-hidden="true">
     <div class="loader-spinner" role="status" aria-label="กำลังโหลด"></div>
   </div>
+
+  <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js" defer></script>
+<?php if (isset($component)) { $__componentOriginal7cfab914afdd05940201ca0b2cbc009b = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal7cfab914afdd05940201ca0b2cbc009b = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.toast','data' => []] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('toast'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes([]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal7cfab914afdd05940201ca0b2cbc009b)): ?>
+<?php $attributes = $__attributesOriginal7cfab914afdd05940201ca0b2cbc009b; ?>
+<?php unset($__attributesOriginal7cfab914afdd05940201ca0b2cbc009b); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal7cfab914afdd05940201ca0b2cbc009b)): ?>
+<?php $component = $__componentOriginal7cfab914afdd05940201ca0b2cbc009b; ?>
+<?php unset($__componentOriginal7cfab914afdd05940201ca0b2cbc009b); ?>
+<?php endif; ?>
+
+  <?php if(session('toast')): ?>
+    <script>
+      const t = <?php echo json_encode(session('toast'), 15, 512) ?>;
+      t.position = 'tc'; // บังคับบนกึ่งกลางจากฝั่ง layout อีกชั้น
+      if (window.showToast) { window.showToast(t); }
+      else { window.dispatchEvent(new CustomEvent('app:toast', { detail: t })); }
+    </script>
+  <?php endif; ?>
 </body>
-</html>
-<?php /**PATH C:\Users\Developer\development\Asset-Repair-Management-System\resources\views/layouts/app.blade.php ENDPATH**/ ?>
+</html><?php /**PATH C:\Users\Developer\development\Asset-Repair-Management-System\resources\views/layouts/app.blade.php ENDPATH**/ ?>

@@ -1,5 +1,5 @@
-{{-- resources/views/components/toast.blade.php --}}
-@php
+
+<?php
   $toast = session('toast');
   if ($toast) { session()->forget('toast'); }
 
@@ -16,7 +16,7 @@
     'warning' => $lottieGreen,
     'error'   => $lottieRed,
   ];
-@endphp
+?>
 
 <style>
   .toast-overlay{position:fixed;inset:0;z-index:100001;pointer-events:none}
@@ -116,10 +116,10 @@
 <script>
 (function(){
   const LOTTIE = {
-    success: @json($lottieMap['success']),
-    info:    @json($lottieMap['info']),
-    warning: @json($lottieMap['warning']),
-    error:   @json($lottieMap['error']),
+    success: <?php echo json_encode($lottieMap['success'], 15, 512) ?>,
+    info:    <?php echo json_encode($lottieMap['info'], 15, 512) ?>,
+    warning: <?php echo json_encode($lottieMap['warning'], 15, 512) ?>,
+    error:   <?php echo json_encode($lottieMap['error'], 15, 512) ?>,
   };
 
   function ensurePos(position){
@@ -197,10 +197,11 @@
   window.showToast = showToast;
   window.addEventListener('app:toast', e => showToast(e.detail || {}));
 
-  @if ($type && $message)
+  <?php if($type && $message): ?>
   document.addEventListener('DOMContentLoaded', function(){
-    showToast({ type: @json($type), message: @json($message), position: @json($position), timeout: @json($timeout) });
+    showToast({ type: <?php echo json_encode($type, 15, 512) ?>, message: <?php echo json_encode($message, 15, 512) ?>, position: <?php echo json_encode($position, 15, 512) ?>, timeout: <?php echo json_encode($timeout, 15, 512) ?> });
   });
-  @endif
+  <?php endif; ?>
 })();
 </script>
+<?php /**PATH C:\Users\Developer\development\Asset-Repair-Management-System\resources\views/components/toast.blade.php ENDPATH**/ ?>

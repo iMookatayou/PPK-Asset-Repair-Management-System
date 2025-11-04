@@ -1,12 +1,12 @@
-{{-- resources/views/layouts/auth.blade.php --}}
+
 <!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="csrf-token" content="{{ csrf_token() }}">
-  <title>@yield('title', 'Sign in') • PPK Hospital System</title>
-  @vite(['resources/css/app.css', 'resources/js/app.js'])
+  <meta name="csrf-token" content="<?php echo e(csrf_token()); ?>">
+  <title><?php echo $__env->yieldContent('title', 'Sign in'); ?> • PPK Hospital System</title>
+  <?php echo app('Illuminate\Foundation\Vite')(['resources/css/app.css', 'resources/js/app.js']); ?>
 
   <style>
     /* ===== Button mini spinner (เฉพาะปุ่ม) ===== */
@@ -50,34 +50,34 @@
   <main class="min-h-screen flex items-center justify-center p-5">
     <div class="w-full max-w-md">
 
-      {{-- Card --}}
+      
       <div class="rounded-2xl border border-slate-200 shadow-[0_10px_32px_-12px_rgba(2,6,23,0.45)] overflow-hidden">
 
-        {{-- Header (ขาว) --}}
+        
         <div class="px-8 pt-8 pb-5 text-center bg-white">
           <div class="mx-auto w-20 h-20 rounded-full bg-white ring-1 ring-slate-200 shadow flex items-center justify-center mb-4">
-            <img src="{{ asset('images/logoppk.png') }}" class="w-16 h-16 object-contain" alt="PPK Logo">
+            <img src="<?php echo e(asset('images/logoppk.png')); ?>" class="w-16 h-16 object-contain" alt="PPK Logo">
           </div>
-          <h1 class="text-[18px] font-semibold text-slate-800">@yield('title', 'Sign in')</h1>
+          <h1 class="text-[18px] font-semibold text-slate-800"><?php echo $__env->yieldContent('title', 'Sign in'); ?></h1>
           <p class="text-xs text-slate-600 tracking-wide">Hospital Information Service</p>
         </div>
 
-        {{-- Divider --}}
+        
         <div class="h-px bg-slate-200"></div>
 
-        {{-- Content (ขาว) --}}
+        
         <div class="px-8 py-6 bg-white">
-          @yield('content')
+          <?php echo $__env->yieldContent('content'); ?>
         </div>
       </div>
 
       <p class="text-center text-[11px] text-slate-200 mt-6">
-        &copy; {{ date('Y') }} PPK Hospital IT
+        &copy; <?php echo e(date('Y')); ?> PPK Hospital IT
       </p>
     </div>
   </main>
 
-  {{-- Optional overlay ทั้งหน้า (ปิดไว้ก่อน) --}}
+  
   <div id="authOverlay" class="auth-overlay" aria-hidden="true">
     <div class="spinner"></div>
   </div>
@@ -121,15 +121,34 @@
   </script>
 
   <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js" defer></script>
-    <x-toast />
+    <?php if (isset($component)) { $__componentOriginal7cfab914afdd05940201ca0b2cbc009b = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal7cfab914afdd05940201ca0b2cbc009b = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.toast','data' => []] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('toast'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes([]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal7cfab914afdd05940201ca0b2cbc009b)): ?>
+<?php $attributes = $__attributesOriginal7cfab914afdd05940201ca0b2cbc009b; ?>
+<?php unset($__attributesOriginal7cfab914afdd05940201ca0b2cbc009b); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal7cfab914afdd05940201ca0b2cbc009b)): ?>
+<?php $component = $__componentOriginal7cfab914afdd05940201ca0b2cbc009b; ?>
+<?php unset($__componentOriginal7cfab914afdd05940201ca0b2cbc009b); ?>
+<?php endif; ?>
 
-      @if (session('toast'))
+      <?php if(session('toast')): ?>
         <script>
-          const t = @json(session('toast'));
+          const t = <?php echo json_encode(session('toast'), 15, 512) ?>;
           t.position = 'tc'; // บังคับบนกึ่งกลางจากฝั่ง layout อีกชั้น
           if (window.showToast) { window.showToast(t); }
           else { window.dispatchEvent(new CustomEvent('app:toast', { detail: t })); }
         </script>
-      @endif
+      <?php endif; ?>
 </body>
-</html>
+</html><?php /**PATH C:\Users\Developer\development\Asset-Repair-Management-System\resources\views/layouts/auth.blade.php ENDPATH**/ ?>
