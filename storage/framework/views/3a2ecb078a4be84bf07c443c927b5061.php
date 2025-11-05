@@ -1,371 +1,337 @@
-<?php $__env->startSection('title','Repair #'.$req->id); ?>
+<?php $__env->startSection('title', 'Repair #'.$req->id); ?>
 
-<?php $__env->startPush('head'); ?>
-<style>
-  :root{
-    --bg:#0b0b0b;--card:#111213;--line:#25262a;--muted:#a1a1aa;--text:#e5e7eb;
-    --field:#0f1012;--primary:#1d2430;--primary-line:#343740;
-    --good:#16a34a;--warn:#eab308;--bad:#ef4444;--info:#3b82f6;
-    --chip:#0f1115;--chip-line:#2b2e36;
-    --accent:#4f46e5;--accent-2:#06b6d4;
-  }
-  /* layout base */
-  body{background:var(--bg);color:var(--text)}
-  .container{max-width:1100px;margin:0 auto;padding:18px}
-  .page-head{
-    position:sticky;top:0;z-index:30;
-    background:linear-gradient(180deg,rgba(10,10,10,.9),rgba(10,10,10,.7) 60%,transparent);
-    backdrop-filter: blur(6px);
-    padding:12px 0 8px;border-bottom:1px solid #131313;
-  }
-  .titlebar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .titlebar h1{font-size:20px;font-weight:700;display:flex;align-items:center;gap:10px;margin:0}
-  .subrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-  .card{
-    background:var(--card);border:1px solid var(--line);border-radius:16px;
-    padding:16px;margin:14px 0;
-    box-shadow:0 10px 30px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.02);
-  }
-  .card h3{margin:0 0 10px;font-size:16px;display:flex;align-items:center;gap:8px}
-  .grid-2{display:grid;grid-template-columns:2fr 1fr;gap:14px}
-  .grid-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  @media (max-width:980px){.grid-2{grid-template-columns:1fr}.grid-row{grid-template-columns:1fr}}
-  /* chips/badges */
-  .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;
-    border:1px solid var(--chip-line);background:var(--chip);font-size:12px;color:#d1d5db;white-space:nowrap}
-  .chip.soft{background:linear-gradient(180deg,#0f1218,#0c0e12);border-color:#1f2430}
-  .chip.good{border-color:var(--good);color:#86efac}
-  .chip.warn{border-color:var(--warn);color:#fde68a}
-  .chip.bad{border-color:var(--bad);color:#fecaca}
-  .chip.info{border-color:var(--info);color:#bfdbfe}
-  .chip.hl{border-color:#4f46e5;color:#c7d2fe}
-  /* fields */
-  label{display:flex;align-items:center;gap:8px;margin:6px 0 6px;color:#cbd5e1;font-size:13px}
-  input,select,textarea{
-    width:100%;padding:11px 12px;background:var(--field);color:#e5e7eb;
-    border:1px solid #2b2f36;border-radius:10px;outline:none;
-    transition:border .2s, box-shadow .2s, transform .02s;
-  }
-  input:focus,select:focus,textarea:focus{
-    border-color:#4f46e5;box-shadow:0 0 0 3px rgba(79,70,229,.25);
-  }
-  .btn{
-    display:inline-flex;align-items:center;gap:8px;padding:11px 14px;border-radius:10px;
-    border:1px solid var(--primary-line);background:
-      linear-gradient(180deg,rgba(37,47,66,.9),rgba(24,30,44,.95));
-    color:#fff;cursor:pointer;transition:transform .02s,filter .2s,opacity .2s;
-    text-decoration:none;
-  }
-  .btn:hover{filter:brightness(1.08)}
-  .btn:active{transform:translateY(1px)}
-  .btn.ghost{background:#12141a;border-color:#2a2f38}
-  .btn.pri{border-color:#475569;background:linear-gradient(180deg,#334155,#1f2937)}
-  .btn.warn{border-color:#856c12;background:linear-gradient(180deg,#a07f12,#7c5f0f)}
-  .btn.good{border-color:#1a6d33;background:linear-gradient(180deg,#15803d,#14532d)}
-  .muted{color:var(--muted)}
-  /* meta */
-  .meta{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-  @media (max-width:980px){.meta{grid-template-columns:repeat(2,1fr)}}
-  .kv .k{color:#a1a1aa;font-size:12px;margin-bottom:2px;display:flex;align-items:center;gap:6px}
-  .kv .v{font-weight:600}
-  /* timeline */
-  .timeline{position:relative;padding-left:22px}
-  .timeline:before{content:"";position:absolute;left:9px;top:6px;bottom:6px;width:2px;background:#212328;border-radius:2px}
-  .t-item{position:relative;margin:12px 0;padding-left:12px}
-  .dot{position:absolute;left:0;top:4px;width:18px;height:18px;border-radius:50%;
-    background:#0e1116;border:2px solid #374151;display:flex;align-items:center;justify-content:center}
-  .dot.good{border-color:var(--good)} .dot.warn{border-color:var(--warn)} .dot.bad{border-color:var(--bad)}
-  /* attachments */
-  .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
-  .thumb{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#0f1217}
-  .thumb img{display:block;width:100%;height:130px;object-fit:cover}
-  .thumb .cap{padding:6px 8px;font-size:12px;color:#cbd5e1;display:flex;align-items:center;justify-content:space-between;gap:6px}
-  .cap a.chip{text-decoration:none}
-  /* helpers */
-  .hr{height:1px;background:linear-gradient(90deg,transparent,#1c1f25,transparent);margin:10px 0}
-  .ribbon{
-    background:linear-gradient(90deg,rgba(79,70,229,.3),rgba(6,182,212,.18) 60%,transparent);
-    border:1px solid rgba(79,70,229,.25);padding:8px 12px;border-radius:12px
-  }
-  /* print */
-  @media print{
-    .page-head,.btn,.thumb .cap a{display:none!important}
-    body{background:#fff;color:#000}
-    .card{box-shadow:none;border-color:#ccc}
-  }
-</style>
-<?php $__env->stopPush(); ?>
+
+<?php $__env->startSection('page-header'); ?>
+  <?php
+    $statusText  = str_replace('_',' ',$req->status);
+    $statusTone  = match($req->status){
+      'completed' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      'canceled'  => 'bg-rose-50 text-rose-700 border-rose-200',
+      'assigned','in_progress' => 'bg-amber-50 text-amber-700 border-amber-200',
+      default     => 'bg-sky-50 text-sky-700 border-sky-200',
+    };
+    $prio = strtolower((string)$req->priority);
+    $prioTone = match($prio){
+      'high'   => 'bg-rose-50 text-rose-700 border-rose-200',
+      'medium' => 'bg-amber-50 text-amber-700 border-amber-200',
+      'low'    => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      default  => 'bg-slate-50 text-slate-700 border-slate-200',
+    };
+  ?>
+
+  <div class="flex flex-wrap items-center gap-3">
+    <h1 class="text-xl font-semibold text-slate-900">
+      Repair Detail <span id="rid">#<?php echo e($req->id); ?></span>
+    </h1>
+
+    <span class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium bg-slate-50 text-slate-700 border-slate-200">
+      
+      <?php echo e($req->asset->name ?? $req->asset_id); ?>
+
+    </span>
+
+    <span class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium <?php echo e($statusTone); ?>">
+      <?php echo e($statusText); ?>
+
+    </span>
+
+    <span class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium <?php echo e($prioTone); ?>">
+      <?php echo e($req->priority ?? 'unknown'); ?>
+
+    </span>
+
+    <div class="ml-auto flex flex-wrap items-center gap-2">
+      <button id="copyIdBtn" type="button"
+              class="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50">
+        Copy ID
+      </button>
+      <button type="button" onclick="window.print()"
+              class="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50">
+        Print
+      </button>
+      <a href="<?php echo e(route('maintenance.requests.index')); ?>"
+         class="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50">
+        กลับรายการ
+      </a>
+    </div>
+  </div>
+<?php $__env->stopSection(); ?>
 
 <?php $__env->startSection('content'); ?>
 <?php
-  $statusText = str_replace('_',' ',$req->status);
-  $statusClass = match($req->status){
-    'completed' => 'good', 'canceled' => 'bad',
-    'assigned','in_progress' => 'warn', default => 'info'
-  };
-  $prio = strtolower((string)$req->priority);
-  $prioClass = match($prio){ 'high'=>'bad','medium'=>'warn','low'=>'good', default=>'info' };
   $requestedAt = optional($req->request_date ?? $req->created_at);
 ?>
 
-<div class="page-head" role="banner">
-  <div class="container">
-    <div class="titlebar">
-      <h1><i data-lucide="wrench"></i> Repair Detail <span id="rid">#<?php echo e($req->id); ?></span></h1>
-      <span class="chip soft" title="Asset"><i data-lucide="package"></i><?php echo e($req->asset->name ?? $req->asset_id); ?></span>
-      <span class="chip <?php echo e($statusClass); ?>"><i data-lucide="workflow"></i><?php echo e($statusText); ?></span>
-      <span class="chip <?php echo e($prioClass); ?>"><i data-lucide="flag-triangle-right"></i><?php echo e($req->priority); ?></span>
+<div class="space-y-6">
 
-      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
-        <button type="button" class="btn ghost" id="copyIdBtn" title="คัดลอกเลขงาน"><i data-lucide="copy"></i> Copy ID</button>
-        <button type="button" class="btn ghost" onclick="window.print()" title="พิมพ์"><i data-lucide="printer"></i> Print</button>
-        <a class="btn ghost" href="<?php echo e(route('maintenance.requests.index')); ?>"><i data-lucide="arrow-left"></i> กลับรายการ</a>
-      </div>
-    </div>
-
-    <?php if(session('ok')): ?>
-      <div class="subrow" role="status"><span class="chip good"><i data-lucide="check-circle-2"></i><?php echo e(session('ok')); ?></span></div>
-    <?php endif; ?>
-    <?php if($errors->any()): ?>
-      <div class="subrow" role="alert">
-        <span class="chip bad"><i data-lucide="alert-triangle"></i> ดำเนินการไม่สำเร็จ</span>
-        <span class="chip soft"><?php echo e(collect($errors->all())->take(3)->implode(' • ')); ?></span>
-      </div>
-    <?php endif; ?>
-  </div>
-</div>
-
-<div class="container" role="main">
   
-  <div class="card">
-    <div class="meta" aria-label="ข้อมูลหลัก">
-      <div class="kv">
-        <div class="k"><i data-lucide="hash"></i>หมายเลข</div>
-        <div class="v">#<?php echo e($req->id); ?></div>
+  <section class="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div class="p-4">
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-4 text-sm">
+        <div>
+          <div class="text-slate-500">หมายเลข</div>
+          <div class="font-semibold text-slate-900">#<?php echo e($req->id); ?></div>
+        </div>
+        <div>
+          <div class="text-slate-500">ผู้แจ้ง</div>
+          <div class="font-semibold text-slate-900"><?php echo e($req->reporter_name ?? ($req->reporter->name ?? '-')); ?></div>
+        </div>
+        <div>
+          <div class="text-slate-500">ทรัพย์สิน</div>
+          <div class="font-semibold text-slate-900"><?php echo e($req->asset->name ?? $req->asset_id); ?></div>
+        </div>
+        <div>
+          <div class="text-slate-500">สถานที่</div>
+          <div class="font-semibold text-slate-900"><?php echo e($req->location ?? '-'); ?></div>
+        </div>
       </div>
-      <div class="kv">
-        <div class="k"><i data-lucide="user-2"></i>ผู้แจ้ง</div>
-        <div class="v"><?php echo e($req->reporter_name ?? ($req->reporter->name ?? '-')); ?></div>
-      </div>
-      <div class="kv">
-        <div class="k"><i data-lucide="package"></i>ทรัพย์สิน</div>
-        <div class="v"><?php echo e($req->asset->name ?? $req->asset_id); ?></div>
-      </div>
-      <div class="kv">
-        <div class="k"><i data-lucide="map-pin"></i>สถานที่</div>
-        <div class="v"><?php echo e($req->location ?? '-'); ?></div>
-      </div>
-    </div>
 
-    <div class="grid-2" style="margin-top:12px">
-      <div>
-        <div class="k"><i data-lucide="type"></i>หัวข้อ</div>
-        <div class="v" style="font-size:15px"><?php echo e($req->title); ?></div>
-        <div class="hr" role="separator" aria-hidden="true"></div>
-        <div class="k"><i data-lucide="file-text"></i>รายละเอียด</div>
-        <div class="prose prose-invert" style="margin-top:4px"><?php echo e($req->description ?: '-'); ?></div>
-      </div>
-      <div>
-        <div class="k"><i data-lucide="calendar-clock"></i>เวลา</div>
-        <div class="ribbon" style="margin-top:6px;display:grid;gap:6px">
-          <span class="chip info">
-            <i data-lucide="calendar-search"></i>
-            Requested:
-            <?php if($requestedAt): ?>
-              <time datetime="<?php echo e($requestedAt->toIso8601String()); ?>"><?php echo e($requestedAt->format('Y-m-d H:i')); ?></time>
-            <?php else: ?> - <?php endif; ?>
-          </span>
-          <?php if($req->assigned_date): ?>
-            <span class="chip warn">
-              <i data-lucide="calendar-range"></i>
-              Assigned:
-              <time datetime="<?php echo e($req->assigned_date->toIso8601String()); ?>"><?php echo e($req->assigned_date->format('Y-m-d H:i')); ?></time>
-            </span>
-          <?php endif; ?>
-          <?php if($req->completed_date): ?>
-            <span class="chip good">
-              <i data-lucide="calendar-check-2"></i>
-              Done:
-              <time datetime="<?php echo e($req->completed_date->toIso8601String()); ?>"><?php echo e($req->completed_date->format('Y-m-d H:i')); ?></time>
-            </span>
-          <?php endif; ?>
+      <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div class="lg:col-span-2">
+          <div class="mb-1 text-slate-500">หัวข้อ</div>
+          <div class="text-base font-semibold text-slate-900"><?php echo e($req->title); ?></div>
+
+          <div class="my-4 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"></div>
+
+          <div class="mb-1 text-slate-500">รายละเอียด</div>
+          <div class="prose max-w-none text-slate-800"><?php echo e($req->description ?: '-'); ?></div>
+        </div>
+
+        <div>
+          <div class="mb-2 text-slate-500">เวลา</div>
+          <div class="space-y-2 rounded-xl border border-indigo-100 bg-indigo-50/60 p-3">
+            <div class="inline-flex items-center gap-2 rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-800">
+              Requested:
+              <?php if($requestedAt): ?>
+                <time datetime="<?php echo e($requestedAt->toIso8601String()); ?>"><?php echo e($requestedAt->format('Y-m-d H:i')); ?></time>
+              <?php else: ?> - <?php endif; ?>
+            </div>
+            <?php if($req->assigned_date): ?>
+              <div class="inline-flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
+                Assigned:
+                <time datetime="<?php echo e($req->assigned_date->toIso8601String()); ?>"><?php echo e($req->assigned_date->format('Y-m-d H:i')); ?></time>
+              </div>
+            <?php endif; ?>
+            <?php if($req->completed_date): ?>
+              <div class="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800">
+                Done:
+                <time datetime="<?php echo e($req->completed_date->toIso8601String()); ?>"><?php echo e($req->completed_date->format('Y-m-d H:i')); ?></time>
+              </div>
+            <?php endif; ?>
+          </div>
         </div>
       </div>
     </div>
-  </div>
+  </section>
 
   
-  <div class="card">
-    <h3><i data-lucide="settings-2"></i> ดำเนินการ</h3>
-    <form method="post"
-          action="<?php echo e(route('maintenance.requests.transition', $req)); ?>"
-          class="grid-row" style="margin-top:6px" aria-label="Change request status form">
-      <?php echo csrf_field(); ?>
+  <section class="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div class="p-4">
+      <h3 class="text-base font-semibold text-slate-900">ดำเนินการ</h3>
 
-      <div>
-        <label for="action"><i data-lucide="workflow"></i> Action</label>
-        <select id="action" name="action" required aria-required="true">
-          <option value="" disabled <?php echo e(old('action') ? '' : 'selected'); ?>>เลือกการดำเนินการ…</option>
-          <option value="assign"   <?php if(old('action')==='assign'): echo 'selected'; endif; ?>>assign</option>
-          <option value="start"    <?php if(old('action')==='start'): echo 'selected'; endif; ?>>start</option>
-          <option value="complete" <?php if(old('action')==='complete'): echo 'selected'; endif; ?>>complete</option>
-          <option value="cancel"   <?php if(old('action')==='cancel'): echo 'selected'; endif; ?>>cancel</option>
-        </select>
-      </div>
+      <form method="post"
+            action="<?php echo e(route('maintenance.requests.transition', $req)); ?>"
+            class="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <?php echo csrf_field(); ?>
 
-      <div id="techWrap" style="display:none">
-        <label for="technician_id"><i data-lucide="user-round"></i> Technician ID</label>
-        <input id="technician_id" type="number" name="technician_id" placeholder="เช่น 5" inputmode="numeric" value="<?php echo e(old('technician_id')); ?>"/>
-      </div>
+        <div>
+          <label for="action" class="mb-1 block text-sm text-slate-600">Action</label>
+          <select id="action" name="action" required
+                  class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+            <option value="" disabled <?php echo e(old('action') ? '' : 'selected'); ?>>เลือกการดำเนินการ…</option>
+            <option value="assign"   <?php if(old('action')==='assign'): echo 'selected'; endif; ?>>assign</option>
+            <option value="start"    <?php if(old('action')==='start'): echo 'selected'; endif; ?>>start</option>
+            <option value="complete" <?php if(old('action')==='complete'): echo 'selected'; endif; ?>>complete</option>
+            <option value="cancel"   <?php if(old('action')==='cancel'): echo 'selected'; endif; ?>>cancel</option>
+          </select>
+        </div>
 
-      <div style="grid-column:1/-1">
-        <label for="remark"><i data-lucide="message-square"></i> Remark</label>
-        <input id="remark" type="text" name="remark" placeholder="บันทึกเพิ่มเติม (optional)" value="<?php echo e(old('remark')); ?>"/>
-      </div>
+        <div id="techWrap" class="hidden">
+          <label for="technician_id" class="mb-1 block text-sm text-slate-600">Technician ID</label>
+          <input id="technician_id" type="number" inputmode="numeric" name="technician_id"
+                 class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                 value="<?php echo e(old('technician_id')); ?>" placeholder="เช่น 5">
+        </div>
 
-      <div style="grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap">
-        <button type="submit" class="btn pri"><i data-lucide="save"></i> บันทึก</button>
-        <a class="btn ghost" href="<?php echo e(route('maintenance.requests.index')); ?>"><i data-lucide="arrow-left"></i> กลับรายการ</a>
-      </div>
-    </form>
-  </div>
+        <div class="md:col-span-2">
+          <label for="remark" class="mb-1 block text-sm text-slate-600">Remark</label>
+          <input id="remark" type="text" name="remark"
+                 class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                 placeholder="บันทึกเพิ่มเติม (optional)" value="<?php echo e(old('remark')); ?>">
+        </div>
+
+        <div class="md:col-span-2 flex flex-wrap gap-2">
+          <button type="submit"
+                  class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            บันทึก
+          </button>
+          <a href="<?php echo e(route('maintenance.requests.index')); ?>"
+             class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+            กลับรายการ
+          </a>
+        </div>
+      </form>
+    </div>
+  </section>
 
   
-  <div class="card">
-    <h3><i data-lucide="image-up"></i> ไฟล์แนบ</h3>
-    <form method="post" enctype="multipart/form-data"
-          action="<?php echo e(route('maintenance.requests.attachments', $req)); ?>"
-          class="grid-row" style="margin-top:6px" aria-label="Upload attachment form">
-      <?php echo csrf_field(); ?>
-      <div>
-        <label for="att_type"><i data-lucide="badge-info"></i> ประเภท</label>
-        <select id="att_type" name="type">
-          <option value="before" <?php if(old('type')==='before'): echo 'selected'; endif; ?>>before</option>
-          <option value="after"  <?php if(old('type')==='after'): echo 'selected'; endif; ?>>after</option>
-          <option value="other"  <?php if(old('type','other')==='other'): echo 'selected'; endif; ?>>other</option>
-        </select>
-      </div>
-      <div>
-        <label for="file"><i data-lucide="paperclip"></i> ไฟล์</label>
-        <input id="file" type="file" name="file" required aria-required="true" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"/>
-      </div>
-      <div style="grid-column:1/-1">
-        <button type="submit" class="btn"><i data-lucide="upload-cloud"></i> อัปโหลด</button>
-      </div>
-    </form>
+  <section class="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div class="p-4">
+      <h3 class="text-base font-semibold text-slate-900">ไฟล์แนบ</h3>
 
-    <?php if($req->attachments->count()): ?>
-      <div class="thumbs" style="margin-top:10px">
-        <?php $__currentLoopData = $req->attachments; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $att): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-          <?php
-            $name = $att->original_name ?? basename($att->file_path ?? $att->path ?? '');
-            $ext  = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-            $isImg = in_array($ext,['jpg','jpeg','png','gif','webp','bmp']);
-            $url = isset($att->file_path) ? asset('storage/'.$att->file_path) : (isset($att->path) ? asset('storage/'.$att->path) : '#');
-            $tag = $att->file_type ?? $att->type ?? 'other';
-          ?>
-          <figure class="thumb">
-            <?php if($isImg && $url !== '#'): ?>
-              <a href="<?php echo e($url); ?>" target="_blank" rel="noopener">
-                <img src="<?php echo e($url); ?>" alt="<?php echo e($name); ?>">
-              </a>
-            <?php else: ?>
-              <div style="height:130px;display:flex;align-items:center;justify-content:center;color:#a1a1aa">
-                <i data-lucide="file"></i> <?php echo e(strtoupper($ext ?: 'FILE')); ?>
+      <form method="post" enctype="multipart/form-data"
+            action="<?php echo e(route('maintenance.requests.attachments', $req)); ?>"
+            class="mt-3 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <?php echo csrf_field(); ?>
+        <div>
+          <label for="att_type" class="mb-1 block text-sm text-slate-600">ประเภท</label>
+          <select id="att_type" name="type"
+                  class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+            <option value="before" <?php if(old('type')==='before'): echo 'selected'; endif; ?>>before</option>
+            <option value="after"  <?php if(old('type')==='after'): echo 'selected'; endif; ?>>after</option>
+            <option value="other"  <?php if(old('type','other')==='other'): echo 'selected'; endif; ?>>other</option>
+          </select>
+        </div>
+        <div class="md:col-span-2">
+          <label for="file" class="mb-1 block text-sm text-slate-600">ไฟล์</label>
+          <input id="file" type="file" name="file" required
+                 accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                 class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm hover:file:bg-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+        </div>
+        <div class="md:col-span-3">
+          <button type="submit"
+                  class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+            อัปโหลด
+          </button>
+        </div>
+      </form>
 
-              </div>
-            <?php endif; ?>
-            <figcaption class="cap">
-              <span class="chip" title="ประเภทไฟล์"><i data-lucide="tag"></i><?php echo e($tag); ?></span>
-              <span class="muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?php echo e($name); ?></span>
-              <?php if($url !== '#'): ?>
-                <a class="chip" href="<?php echo e($url); ?>" target="_blank" rel="noopener"><i data-lucide="download"></i> เปิด</a>
+      <?php if($req->attachments->count()): ?>
+        <div class="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+          <?php $__currentLoopData = $req->attachments; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $att): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+            <?php
+              $name = $att->original_name ?? basename($att->file_path ?? $att->path ?? '');
+              $ext  = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+              $isImg = in_array($ext,['jpg','jpeg','png','gif','webp','bmp']);
+              $url = isset($att->file_path) ? asset('storage/'.$att->file_path) : (isset($att->path) ? asset('storage/'.$att->path) : '#');
+              $tag = $att->file_type ?? $att->type ?? 'other';
+            ?>
+            <figure class="overflow-hidden rounded-lg border border-slate-200">
+              <?php if($isImg && $url !== '#'): ?>
+                <a href="<?php echo e($url); ?>" target="_blank" rel="noopener">
+                  <img src="<?php echo e($url); ?>" alt="<?php echo e($name); ?>" class="h-36 w-full object-cover">
+                </a>
+              <?php else: ?>
+                <div class="grid h-36 w-full place-items-center text-slate-500">
+                  <?php echo e(strtoupper($ext ?: 'FILE')); ?>
+
+                </div>
               <?php endif; ?>
-            </figcaption>
-          </figure>
-        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-      </div>
-    <?php else: ?>
-      <p class="muted" style="margin-top:6px">ไม่มีไฟล์แนบ</p>
-    <?php endif; ?>
-  </div>
+              <figcaption class="flex items-center justify-between gap-2 px-3 py-2 text-xs">
+                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-medium text-slate-700">
+                  <?php echo e($tag); ?>
 
-  
-  <div class="card">
-    <h3><i data-lucide="timeline"></i> ประวัติการดำเนินการ</h3>
-    <div class="timeline" style="margin-top:6px">
-      <?php $__empty_1 = true; $__currentLoopData = $req->logs; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $log): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-        <?php
-          $cls = match($log->action) {
-            'complete_request' => 'good',
-            'cancel_request'   => 'bad',
-            'assign_technician','start_request' => 'warn',
-            default => ''
-          };
-        ?>
-        <article class="t-item">
-          <div class="dot <?php echo e($cls); ?>"><i data-lucide="dot"></i></div>
-          <header style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-            <strong>#<?php echo e($log->id); ?></strong>
-            <span class="chip"><i data-lucide="workflow"></i><?php echo e($log->action); ?></span>
-            <span class="chip">
-              <i data-lucide="calendar-clock"></i>
-              <time datetime="<?php echo e($log->created_at->toIso8601String()); ?>"><?php echo e($log->created_at->format('Y-m-d H:i')); ?></time>
-            </span>
-            <?php if($log->user_id): ?>
-              <span class="chip" title="ผู้ใช้ที่ดำเนินการ"><i data-lucide="user"></i><?php echo e($log->user_id); ?></span>
-            <?php endif; ?>
-          </header>
-          <?php if($log->note): ?>
-            <p style="margin-top:6px"><?php echo e($log->note); ?></p>
-          <?php endif; ?>
-        </article>
-      <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-        <p class="muted">ยังไม่มีบันทึก</p>
+                </span>
+                <span class="truncate text-slate-600"><?php echo e($name); ?></span>
+                <?php if($url !== '#'): ?>
+                  <a href="<?php echo e($url); ?>" target="_blank" rel="noopener"
+                     class="inline-flex items-center rounded-md border border-sky-300 bg-sky-50 px-2 py-1 font-medium text-sky-800 hover:bg-sky-100">
+                    เปิด
+                  </a>
+                <?php endif; ?>
+              </figcaption>
+            </figure>
+          <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+        </div>
+      <?php else: ?>
+        <p class="mt-3 text-slate-500">ไม่มีไฟล์แนบ</p>
       <?php endif; ?>
     </div>
-  </div>
+  </section>
+
+  
+  <section class="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div class="p-4">
+      <h3 class="text-base font-semibold text-slate-900">ประวัติการดำเนินการ</h3>
+
+      <div class="mt-3 space-y-3">
+        <?php $__empty_1 = true; $__currentLoopData = $req->logs; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $log): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+          <?php
+            $tone = match($log->action) {
+              'complete_request' => 'bg-emerald-600',
+              'cancel_request'   => 'bg-rose-600',
+              'assign_technician','start_request' => 'bg-amber-600',
+              default => 'bg-slate-400'
+            };
+          ?>
+          <article class="relative border-l-2 border-slate-200 pl-6">
+            <span class="absolute -left-1.5 top-2 inline-block h-3 w-3 rounded-full <?php echo e($tone); ?>"></span>
+            <header class="flex flex-wrap items-center gap-2 text-sm">
+              <strong>#<?php echo e($log->id); ?></strong>
+              <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700">
+                <?php echo e($log->action); ?>
+
+              </span>
+              <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700">
+                <time datetime="<?php echo e($log->created_at->toIso8601String()); ?>"><?php echo e($log->created_at->format('Y-m-d H:i')); ?></time>
+              </span>
+              <?php if($log->user_id): ?>
+                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700">
+                  by <?php echo e($log->user_id); ?>
+
+                </span>
+              <?php endif; ?>
+            </header>
+            <?php if($log->note): ?>
+              <p class="mt-1 text-slate-700"><?php echo e($log->note); ?></p>
+            <?php endif; ?>
+          </article>
+        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+          <p class="text-slate-500">ยังไม่มีบันทึก</p>
+        <?php endif; ?>
+      </div>
+    </div>
+  </section>
+
 </div>
 <?php $__env->stopSection(); ?>
 
 <?php $__env->startPush('scripts'); ?>
-<script src="https://unpkg.com/lucide@latest"></script>
 <script>
-  lucide.createIcons({attrs:{width:18,height:18,'stroke-width':1.8}});
-
   // toggle technician input visibility/required by action
-  const actionSel = document.getElementById('action');
-  const techWrap  = document.getElementById('techWrap');
-  const techInput = document.getElementById('technician_id');
-  function syncTech(){
-    const show = actionSel?.value === 'assign';
-    if(!techWrap) return;
-    techWrap.style.display = show ? '' : 'none';
-    if(techInput){
-      techInput.required = show;
-      techInput.toggleAttribute('aria-required', show);
-      if(!show) techInput.value = '';
+  (function(){
+    const sel = document.getElementById('action');
+    const wrap = document.getElementById('techWrap');
+    const input = document.getElementById('technician_id');
+    function sync(){
+      const show = sel && sel.value === 'assign';
+      if(!wrap) return;
+      wrap.classList.toggle('hidden', !show);
+      if(input){
+        input.required = !!show;
+        if(!show) input.value = '';
+      }
     }
-  }
-  actionSel?.addEventListener('change', syncTech);
-  syncTech();
+    sel && sel.addEventListener('change', sync);
+    sync();
+  })();
 
-  // copy repair id
-  const copyBtn = document.getElementById('copyIdBtn');
-  copyBtn?.addEventListener('click', async () => {
-    const idText = document.getElementById('rid')?.textContent?.replace('#','') ?? '<?php echo e($req->id); ?>';
-    try{
-      await navigator.clipboard.writeText(idText);
-      copyBtn.classList.add('good');
-      copyBtn.innerHTML = '<i data-lucide="check"></i> Copied';
-      lucide.createIcons();
-      setTimeout(()=>{
-        copyBtn.classList.remove('good');
-        copyBtn.innerHTML = '<i data-lucide="copy"></i> Copy ID';
-        lucide.createIcons();
-      }, 1400);
-    }catch(e){}
-  });
+  // copy id
+  (function(){
+    const btn = document.getElementById('copyIdBtn');
+    btn?.addEventListener('click', async () => {
+      const idText = (document.getElementById('rid')?.textContent || '<?php echo e($req->id); ?>').replace('#','');
+      try{
+        await navigator.clipboard.writeText(idText);
+        btn.classList.add('bg-slate-900','text-white','border-slate-900');
+        btn.textContent = 'Copied';
+        setTimeout(()=> {
+          btn.classList.remove('bg-slate-900','text-white','border-slate-900');
+          btn.textContent = 'Copy ID';
+        }, 1200);
+      }catch(e){}
+    });
+  })();
 </script>
 <?php $__env->stopPush(); ?>
 

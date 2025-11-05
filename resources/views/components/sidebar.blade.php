@@ -85,28 +85,36 @@
     <span class="truncate">Livechat</span>
   </a>
 
-  {{-- Users (Admin area) --}}
-  @php $active = $is('admin.users.*'); @endphp
-  <a href="{{ $rl('admin.users.index', url('/admin/users')) }}" class="{{ $base }} {{ $active ? $on : $off }}">
+  {{-- Profile --}}
+  @php $active = $is('profile.*'); @endphp
+  <a href="{{ $rl('profile.edit', url('/profile')) }}" class="{{ $base }} {{ $active ? $on : $off }}">
     <span class="{{ $dot($active) }}"></span>
     <span class="w-8 h-8 flex items-center justify-center">
-      {{-- users --}}
-      <svg class="{{ $ico($active) }}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-    </span>
-    <span class="truncate">Users</span>
-  </a>
-
-  {{-- Manage Users (general) --}}
-  @php $active = $is('users.*'); @endphp
-  <a href="{{ $rl('users.index', url('/users')) }}" class="{{ $base }} {{ $active ? $on : $off }}">
-    <span class="{{ $dot($active) }}"></span>
-    <span class="w-8 h-8 flex items-center justify-center">
-      <svg class="{{ $ico($active) }}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-        <path d="M9 11l2 2 4-4"/>
+      <svg class="{{ $ico($active) }}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+          fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
       </svg>
     </span>
-    <span class="truncate">Manage Users</span>
+    <span class="truncate">Profile</span>
   </a>
+
+  {{-- Manage Users (admin only) --}}
+  @can('manage-users')
+    @php $active = $is('admin.users.*'); @endphp
+    <a href="{{ $rl('admin.users.index', url('/admin/users')) }}" class="{{ $base }} {{ $active ? $on : $off }}">
+      <span class="{{ $dot($active) }}"></span>
+      <span class="w-8 h-8 flex items-center justify-center">
+        <svg class="{{ $ico($active) }}" xmlns="http://www.w3.org/2000/svg" fill="none"
+            viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <path d="M9 11l2 2 4-4"/>
+        </svg>
+      </span>
+      <span class="truncate">Manage Users</span>
+    </a>
+  @endcan
 
 </nav>

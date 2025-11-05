@@ -16,6 +16,9 @@ use App\Http\Controllers\AssetController;
 
 // Admin User Controller
 use App\Http\Controllers\Admin\UserController as AdminUserController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Auth;
 
 // หน้าแรก → login
 Route::redirect('/', '/login');
@@ -28,10 +31,41 @@ Route::middleware('guest')->group(function () {
     Route::post('/register', [RegisteredUserController::class, 'store']);
 });
 
-// ---------------------
-// Authenticated
-// ---------------------
 Route::middleware(['auth'])->group(function () {
+    // ... routes อื่น ๆ ของคุณ
+
+    // ===== Admin → Manage Users (เฉพาะคนที่มีสิทธิ์ manage-users) =====
+    Route::prefix('admin')
+        ->name('admin.')
+        ->middleware('can:manage-users')
+        ->group(function () {
+            Route::prefix('users')->name('users.')->group(function () {
+                Route::get('/',              [AdminUserController::class, 'index'])->name('index');
+                Route::get('/create',        [AdminUserController::class, 'create'])->name('create');
+                Route::post('/',             [AdminUserController::class, 'store'])->name('store');
+
+                // ใช้ implicit binding ของ {user} ได้เลย
+                Route::get('/{user}/edit',   [AdminUserController::class, 'edit'])->name('edit');
+                Route::put('/{user}',        [AdminUserController::class, 'update'])->name('update');
+                Route::delete('/{user}',     [AdminUserController::class, 'destroy'])->name('destroy');
+
+                // Bulk action: change_role / delete
+                Route::post('/bulk',         [AdminUserController::class, 'bulk'])->name('bulk');
+            });
+        });
+
+    Route::get('/debug/whoami', function (Request $request) {
+        /** @var \App\Models\User|null $u */
+        $u = $request->user();
+
+        return response()->json([
+            'id'    => $u?->id,
+            'email' => $u?->email,
+            'role'  => $u?->role,
+            'can_manage_users' => $u ? Gate::forUser($u)->allows('manage-users') : false,
+            'guard' => Auth::getDefaultDriver(),
+        ]);
+    })->middleware('auth');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -61,15 +95,13 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/chat/threads/{thread}/messages', [ChatController::class, 'messages'])->name('chat.messages');
     Route::post('/chat/threads/{thread}/messages', [ChatController::class, 'storeMessage'])->name('chat.messages.store');
 
-    Route::prefix('assets')->name('assets.')->group(function () {
-        Route::get('/',              [AssetController::class, 'indexPage'])->name('index');
-        Route::get('/create',        [AssetController::class, 'createPage'])->name('create');
-        Route::post('/',             [AssetController::class, 'storePage'])->name('store');
-        Route::get('/{asset}',       [AssetController::class, 'showPage'])->name('show');
-        Route::get('/{asset}/edit',  [AssetController::class, 'editPage'])->name('edit');
-        Route::put('/{asset}',       [AssetController::class, 'updatePage'])->name('update');
-        Route::delete('/{asset}',    [AssetController::class, 'destroyPage'])->name('destroy');
-    });
+    Route::get('/assets', [AssetController::class, 'indexPage'])->name('assets.index');
+    Route::get('/assets/create', [AssetController::class, 'createPage'])->name('assets.create');
+    Route::post('/assets', [AssetController::class, 'storePage'])->name('assets.store');        
+    Route::get('/assets/{asset}', [AssetController::class, 'showPage'])->name('assets.show');
+    Route::get('/assets/{asset}/edit', [AssetController::class, 'editPage'])->name('assets.edit');
+    Route::put('/assets/{asset}', [AssetController::class, 'updatePage'])->name('assets.update');
+    Route::delete('/assets/{asset}', [AssetController::class, 'destroyPage'])->name('assets.destroy');
 
     Route::prefix('admin')->name('admin.')->middleware('can:manage-users')->group(function () {
         Route::prefix('users')->name('users.')->group(function () {

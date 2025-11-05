@@ -33,7 +33,7 @@
       backdrop-filter: blur(6px);
     }
     .navbar-hero .navbar-brand{
-      font-weight: 800;
+      font-weight: 700; /* ลดความหนา */
       letter-spacing: .2px;
       font-size: 1.45rem;
       line-height: 1;
@@ -105,8 +105,8 @@
           <img src="{{ asset('images/logoppk.png') }}" alt="PPK Logo" class="brand-logo">
         </span>
         <span>
-          Asset Repair
-          <div class="brand-kicker fw-normal">Management Dashboard</div>
+          Laravel
+          <div class="brand-kicker fw-normal">Asset Repair Management</div>
         </span>
       </a>
 
@@ -115,13 +115,7 @@
       </button>
 
       <div class="collapse navbar-collapse" id="topNav">
-        <!-- ช่องค้นหา (กลาง) -->
-        <form class="ms-lg-5 me-lg-auto d-none d-lg-block" role="search" style="min-width:360px;">
-          <div class="input-group">
-            <span class="input-group-text bg-white border-0"><i class="bi bi-search"></i></span>
-            <input class="form-control border-0" type="search" placeholder="ค้นหาเลขใบซ่อม / ผู้แจ้ง / รายการ..." aria-label="Search">
-          </div>
-        </form>
+        <!-- (ลบช่องค้นหาออกตามคำขอ) -->
 
         <ul class="navbar-nav ms-auto align-items-center gap-2">
           <li class="nav-item d-none d-sm-block">
@@ -165,16 +159,7 @@
 
   <!-- CONTENT -->
   <main class="container-fluid py-4">
-    <!-- หัวข้อ + badges (แถบแบ่งสีถูกลบออกแล้ว) -->
-    <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
-      <div class="fs-5 fw-bold text-dark">Asset Repair Dashboard</div>
-      <div class="d-flex align-items-center gap-2 ms-auto">
-        <span class="status-badge status-total">Total: <strong>300</strong></span>
-        <span class="status-badge status-pending">Pending: <strong>103</strong></span>
-        <span class="status-badge status-progress">In progress: <strong>107</strong></span>
-        <span class="status-badge status-done">Completed: <strong>90</strong></span>
-      </div>
-    </div>
+    <!-- (ลบส่วนสรุปตัวเลขที่แคปไว้) -->
 
     <!-- demo cards -->
     <div class="row g-3">

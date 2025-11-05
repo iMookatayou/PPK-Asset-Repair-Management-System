@@ -1,12 +1,34 @@
-
 <?php
+  // อ่าน toast ปกติ
   $toast = session('toast');
   if ($toast) { session()->forget('toast'); }
 
-  $type     = $toast['type']     ?? null;          // success|info|warning|error
+  // Base fields
+  $type     = $toast['type']     ?? null;      // success|info|warning|error
   $message  = $toast['message']  ?? null;
-  $position = $toast['position'] ?? 'tc';          // tr|tl|br|bl|center|tc|bc
+  $position = $toast['position'] ?? 'tc';      // tr|tl|br|bl|center|tc|bc
   $timeout  = (int)($toast['timeout'] ?? 3200);
+  $size     = $toast['size']     ?? 'lg';      // sm|md|lg
+
+  // ===== เพิ่มเติม: map error/status → toast อัตโนมัติ =====
+  // (กรณี Laravel login fail จะมี $errors->first() เสมอ)
+  $firstError = ($errors ?? null)?->first();
+  if (!$message && $firstError) {
+      $message = $firstError;
+      $type    = $type ?: 'error';
+  }
+
+  // ถ้ามี session('error') แบบธรรมดา
+  if (!$message && session('error')) {
+      $message = session('error');
+      $type    = $type ?: 'error';
+  }
+
+  // ถ้ามี session('status') (เช่น reset password ส่งเมลสำเร็จ ฯลฯ)
+  if (!$message && session('status')) {
+      $message = session('status');
+      $type    = $type ?: 'success';
+  }
 
   $lottieGreen = asset('lottie/lock_with_green_tick.json');
   $lottieRed   = asset('lottie/lock_with_red_tick.json');
@@ -29,15 +51,24 @@
   .toast-pos.tc{align-items:flex-start;justify-content:center;padding-top:calc(var(--topbar-h,0px) + .75rem)}
   .toast-pos.bc{align-items:flex-end;justify-content:center;padding-bottom:.75rem}
 
-  /* แทนที่เดิมของ .toast-card ทั้งบล็อก */
+  /* ============ Design tokens (ผ่าน CSS variables) ============ */
   .toast-card{
+    --toast-max-w: min(92vw, 640px);
+    --toast-min-w: 420px;
+    --toast-pad-x: 22px;
+    --toast-pad-y: 16px;
+    --toast-fs: 16px;
+    --toast-icon: 36px;
+    --toast-radius: 14px;
+    --toast-bar-h: 4px;
+
     pointer-events:auto;
-    width:max-content;
-    max-width:min(92vw, 560px);
-    min-width:400px;
+    width: max-content;
+    max-width: var(--toast-max-w);
+    min-width: var(--toast-min-w);
 
     background:#fff;
-    border-radius:1rem;
+    border-radius: var(--toast-radius);
     border:1px solid #e5eef7;
     box-shadow:0 14px 48px rgba(15,23,42,.14);
 
@@ -48,28 +79,54 @@
     display:flex;
     align-items:center;
     gap:.9rem;
-    padding:14px 16px 14px 16px;
-
+    padding: var(--toast-pad-y) var(--toast-pad-x);
     position:relative;
     overflow:hidden;
   }
 
-  .toast-card.show{
-    opacity:1;
-    transform:translateY(0);
+  .toast-card.show{ opacity:1; transform:translateY(0); }
+
+  /* ขนาด (ใหม่) */
+  .toast--sm{
+    --toast-max-w: min(92vw, 420px);
+    --toast-min-w: 320px;
+    --toast-pad-x: 16px;
+    --toast-pad-y: 10px;
+    --toast-fs: 14px;
+    --toast-icon: 28px;
+    --toast-radius: 12px;
+    --toast-bar-h: 3px;
+  }
+  .toast--md{
+    --toast-max-w: min(92vw, 520px);
+    --toast-min-w: 380px;
+    --toast-pad-x: 18px;
+    --toast-pad-y: 14px;
+    --toast-fs: 15px;
+    --toast-icon: 32px;
+    --toast-radius: 12px;
+    --toast-bar-h: 4px;
+  }
+  .toast--lg{ /* ค่าเริ่มต้นของเราให้ใหญ่ */
+    --toast-max-w: min(92vw, 680px);
+    --toast-min-w: 440px;
+    --toast-pad-x: 24px;
+    --toast-pad-y: 18px;
+    --toast-fs: 16px;
+    --toast-icon: 36px;
+    --toast-radius: 16px;
+    --toast-bar-h: 4px;
   }
 
   .toast-icon{
-    flex:0 0 32px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
+    flex:0 0 var(--toast-icon);
+    display:flex; align-items:center; justify-content:center;
   }
 
   .toast-msg{
-    font-size:15px;
+    font-size: var(--toast-fs);
     color:#0f172a;
-    line-height:1.45;
+    line-height:1.5;
     white-space:normal;
     word-break:break-word;
     flex:1;
@@ -78,37 +135,31 @@
   .toast-close{
     border:0;
     background:transparent;
-    font-size:16px;
+    font-size: calc(var(--toast-fs) + 1px);
     color:#64748b;
     cursor:pointer;
+    line-height:1;
   }
-
-  .toast-close:hover{
-    color:#0f172a;
-  }
+  .toast-close:hover{ color:#0f172a; }
 
   /* Progress bar */
   .toast-bar{
     position:absolute;
-    bottom:0;
-    left:0;
-    height:4px;
+    bottom:0; left:0;
+    height: var(--toast-bar-h);
     width:100%;
     background:#f1f5f9;
   }
-
-  .toast-fill{
-    height:4px;
-    width:0;
-    transition:width linear;
-  }
-
+  .toast-fill{ height:var(--toast-bar-h); width:0; transition:width linear; }
   .fill-success{background:#10b981;}
   .fill-info{background:#3b82f6;}
   .fill-warning{background:#f59e0b;}
   .fill-error{background:#ef4444;}
 
-  @media (max-width:420px){.toast-card{min-width:calc(100vw - 2rem)}}
+  /* Mobile safety */
+  @media (max-width:480px){
+    .toast-card{ min-width: calc(100vw - 2rem); }
+  }
 </style>
 
 <div class="toast-overlay" aria-live="polite" aria-atomic="true"></div>
@@ -122,6 +173,9 @@
     error:   <?php echo json_encode($lottieMap['error'], 15, 512) ?>,
   };
 
+  // ถ้าอยากบังคับตำแหน่งจาก layout ให้ตั้งค่าตัวนี้เป็น 'tc' เป็นต้น
+  const FORCE_POSITION = 'tc';
+
   function ensurePos(position){
     const overlay = document.querySelector('.toast-overlay');
     overlay.innerHTML = '';
@@ -131,9 +185,15 @@
     return { overlay, posEl };
   }
 
-  const FORCE_POSITION = 'tc';
-
-  function showToast({type='info', message='', position='tc', timeout=3200} = {}){
+  /*
+    showToast options:
+    - type: 'success'|'info'|'warning'|'error'
+    - message: string
+    - position: 'tr'|'tl'|'br'|'bl'|'center'|'tc'|'bc'
+    - timeout: milliseconds
+    - size: 'sm'|'md'|'lg'  (ใหม่)
+  */
+  function showToast({type='info', message='', position='tc', timeout=3200, size='lg'} = {}){
     position = FORCE_POSITION || position || 'tc';
     const allowed = ['tr','tl','br','bl','center','tc','bc'];
     if (!allowed.includes(position)) position = 'tc';
@@ -142,25 +202,36 @@
     const { posEl } = ensurePos(position);
 
     const card = document.createElement('section');
-    card.className = `toast-card toast-${type}`;
+    const sizeClass = (['sm','md','lg'].includes(size) ? `toast--${size}` : 'toast--lg');
+    card.className = `toast-card ${sizeClass} toast-${type}`;
     card.setAttribute('role','status');
 
-    card.innerHTML = `
-      <div class="toast-icon">
-        <lottie-player src="${LOTTIE[type] || LOTTIE.success}" style="width:32px;height:32px" background="transparent" speed="1" autoplay></lottie-player>
-      </div>
+    // โครงสร้าง DOM
+    const icon = document.createElement('div');
+    icon.className = 'toast-icon';
+    icon.innerHTML = `<lottie-player src="${LOTTIE[type] || LOTTIE.success}"
+                        style="width:var(--toast-icon);height:var(--toast-icon)"
+                        background="transparent" speed="1" autoplay></lottie-player>`;
 
-      <div class="toast-msg">${message}</div>
+    const msg = document.createElement('div');
+    msg.className = 'toast-msg';
+    msg.textContent = message ?? ''; // ใช้ textContent เพื่อความปลอดภัย
 
-      <button class="toast-close">&times;</button>
+    const btn = document.createElement('button');
+    btn.className = 'toast-close';
+    btn.setAttribute('aria-label','Close');
+    btn.innerHTML = '&times;';
 
-      <div class="toast-bar"><div class="toast-fill fill-${type}"></div></div>
-    `;
+    const bar = document.createElement('div');
+    bar.className = 'toast-bar';
+    const fill = document.createElement('div');
+    fill.className = `toast-fill fill-${type}`;
+    bar.appendChild(fill);
 
+    card.append(icon, msg, btn, bar);
     posEl.appendChild(card);
 
-    const fill = card.querySelector('.toast-fill');
-
+    // Animate in + progress
     requestAnimationFrame(() => {
       card.classList.add('show');
       requestAnimationFrame(() => {
@@ -170,12 +241,15 @@
     });
 
     let timer = setTimeout(close, timeout + 60);
+
     function close(){
       card.classList.remove('show');
       setTimeout(()=> card.remove(), 200);
     }
 
-    card.querySelector('.toast-close').addEventListener('click', close);
+    btn.addEventListener('click', close);
+
+    // Pause on hover
     card.addEventListener('mouseenter', () => {
       fill.style.transition = 'none';
       const w = getComputedStyle(fill).width;
@@ -191,6 +265,8 @@
       });
       timer = setTimeout(close, remainMs + 50);
     });
+
+    // ESC to close (ครั้งเดียวสำหรับอันนี้)
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); }, { once:true });
   }
 
@@ -199,7 +275,13 @@
 
   <?php if($type && $message): ?>
   document.addEventListener('DOMContentLoaded', function(){
-    showToast({ type: <?php echo json_encode($type, 15, 512) ?>, message: <?php echo json_encode($message, 15, 512) ?>, position: <?php echo json_encode($position, 15, 512) ?>, timeout: <?php echo json_encode($timeout, 15, 512) ?> });
+    window.showToast({
+      type: <?php echo json_encode($type, 15, 512) ?>,
+      message: <?php echo json_encode($message, 15, 512) ?>,
+      position: <?php echo json_encode($position, 15, 512) ?>,
+      timeout: <?php echo json_encode($timeout, 15, 512) ?>,
+      size: <?php echo json_encode($size ?? 'lg', 15, 512) ?> // default ให้ใหญ่
+    });
   });
   <?php endif; ?>
 })();

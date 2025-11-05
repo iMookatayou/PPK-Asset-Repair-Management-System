@@ -13,6 +13,8 @@
   <?php echo app('Illuminate\Foundation\Vite')(['resources/css/app.css','resources/js/app.js']); ?>
   <?php echo $__env->yieldPushContent('styles'); ?>
 
+  <?php echo $__env->yieldPushContent('head'); ?>
+
     <style>
     :root{
       color-scheme: light;

@@ -13,6 +13,8 @@
   @vite(['resources/css/app.css','resources/js/app.js'])
   @stack('styles')
 
+  @stack('head')
+
     <style>
     :root{
       color-scheme: light;

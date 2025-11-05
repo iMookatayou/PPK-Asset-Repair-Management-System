@@ -6,112 +6,199 @@
 <?php
   use Illuminate\Support\Str;
 
-  $current = request('status');
-  $isActive = fn(string $s = null) => ($current === $s) ? 'btn-primary' : 'btn-ghost';
+  $q        = request('q');
+  $status   = request('status'); // null|pending|accepted|in_progress|on_hold|resolved|closed|cancelled
+  $sort     = request('sort','updated_desc'); // updated_desc|updated_asc|created_desc|created_asc
+  $perPage  = (int) request('per_page', 20);
 
-  $statusStyles = [
-    'pending'     => 'badge-warning badge-outline',
-    'accepted'    => 'badge-info badge-outline',
-    'in_progress' => 'badge-info',
-    'on_hold'     => 'badge-ghost',
-    'resolved'    => 'badge-success',
-    'closed'      => 'badge-neutral',
-    'cancelled'   => 'badge-neutral badge-outline',
+  $tabClass = function (?string $s) use ($status) {
+    $active = $status === $s || (is_null($s) && is_null($status));
+    return $active
+      ? 'bg-indigo-600 text-white shadow-sm'
+      : 'bg-white text-slate-700 hover:bg-slate-50';
+  };
+
+  // Badges (Tailwind only)
+  $statusClasses = [
+    'pending'     => 'text-amber-700 bg-amber-50 ring-1 ring-amber-200',
+    'accepted'    => 'text-sky-700 bg-sky-50 ring-1 ring-sky-200',
+    'in_progress' => 'text-sky-800 bg-sky-100',
+    'on_hold'     => 'text-slate-700 bg-slate-50 ring-1 ring-slate-200',
+    'resolved'    => 'text-emerald-800 bg-emerald-100',
+    'closed'      => 'text-slate-800 bg-slate-200',
+    'cancelled'   => 'text-slate-600 bg-white ring-1 ring-slate-300',
   ];
-
-  $humanize = fn($s) => Str::of($s)->replace('_',' ')->title();
+  $human = fn($s) => Str::of($s)->replace('_',' ')->title();
 ?>
 
-<div class="max-w-6xl mx-auto py-6 space-y-5">
+<div class="mx-auto max-w-7xl py-6 space-y-6">
   
-  <div class="flex items-center justify-between gap-3">
-    <div class="join hidden md:inline-flex">
-      <a href="<?php echo e(route('repairs.my_jobs', ['status'=>'in_progress'])); ?>"
-         class="btn btn-sm join-item <?php echo e($isActive('in_progress')); ?>">In Progress</a>
-      <a href="<?php echo e(route('repairs.my_jobs', ['status'=>'resolved'])); ?>"
-         class="btn btn-sm join-item <?php echo e($isActive('resolved')); ?>">Resolved</a>
-      <a href="<?php echo e(route('repairs.my_jobs')); ?>"
-         class="btn btn-sm join-item <?php echo e($isActive(null)); ?>">All</a>
+  <div class="flex flex-wrap items-center gap-3">
+    <div class="mr-auto">
+      <h1 class="text-xl font-semibold text-slate-900">My Repair Jobs</h1>
+      <p class="text-sm text-slate-500">งานที่รับผิดชอบทั้งหมดของฉัน</p>
     </div>
+    <a href="<?php echo e(route('maintenance.requests.index')); ?>"
+       class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+      All Requests
+    </a>
+  </div>
 
-    <div class="md:hidden dropdown dropdown-end">
-      <label tabindex="0" class="btn btn-sm btn-ghost">Filter</label>
-      <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-40">
-        <li><a class="<?php echo e($current === 'in_progress' ? 'active' : ''); ?>"
-               href="<?php echo e(route('repairs.my_jobs', ['status'=>'in_progress'])); ?>">In Progress</a></li>
-        <li><a class="<?php echo e($current === 'resolved' ? 'active' : ''); ?>"
-               href="<?php echo e(route('repairs.my_jobs', ['status'=>'resolved'])); ?>">Resolved</a></li>
-        <li><a class="<?php echo e(is_null($current) ? 'active' : ''); ?>"
-               href="<?php echo e(route('repairs.my_jobs')); ?>">All</a></li>
-      </ul>
+  
+  <div class="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div class="flex flex-col gap-3 p-4 md:flex-row md:items-center md:gap-4">
+      
+      <div class="hidden md:flex items-center gap-2">
+        <a href="<?php echo e(route('repairs.my_jobs', ['status'=>'in_progress'] + request()->except('page','status'))); ?>"
+           class="inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-medium <?php echo e($tabClass('in_progress')); ?>">
+          In Progress
+        </a>
+        <a href="<?php echo e(route('repairs.my_jobs', ['status'=>'resolved'] + request()->except('page','status'))); ?>"
+           class="inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-medium <?php echo e($tabClass('resolved')); ?>">
+          Resolved
+        </a>
+        <a href="<?php echo e(route('repairs.my_jobs', request()->except('page','status'))); ?>"
+           class="inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-medium <?php echo e($tabClass(null)); ?>">
+          All
+        </a>
+      </div>
+
+      
+      <form method="GET" class="md:hidden w-full">
+        <?php $__currentLoopData = request()->except(['status','page']); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $k => $v): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+          <input type="hidden" name="<?php echo e($k); ?>" value="<?php echo e($v); ?>">
+        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+        <select name="status"
+                class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-indigo-500">
+          <option value="" <?php if(!$status): echo 'selected'; endif; ?>>All</option>
+          <option value="in_progress" <?php if($status==='in_progress'): echo 'selected'; endif; ?>>In Progress</option>
+          <option value="resolved" <?php if($status==='resolved'): echo 'selected'; endif; ?>>Resolved</option>
+        </select>
+      </form>
+
+      
+      <form method="GET" class="flex w-full flex-col gap-3 md:ml-auto md:w-auto md:flex-row md:items-center">
+        <?php $__currentLoopData = request()->except(['q','sort','per_page','page']); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $k => $v): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+          <input type="hidden" name="<?php echo e($k); ?>" value="<?php echo e($v); ?>">
+        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+
+        <div class="relative md:w-80">
+          <svg class="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none">
+            <path d="m21 21-4.35-4.35M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16z"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <input type="text" name="q" value="<?php echo e($q); ?>"
+                 placeholder="Search subject, asset, reporter…"
+                 class="w-full rounded-lg border border-slate-300 bg-white px-9 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:ring-indigo-500"/>
+        </div>
+
+        <select name="sort"
+                class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-indigo-500">
+          <option value="updated_desc" <?php if($sort==='updated_desc'): echo 'selected'; endif; ?>>Updated ↓</option>
+          <option value="updated_asc"  <?php if($sort==='updated_asc'): echo 'selected'; endif; ?>>Updated ↑</option>
+          <option value="created_desc" <?php if($sort==='created_desc'): echo 'selected'; endif; ?>>Created ↓</option>
+          <option value="created_asc"  <?php if($sort==='created_asc'): echo 'selected'; endif; ?>>Created ↑</option>
+        </select>
+
+        <select name="per_page"
+                class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-indigo-500">
+          <?php $__currentLoopData = [10,20,50,100]; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $n): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+            <option value="<?php echo e($n); ?>" <?php if($perPage===$n): echo 'selected'; endif; ?>><?php echo e($n); ?>/page</option>
+          <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+        </select>
+
+        <div class="flex items-center gap-2">
+          <button type="submit"
+                  class="inline-flex items-center rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+            Apply
+          </button>
+          <?php if($q || $sort!=='updated_desc' || $perPage!==20 || $status): ?>
+            <a href="<?php echo e(route('repairs.my_jobs')); ?>"
+               class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              Reset
+            </a>
+          <?php endif; ?>
+        </div>
+      </form>
     </div>
   </div>
 
   
-  <div class="card bg-base-100 shadow-sm border hidden md:block">
+  <div class="hidden md:block rounded-xl border border-slate-200 bg-white shadow-sm">
     <div class="overflow-x-auto">
-      <table class="table table-sm md:table-md">
-        <thead class="sticky top-0 z-10 bg-base-100/95 backdrop-blur supports-[backdrop-filter]:bg-base-100/70">
-          <tr class="text-xs text-base-content/70 border-b">
-            <th class="w-[30%]">Subject</th>
-            <th>Asset</th>
-            <th>Reporter</th>
-            <th>Status</th>
-            <th>Updated</th>
-            <th class="text-right">Actions</th>
+      <table class="w-full table-auto text-left">
+        <thead class="sticky top-0 z-10 bg-white/90 backdrop-blur">
+          <tr class="text-xs uppercase tracking-wide text-slate-500 border-b border-slate-200">
+            <th class="px-4 py-3 w-[34%]">Subject</th>
+            <th class="px-4 py-3 w-[22%]">Asset</th>
+            <th class="px-4 py-3 w-[16%]">Reporter</th>
+            <th class="px-4 py-3 w-[12%]">Status</th>
+            <th class="px-4 py-3 w-[12%]">Updated</th>
+            <th class="px-4 py-3 w-[4%]"></th>
           </tr>
         </thead>
-        <tbody>
+        <tbody class="text-sm text-slate-800">
         <?php $__empty_1 = true; $__currentLoopData = $list; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $r): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-          <tr class="hover:bg-base-200/40">
-            <td>
-              <a href="<?php echo e(route('maintenance.requests.show', $r)); ?>" class="link link-hover font-medium">
+          <tr class="border-b border-slate-100 hover:bg-slate-50/60 align-top">
+            <td class="px-4 py-3">
+              <a href="<?php echo e(route('maintenance.requests.show', $r)); ?>"
+                 class="font-medium text-slate-900 hover:underline">
                 <?php echo e($r->title); ?>
 
               </a>
-              <div class="text-xs opacity-70"><?php echo e(Str::limit($r->description ?? '', 90)); ?></div>
+              <div class="mt-0.5 text-xs text-slate-500"><?php echo e(Str::limit($r->description ?? '', 100)); ?></div>
             </td>
-            <td class="whitespace-nowrap">#<?php echo e($r->asset_id); ?> — <?php echo e($r->asset->name ?? '-'); ?></td>
-            <td class="whitespace-nowrap"><?php echo e($r->reporter->name ?? '-'); ?></td>
-            <td>
-              <?php $style = $statusStyles[$r->status] ?? 'badge-ghost'; ?>
-              <span class="badge <?php echo e($style); ?>"><?php echo e($humanize($r->status)); ?></span>
+            <td class="px-4 py-3 whitespace-nowrap">
+              #<?php echo e($r->asset_id); ?> — <?php echo e($r->asset->name ?? '-'); ?>
+
+              <?php if($r->location ?? null): ?>
+                <div class="text-xs text-slate-500"><?php echo e($r->location); ?></div>
+              <?php endif; ?>
             </td>
-            <td class="whitespace-nowrap text-sm opacity-80">
+            <td class="px-4 py-3 whitespace-nowrap"><?php echo e($r->reporter->name ?? '-'); ?></td>
+            <td class="px-4 py-3">
+              <?php $cls = $statusClasses[$r->status] ?? 'text-slate-700 bg-slate-50 ring-1 ring-slate-200'; ?>
+              <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium <?php echo e($cls); ?>">
+                <?php echo e($human($r->status)); ?>
+
+              </span>
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap text-slate-600">
               <?php echo e(optional($r->updated_at)->format('Y-m-d H:i')); ?>
 
             </td>
-            <td>
+            <td class="px-4 py-3">
               <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('tech-only')): ?>
-                <div class="flex justify-end gap-2">
+                
+                <div class="flex justify-end gap-1.5">
                   <?php if($r->status==='pending'): ?>
                     <form method="POST" action="<?php echo e(route('maintenance.requests.transition', $r)); ?>">
                       <?php echo csrf_field(); ?> <input type="hidden" name="action" value="accept">
-                      <button class="btn btn-xs md:btn-sm btn-info text-white">Queue</button>
+                      <button class="rounded-md bg-sky-600 px-2 py-1 text-xs font-medium text-white hover:bg-sky-700">Queue</button>
                     </form>
                     <form method="POST" action="<?php echo e(route('maintenance.requests.transition', $r)); ?>">
                       <?php echo csrf_field(); ?> <input type="hidden" name="action" value="start">
-                      <button class="btn btn-xs md:btn-sm btn-accent text-white">Start</button>
+                      <button class="rounded-md bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-700">Start</button>
                     </form>
                   <?php elseif($r->status==='accepted'): ?>
                     <form method="POST" action="<?php echo e(route('maintenance.requests.transition', $r)); ?>">
                       <?php echo csrf_field(); ?> <input type="hidden" name="action" value="start">
-                      <button class="btn btn-xs md:btn-sm btn-accent text-white">Start</button>
+                      <button class="rounded-md bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-700">Start</button>
                     </form>
                   <?php elseif($r->status==='in_progress'): ?>
                     <form method="POST" action="<?php echo e(route('maintenance.requests.transition', $r)); ?>">
                       <?php echo csrf_field(); ?> <input type="hidden" name="action" value="hold">
-                      <button class="btn btn-xs md:btn-sm btn-warning text-white">Hold</button>
+                      <button class="rounded-md bg-amber-600 px-2 py-1 text-xs font-medium text-white hover:bg-amber-700">Hold</button>
                     </form>
                     <form method="POST" action="<?php echo e(route('maintenance.requests.transition', $r)); ?>">
                       <?php echo csrf_field(); ?> <input type="hidden" name="action" value="resolve">
-                      <button class="btn btn-xs md:btn-sm btn-success text-white">Resolve</button>
+                      <button class="rounded-md bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-700">Resolve</button>
                     </form>
                   <?php elseif($r->status==='resolved'): ?>
                     <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('admin-only')): ?>
                       <form method="POST" action="<?php echo e(route('maintenance.requests.transition', $r)); ?>">
                         <?php echo csrf_field(); ?> <input type="hidden" name="action" value="close">
-                        <button class="btn btn-xs md:btn-sm btn-neutral text-white">Close</button>
+                        <button class="rounded-md bg-slate-700 px-2 py-1 text-xs font-medium text-white hover:bg-slate-800">Close</button>
                       </form>
                     <?php endif; ?>
                   <?php endif; ?>
@@ -120,16 +207,25 @@
             </td>
           </tr>
         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-          <tr><td colspan="6">
-            <div class="py-10 text-center text-base-content/60">No jobs found.</div>
-          </td></tr>
+          <tr>
+            <td colspan="6" class="px-4 py-10">
+              <div class="text-center text-slate-500">
+                <div class="mb-2 text-sm">No jobs found.</div>
+                <a href="<?php echo e(route('repairs.my_jobs')); ?>"
+                   class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                  Clear filters
+                </a>
+              </div>
+            </td>
+          </tr>
         <?php endif; ?>
         </tbody>
       </table>
     </div>
 
-    <div class="card-body pt-0">
+    <div class="px-4 py-3">
       <div class="flex justify-center">
+        
         <?php echo e($list->withQueryString()->links()); ?>
 
       </div>
@@ -139,76 +235,89 @@
   
   <div class="grid grid-cols-1 gap-3 md:hidden">
     <?php $__empty_1 = true; $__currentLoopData = $list; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $r): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-      <div class="card bg-base-100 border">
-        <div class="card-body p-4">
+      <div class="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div class="p-4">
           <div class="flex items-start justify-between gap-3">
-            <div class="space-y-1">
-              <a href="<?php echo e(route('maintenance.requests.show', $r)); ?>" class="link link-hover font-semibold">
+            <div>
+              <a href="<?php echo e(route('maintenance.requests.show', $r)); ?>"
+                 class="font-semibold text-slate-900 hover:underline">
                 <?php echo e($r->title); ?>
 
               </a>
-              <p class="text-sm opacity-70"><?php echo e(Str::limit($r->description ?? '', 120)); ?></p>
+              <p class="mt-1 text-sm text-slate-600"><?php echo e(Str::limit($r->description ?? '', 120)); ?></p>
             </div>
-            <?php $style = $statusStyles[$r->status] ?? 'badge-ghost'; ?>
-            <span class="badge <?php echo e($style); ?>"><?php echo e($humanize($r->status)); ?></span>
+            <?php $cls = $statusClasses[$r->status] ?? 'text-slate-700 bg-slate-50 ring-1 ring-slate-200'; ?>
+            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium <?php echo e($cls); ?>">
+              <?php echo e($human($r->status)); ?>
+
+            </span>
           </div>
 
-          <div class="mt-3 grid grid-cols-2 gap-2 text-sm">
-            <div class="opacity-70">Asset</div>
-            <div>#<?php echo e($r->asset_id); ?> — <?php echo e($r->asset->name ?? '-'); ?></div>
-            <div class="opacity-70">Reporter</div>
-            <div><?php echo e($r->reporter->name ?? '-'); ?></div>
-            <div class="opacity-70">Updated</div>
-            <div><?php echo e(optional($r->updated_at)->format('Y-m-d H:i')); ?></div>
+          <div class="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+            <div class="text-slate-500">Asset</div>
+            <div class="text-slate-800">#<?php echo e($r->asset_id); ?> — <?php echo e($r->asset->name ?? '-'); ?></div>
+            <div class="text-slate-500">Reporter</div>
+            <div class="text-slate-800"><?php echo e($r->reporter->name ?? '-'); ?></div>
+            <div class="text-slate-500">Updated</div>
+            <div class="text-slate-800"><?php echo e(optional($r->updated_at)->format('Y-m-d H:i')); ?></div>
           </div>
 
           <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('tech-only')): ?>
-            <div class="mt-4">
-              <?php if(in_array($r->status, ['pending','accepted','in_progress','resolved'])): ?>
-                <div class="join join-vertical w-full">
-                  <?php if($r->status==='pending'): ?>
-                    <form method="POST" action="<?php echo e(route('maintenance.requests.transition', $r)); ?>" class="join-item">
-                      <?php echo csrf_field(); ?> <input type="hidden" name="action" value="accept">
-                      <button class="btn btn-sm btn-info text-white w-full">Queue</button>
-                    </form>
-                    <form method="POST" action="<?php echo e(route('maintenance.requests.transition', $r)); ?>" class="join-item">
-                      <?php echo csrf_field(); ?> <input type="hidden" name="action" value="start">
-                      <button class="btn btn-sm btn-accent text-white w-full">Start</button>
-                    </form>
-                  <?php elseif($r->status==='accepted'): ?>
-                    <form method="POST" action="<?php echo e(route('maintenance.requests.transition', $r)); ?>" class="join-item">
-                      <?php echo csrf_field(); ?> <input type="hidden" name="action" value="start">
-                      <button class="btn btn-sm btn-accent text-white w-full">Start</button>
-                    </form>
-                  <?php elseif($r->status==='in_progress'): ?>
-                    <form method="POST" action="<?php echo e(route('maintenance.requests.transition', $r)); ?>" class="join-item">
-                      <?php echo csrf_field(); ?> <input type="hidden" name="action" value="hold">
-                      <button class="btn btn-sm btn-warning text-white w-full">Hold</button>
-                    </form>
-                    <form method="POST" action="<?php echo e(route('maintenance.requests.transition', $r)); ?>" class="join-item">
-                      <?php echo csrf_field(); ?> <input type="hidden" name="action" value="resolve">
-                      <button class="btn btn-sm btn-success text-white w-full">Resolve</button>
-                    </form>
-                  <?php elseif($r->status==='resolved'): ?>
-                    <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('admin-only')): ?>
-                      <form method="POST" action="<?php echo e(route('maintenance.requests.transition', $r)); ?>" class="join-item">
-                        <?php echo csrf_field(); ?> <input type="hidden" name="action" value="close">
-                        <button class="btn btn-sm btn-neutral text-white w-full">Close</button>
-                      </form>
-                    <?php endif; ?>
-                  <?php endif; ?>
-                </div>
+            <div class="mt-4 space-y-2">
+              <?php if($r->status==='pending'): ?>
+                <form method="POST" action="<?php echo e(route('maintenance.requests.transition', $r)); ?>">
+                  <?php echo csrf_field(); ?> <input type="hidden" name="action" value="accept">
+                  <button class="w-full rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-700">
+                    Queue
+                  </button>
+                </form>
+                <form method="POST" action="<?php echo e(route('maintenance.requests.transition', $r)); ?>">
+                  <?php echo csrf_field(); ?> <input type="hidden" name="action" value="start">
+                  <button class="w-full rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                    Start
+                  </button>
+                </form>
+              <?php elseif($r->status==='accepted'): ?>
+                <form method="POST" action="<?php echo e(route('maintenance.requests.transition', $r)); ?>">
+                  <?php echo csrf_field(); ?> <input type="hidden" name="action" value="start">
+                  <button class="w-full rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                    Start
+                  </button>
+                </form>
+              <?php elseif($r->status==='in_progress'): ?>
+                <form method="POST" action="<?php echo e(route('maintenance.requests.transition', $r)); ?>">
+                  <?php echo csrf_field(); ?> <input type="hidden" name="action" value="hold">
+                  <button class="w-full rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700">
+                    Hold
+                  </button>
+                </form>
+                <form method="POST" action="<?php echo e(route('maintenance.requests.transition', $r)); ?>">
+                  <?php echo csrf_field(); ?> <input type="hidden" name="action" value="resolve">
+                  <button class="w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">
+                    Resolve
+                  </button>
+                </form>
+              <?php elseif($r->status==='resolved'): ?>
+                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('admin-only')): ?>
+                  <form method="POST" action="<?php echo e(route('maintenance.requests.transition', $r)); ?>">
+                    <?php echo csrf_field(); ?> <input type="hidden" name="action" value="close">
+                    <button class="w-full rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800">
+                      Close
+                    </button>
+                  </form>
+                <?php endif; ?>
               <?php endif; ?>
             </div>
           <?php endif; ?>
         </div>
       </div>
     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-      <div class="card bg-base-100 border">
-        <div class="card-body items-center text-center">
-          <h3 class="font-medium">No jobs found</h3>
-          <p class="text-sm opacity-70">Try switching the filter to see more.</p>
-        </div>
+      <div class="rounded-xl border border-slate-200 bg-white p-6 text-center text-slate-500">
+        <div class="mb-2 text-sm">No jobs found</div>
+        <a href="<?php echo e(route('repairs.my_jobs')); ?>"
+           class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+          Clear filters
+        </a>
       </div>
     <?php endif; ?>
 

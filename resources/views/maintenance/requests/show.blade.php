@@ -1,372 +1,332 @@
 {{-- resources/views/maintenance/show.blade.php --}}
 @extends('layouts.app')
 
-@section('title','Repair #'.$req->id)
+@section('title', 'Repair #'.$req->id)
 
-@push('head')
-<style>
-  :root{
-    --bg:#0b0b0b;--card:#111213;--line:#25262a;--muted:#a1a1aa;--text:#e5e7eb;
-    --field:#0f1012;--primary:#1d2430;--primary-line:#343740;
-    --good:#16a34a;--warn:#eab308;--bad:#ef4444;--info:#3b82f6;
-    --chip:#0f1115;--chip-line:#2b2e36;
-    --accent:#4f46e5;--accent-2:#06b6d4;
-  }
-  /* layout base */
-  body{background:var(--bg);color:var(--text)}
-  .container{max-width:1100px;margin:0 auto;padding:18px}
-  .page-head{
-    position:sticky;top:0;z-index:30;
-    background:linear-gradient(180deg,rgba(10,10,10,.9),rgba(10,10,10,.7) 60%,transparent);
-    backdrop-filter: blur(6px);
-    padding:12px 0 8px;border-bottom:1px solid #131313;
-  }
-  .titlebar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .titlebar h1{font-size:20px;font-weight:700;display:flex;align-items:center;gap:10px;margin:0}
-  .subrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-  .card{
-    background:var(--card);border:1px solid var(--line);border-radius:16px;
-    padding:16px;margin:14px 0;
-    box-shadow:0 10px 30px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.02);
-  }
-  .card h3{margin:0 0 10px;font-size:16px;display:flex;align-items:center;gap:8px}
-  .grid-2{display:grid;grid-template-columns:2fr 1fr;gap:14px}
-  .grid-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  @media (max-width:980px){.grid-2{grid-template-columns:1fr}.grid-row{grid-template-columns:1fr}}
-  /* chips/badges */
-  .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;
-    border:1px solid var(--chip-line);background:var(--chip);font-size:12px;color:#d1d5db;white-space:nowrap}
-  .chip.soft{background:linear-gradient(180deg,#0f1218,#0c0e12);border-color:#1f2430}
-  .chip.good{border-color:var(--good);color:#86efac}
-  .chip.warn{border-color:var(--warn);color:#fde68a}
-  .chip.bad{border-color:var(--bad);color:#fecaca}
-  .chip.info{border-color:var(--info);color:#bfdbfe}
-  .chip.hl{border-color:#4f46e5;color:#c7d2fe}
-  /* fields */
-  label{display:flex;align-items:center;gap:8px;margin:6px 0 6px;color:#cbd5e1;font-size:13px}
-  input,select,textarea{
-    width:100%;padding:11px 12px;background:var(--field);color:#e5e7eb;
-    border:1px solid #2b2f36;border-radius:10px;outline:none;
-    transition:border .2s, box-shadow .2s, transform .02s;
-  }
-  input:focus,select:focus,textarea:focus{
-    border-color:#4f46e5;box-shadow:0 0 0 3px rgba(79,70,229,.25);
-  }
-  .btn{
-    display:inline-flex;align-items:center;gap:8px;padding:11px 14px;border-radius:10px;
-    border:1px solid var(--primary-line);background:
-      linear-gradient(180deg,rgba(37,47,66,.9),rgba(24,30,44,.95));
-    color:#fff;cursor:pointer;transition:transform .02s,filter .2s,opacity .2s;
-    text-decoration:none;
-  }
-  .btn:hover{filter:brightness(1.08)}
-  .btn:active{transform:translateY(1px)}
-  .btn.ghost{background:#12141a;border-color:#2a2f38}
-  .btn.pri{border-color:#475569;background:linear-gradient(180deg,#334155,#1f2937)}
-  .btn.warn{border-color:#856c12;background:linear-gradient(180deg,#a07f12,#7c5f0f)}
-  .btn.good{border-color:#1a6d33;background:linear-gradient(180deg,#15803d,#14532d)}
-  .muted{color:var(--muted)}
-  /* meta */
-  .meta{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-  @media (max-width:980px){.meta{grid-template-columns:repeat(2,1fr)}}
-  .kv .k{color:#a1a1aa;font-size:12px;margin-bottom:2px;display:flex;align-items:center;gap:6px}
-  .kv .v{font-weight:600}
-  /* timeline */
-  .timeline{position:relative;padding-left:22px}
-  .timeline:before{content:"";position:absolute;left:9px;top:6px;bottom:6px;width:2px;background:#212328;border-radius:2px}
-  .t-item{position:relative;margin:12px 0;padding-left:12px}
-  .dot{position:absolute;left:0;top:4px;width:18px;height:18px;border-radius:50%;
-    background:#0e1116;border:2px solid #374151;display:flex;align-items:center;justify-content:center}
-  .dot.good{border-color:var(--good)} .dot.warn{border-color:var(--warn)} .dot.bad{border-color:var(--bad)}
-  /* attachments */
-  .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
-  .thumb{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#0f1217}
-  .thumb img{display:block;width:100%;height:130px;object-fit:cover}
-  .thumb .cap{padding:6px 8px;font-size:12px;color:#cbd5e1;display:flex;align-items:center;justify-content:space-between;gap:6px}
-  .cap a.chip{text-decoration:none}
-  /* helpers */
-  .hr{height:1px;background:linear-gradient(90deg,transparent,#1c1f25,transparent);margin:10px 0}
-  .ribbon{
-    background:linear-gradient(90deg,rgba(79,70,229,.3),rgba(6,182,212,.18) 60%,transparent);
-    border:1px solid rgba(79,70,229,.25);padding:8px 12px;border-radius:12px
-  }
-  /* print */
-  @media print{
-    .page-head,.btn,.thumb .cap a{display:none!important}
-    body{background:#fff;color:#000}
-    .card{box-shadow:none;border-color:#ccc}
-  }
-</style>
-@endpush
+{{-- Header ใต้ท็อปบาร์ จาก layout ของคุณ --}}
+@section('page-header')
+  @php
+    $statusText  = str_replace('_',' ',$req->status);
+    $statusTone  = match($req->status){
+      'completed' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      'canceled'  => 'bg-rose-50 text-rose-700 border-rose-200',
+      'assigned','in_progress' => 'bg-amber-50 text-amber-700 border-amber-200',
+      default     => 'bg-sky-50 text-sky-700 border-sky-200',
+    };
+    $prio = strtolower((string)$req->priority);
+    $prioTone = match($prio){
+      'high'   => 'bg-rose-50 text-rose-700 border-rose-200',
+      'medium' => 'bg-amber-50 text-amber-700 border-amber-200',
+      'low'    => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      default  => 'bg-slate-50 text-slate-700 border-slate-200',
+    };
+  @endphp
+
+  <div class="flex flex-wrap items-center gap-3">
+    <h1 class="text-xl font-semibold text-slate-900">
+      Repair Detail <span id="rid">#{{ $req->id }}</span>
+    </h1>
+
+    <span class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium bg-slate-50 text-slate-700 border-slate-200">
+      {{-- asset --}}
+      {{ $req->asset->name ?? $req->asset_id }}
+    </span>
+
+    <span class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium {{ $statusTone }}">
+      {{ $statusText }}
+    </span>
+
+    <span class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium {{ $prioTone }}">
+      {{ $req->priority ?? 'unknown' }}
+    </span>
+
+    <div class="ml-auto flex flex-wrap items-center gap-2">
+      <button id="copyIdBtn" type="button"
+              class="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50">
+        Copy ID
+      </button>
+      <button type="button" onclick="window.print()"
+              class="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50">
+        Print
+      </button>
+      <a href="{{ route('maintenance.requests.index') }}"
+         class="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50">
+        กลับรายการ
+      </a>
+    </div>
+  </div>
+@endsection
 
 @section('content')
 @php
-  $statusText = str_replace('_',' ',$req->status);
-  $statusClass = match($req->status){
-    'completed' => 'good', 'canceled' => 'bad',
-    'assigned','in_progress' => 'warn', default => 'info'
-  };
-  $prio = strtolower((string)$req->priority);
-  $prioClass = match($prio){ 'high'=>'bad','medium'=>'warn','low'=>'good', default=>'info' };
   $requestedAt = optional($req->request_date ?? $req->created_at);
 @endphp
 
-<div class="page-head" role="banner">
-  <div class="container">
-    <div class="titlebar">
-      <h1><i data-lucide="wrench"></i> Repair Detail <span id="rid">#{{ $req->id }}</span></h1>
-      <span class="chip soft" title="Asset"><i data-lucide="package"></i>{{ $req->asset->name ?? $req->asset_id }}</span>
-      <span class="chip {{ $statusClass }}"><i data-lucide="workflow"></i>{{ $statusText }}</span>
-      <span class="chip {{ $prioClass }}"><i data-lucide="flag-triangle-right"></i>{{ $req->priority }}</span>
+<div class="space-y-6">
 
-      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
-        <button type="button" class="btn ghost" id="copyIdBtn" title="คัดลอกเลขงาน"><i data-lucide="copy"></i> Copy ID</button>
-        <button type="button" class="btn ghost" onclick="window.print()" title="พิมพ์"><i data-lucide="printer"></i> Print</button>
-        <a class="btn ghost" href="{{ route('maintenance.requests.index') }}"><i data-lucide="arrow-left"></i> กลับรายการ</a>
+  {{-- ===== Basic Info ===== --}}
+  <section class="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div class="p-4">
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-4 text-sm">
+        <div>
+          <div class="text-slate-500">หมายเลข</div>
+          <div class="font-semibold text-slate-900">#{{ $req->id }}</div>
+        </div>
+        <div>
+          <div class="text-slate-500">ผู้แจ้ง</div>
+          <div class="font-semibold text-slate-900">{{ $req->reporter_name ?? ($req->reporter->name ?? '-') }}</div>
+        </div>
+        <div>
+          <div class="text-slate-500">ทรัพย์สิน</div>
+          <div class="font-semibold text-slate-900">{{ $req->asset->name ?? $req->asset_id }}</div>
+        </div>
+        <div>
+          <div class="text-slate-500">สถานที่</div>
+          <div class="font-semibold text-slate-900">{{ $req->location ?? '-' }}</div>
+        </div>
       </div>
-    </div>
 
-    @if(session('ok'))
-      <div class="subrow" role="status"><span class="chip good"><i data-lucide="check-circle-2"></i>{{ session('ok') }}</span></div>
-    @endif
-    @if($errors->any())
-      <div class="subrow" role="alert">
-        <span class="chip bad"><i data-lucide="alert-triangle"></i> ดำเนินการไม่สำเร็จ</span>
-        <span class="chip soft">{{ collect($errors->all())->take(3)->implode(' • ') }}</span>
-      </div>
-    @endif
-  </div>
-</div>
+      <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div class="lg:col-span-2">
+          <div class="mb-1 text-slate-500">หัวข้อ</div>
+          <div class="text-base font-semibold text-slate-900">{{ $req->title }}</div>
 
-<div class="container" role="main">
-  {{-- Basic Info --}}
-  <div class="card">
-    <div class="meta" aria-label="ข้อมูลหลัก">
-      <div class="kv">
-        <div class="k"><i data-lucide="hash"></i>หมายเลข</div>
-        <div class="v">#{{ $req->id }}</div>
-      </div>
-      <div class="kv">
-        <div class="k"><i data-lucide="user-2"></i>ผู้แจ้ง</div>
-        <div class="v">{{ $req->reporter_name ?? ($req->reporter->name ?? '-') }}</div>
-      </div>
-      <div class="kv">
-        <div class="k"><i data-lucide="package"></i>ทรัพย์สิน</div>
-        <div class="v">{{ $req->asset->name ?? $req->asset_id }}</div>
-      </div>
-      <div class="kv">
-        <div class="k"><i data-lucide="map-pin"></i>สถานที่</div>
-        <div class="v">{{ $req->location ?? '-' }}</div>
-      </div>
-    </div>
+          <div class="my-4 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"></div>
 
-    <div class="grid-2" style="margin-top:12px">
-      <div>
-        <div class="k"><i data-lucide="type"></i>หัวข้อ</div>
-        <div class="v" style="font-size:15px">{{ $req->title }}</div>
-        <div class="hr" role="separator" aria-hidden="true"></div>
-        <div class="k"><i data-lucide="file-text"></i>รายละเอียด</div>
-        <div class="prose prose-invert" style="margin-top:4px">{{ $req->description ?: '-' }}</div>
-      </div>
-      <div>
-        <div class="k"><i data-lucide="calendar-clock"></i>เวลา</div>
-        <div class="ribbon" style="margin-top:6px;display:grid;gap:6px">
-          <span class="chip info">
-            <i data-lucide="calendar-search"></i>
-            Requested:
-            @if($requestedAt)
-              <time datetime="{{ $requestedAt->toIso8601String() }}">{{ $requestedAt->format('Y-m-d H:i') }}</time>
-            @else - @endif
-          </span>
-          @if($req->assigned_date)
-            <span class="chip warn">
-              <i data-lucide="calendar-range"></i>
-              Assigned:
-              <time datetime="{{ $req->assigned_date->toIso8601String() }}">{{ $req->assigned_date->format('Y-m-d H:i') }}</time>
-            </span>
-          @endif
-          @if($req->completed_date)
-            <span class="chip good">
-              <i data-lucide="calendar-check-2"></i>
-              Done:
-              <time datetime="{{ $req->completed_date->toIso8601String() }}">{{ $req->completed_date->format('Y-m-d H:i') }}</time>
-            </span>
-          @endif
+          <div class="mb-1 text-slate-500">รายละเอียด</div>
+          <div class="prose max-w-none text-slate-800">{{ $req->description ?: '-' }}</div>
+        </div>
+
+        <div>
+          <div class="mb-2 text-slate-500">เวลา</div>
+          <div class="space-y-2 rounded-xl border border-indigo-100 bg-indigo-50/60 p-3">
+            <div class="inline-flex items-center gap-2 rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-800">
+              Requested:
+              @if($requestedAt)
+                <time datetime="{{ $requestedAt->toIso8601String() }}">{{ $requestedAt->format('Y-m-d H:i') }}</time>
+              @else - @endif
+            </div>
+            @if($req->assigned_date)
+              <div class="inline-flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
+                Assigned:
+                <time datetime="{{ $req->assigned_date->toIso8601String() }}">{{ $req->assigned_date->format('Y-m-d H:i') }}</time>
+              </div>
+            @endif
+            @if($req->completed_date)
+              <div class="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800">
+                Done:
+                <time datetime="{{ $req->completed_date->toIso8601String() }}">{{ $req->completed_date->format('Y-m-d H:i') }}</time>
+              </div>
+            @endif
+          </div>
         </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  {{-- Actions --}}
-  <div class="card">
-    <h3><i data-lucide="settings-2"></i> ดำเนินการ</h3>
-    <form method="post"
-          action="{{ route('maintenance.requests.transition', $req) }}"
-          class="grid-row" style="margin-top:6px" aria-label="Change request status form">
-      @csrf
+  {{-- ===== Actions ===== --}}
+  <section class="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div class="p-4">
+      <h3 class="text-base font-semibold text-slate-900">ดำเนินการ</h3>
 
-      <div>
-        <label for="action"><i data-lucide="workflow"></i> Action</label>
-        <select id="action" name="action" required aria-required="true">
-          <option value="" disabled {{ old('action') ? '' : 'selected' }}>เลือกการดำเนินการ…</option>
-          <option value="assign"   @selected(old('action')==='assign')>assign</option>
-          <option value="start"    @selected(old('action')==='start')>start</option>
-          <option value="complete" @selected(old('action')==='complete')>complete</option>
-          <option value="cancel"   @selected(old('action')==='cancel')>cancel</option>
-        </select>
-      </div>
+      <form method="post"
+            action="{{ route('maintenance.requests.transition', $req) }}"
+            class="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
+        @csrf
 
-      <div id="techWrap" style="display:none">
-        <label for="technician_id"><i data-lucide="user-round"></i> Technician ID</label>
-        <input id="technician_id" type="number" name="technician_id" placeholder="เช่น 5" inputmode="numeric" value="{{ old('technician_id') }}"/>
-      </div>
+        <div>
+          <label for="action" class="mb-1 block text-sm text-slate-600">Action</label>
+          <select id="action" name="action" required
+                  class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+            <option value="" disabled {{ old('action') ? '' : 'selected' }}>เลือกการดำเนินการ…</option>
+            <option value="assign"   @selected(old('action')==='assign')>assign</option>
+            <option value="start"    @selected(old('action')==='start')>start</option>
+            <option value="complete" @selected(old('action')==='complete')>complete</option>
+            <option value="cancel"   @selected(old('action')==='cancel')>cancel</option>
+          </select>
+        </div>
 
-      <div style="grid-column:1/-1">
-        <label for="remark"><i data-lucide="message-square"></i> Remark</label>
-        <input id="remark" type="text" name="remark" placeholder="บันทึกเพิ่มเติม (optional)" value="{{ old('remark') }}"/>
-      </div>
+        <div id="techWrap" class="hidden">
+          <label for="technician_id" class="mb-1 block text-sm text-slate-600">Technician ID</label>
+          <input id="technician_id" type="number" inputmode="numeric" name="technician_id"
+                 class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                 value="{{ old('technician_id') }}" placeholder="เช่น 5">
+        </div>
 
-      <div style="grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap">
-        <button type="submit" class="btn pri"><i data-lucide="save"></i> บันทึก</button>
-        <a class="btn ghost" href="{{ route('maintenance.requests.index') }}"><i data-lucide="arrow-left"></i> กลับรายการ</a>
-      </div>
-    </form>
-  </div>
+        <div class="md:col-span-2">
+          <label for="remark" class="mb-1 block text-sm text-slate-600">Remark</label>
+          <input id="remark" type="text" name="remark"
+                 class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                 placeholder="บันทึกเพิ่มเติม (optional)" value="{{ old('remark') }}">
+        </div>
 
-  {{-- Attachments --}}
-  <div class="card">
-    <h3><i data-lucide="image-up"></i> ไฟล์แนบ</h3>
-    <form method="post" enctype="multipart/form-data"
-          action="{{ route('maintenance.requests.attachments', $req) }}"
-          class="grid-row" style="margin-top:6px" aria-label="Upload attachment form">
-      @csrf
-      <div>
-        <label for="att_type"><i data-lucide="badge-info"></i> ประเภท</label>
-        <select id="att_type" name="type">
-          <option value="before" @selected(old('type')==='before')>before</option>
-          <option value="after"  @selected(old('type')==='after')>after</option>
-          <option value="other"  @selected(old('type','other')==='other')>other</option>
-        </select>
-      </div>
-      <div>
-        <label for="file"><i data-lucide="paperclip"></i> ไฟล์</label>
-        <input id="file" type="file" name="file" required aria-required="true" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"/>
-      </div>
-      <div style="grid-column:1/-1">
-        <button type="submit" class="btn"><i data-lucide="upload-cloud"></i> อัปโหลด</button>
-      </div>
-    </form>
-
-    @if($req->attachments->count())
-      <div class="thumbs" style="margin-top:10px">
-        @foreach($req->attachments as $att)
-          @php
-            $name = $att->original_name ?? basename($att->file_path ?? $att->path ?? '');
-            $ext  = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-            $isImg = in_array($ext,['jpg','jpeg','png','gif','webp','bmp']);
-            $url = isset($att->file_path) ? asset('storage/'.$att->file_path) : (isset($att->path) ? asset('storage/'.$att->path) : '#');
-            $tag = $att->file_type ?? $att->type ?? 'other';
-          @endphp
-          <figure class="thumb">
-            @if($isImg && $url !== '#')
-              <a href="{{ $url }}" target="_blank" rel="noopener">
-                <img src="{{ $url }}" alt="{{ $name }}">
-              </a>
-            @else
-              <div style="height:130px;display:flex;align-items:center;justify-content:center;color:#a1a1aa">
-                <i data-lucide="file"></i> {{ strtoupper($ext ?: 'FILE') }}
-              </div>
-            @endif
-            <figcaption class="cap">
-              <span class="chip" title="ประเภทไฟล์"><i data-lucide="tag"></i>{{ $tag }}</span>
-              <span class="muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $name }}</span>
-              @if($url !== '#')
-                <a class="chip" href="{{ $url }}" target="_blank" rel="noopener"><i data-lucide="download"></i> เปิด</a>
-              @endif
-            </figcaption>
-          </figure>
-        @endforeach
-      </div>
-    @else
-      <p class="muted" style="margin-top:6px">ไม่มีไฟล์แนบ</p>
-    @endif
-  </div>
-
-  {{-- Timeline --}}
-  <div class="card">
-    <h3><i data-lucide="timeline"></i> ประวัติการดำเนินการ</h3>
-    <div class="timeline" style="margin-top:6px">
-      @forelse($req->logs as $log)
-        @php
-          $cls = match($log->action) {
-            'complete_request' => 'good',
-            'cancel_request'   => 'bad',
-            'assign_technician','start_request' => 'warn',
-            default => ''
-          };
-        @endphp
-        <article class="t-item">
-          <div class="dot {{ $cls }}"><i data-lucide="dot"></i></div>
-          <header style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-            <strong>#{{ $log->id }}</strong>
-            <span class="chip"><i data-lucide="workflow"></i>{{ $log->action }}</span>
-            <span class="chip">
-              <i data-lucide="calendar-clock"></i>
-              <time datetime="{{ $log->created_at->toIso8601String() }}">{{ $log->created_at->format('Y-m-d H:i') }}</time>
-            </span>
-            @if($log->user_id)
-              <span class="chip" title="ผู้ใช้ที่ดำเนินการ"><i data-lucide="user"></i>{{ $log->user_id }}</span>
-            @endif
-          </header>
-          @if($log->note)
-            <p style="margin-top:6px">{{ $log->note }}</p>
-          @endif
-        </article>
-      @empty
-        <p class="muted">ยังไม่มีบันทึก</p>
-      @endforelse
+        <div class="md:col-span-2 flex flex-wrap gap-2">
+          <button type="submit"
+                  class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            บันทึก
+          </button>
+          <a href="{{ route('maintenance.requests.index') }}"
+             class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+            กลับรายการ
+          </a>
+        </div>
+      </form>
     </div>
-  </div>
+  </section>
+
+  {{-- ===== Attachments ===== --}}
+  <section class="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div class="p-4">
+      <h3 class="text-base font-semibold text-slate-900">ไฟล์แนบ</h3>
+
+      <form method="post" enctype="multipart/form-data"
+            action="{{ route('maintenance.requests.attachments', $req) }}"
+            class="mt-3 grid grid-cols-1 gap-4 md:grid-cols-3">
+        @csrf
+        <div>
+          <label for="att_type" class="mb-1 block text-sm text-slate-600">ประเภท</label>
+          <select id="att_type" name="type"
+                  class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+            <option value="before" @selected(old('type')==='before')>before</option>
+            <option value="after"  @selected(old('type')==='after')>after</option>
+            <option value="other"  @selected(old('type','other')==='other')>other</option>
+          </select>
+        </div>
+        <div class="md:col-span-2">
+          <label for="file" class="mb-1 block text-sm text-slate-600">ไฟล์</label>
+          <input id="file" type="file" name="file" required
+                 accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                 class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm hover:file:bg-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+        </div>
+        <div class="md:col-span-3">
+          <button type="submit"
+                  class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+            อัปโหลด
+          </button>
+        </div>
+      </form>
+
+      @if($req->attachments->count())
+        <div class="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+          @foreach($req->attachments as $att)
+            @php
+              $name = $att->original_name ?? basename($att->file_path ?? $att->path ?? '');
+              $ext  = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+              $isImg = in_array($ext,['jpg','jpeg','png','gif','webp','bmp']);
+              $url = isset($att->file_path) ? asset('storage/'.$att->file_path) : (isset($att->path) ? asset('storage/'.$att->path) : '#');
+              $tag = $att->file_type ?? $att->type ?? 'other';
+            @endphp
+            <figure class="overflow-hidden rounded-lg border border-slate-200">
+              @if($isImg && $url !== '#')
+                <a href="{{ $url }}" target="_blank" rel="noopener">
+                  <img src="{{ $url }}" alt="{{ $name }}" class="h-36 w-full object-cover">
+                </a>
+              @else
+                <div class="grid h-36 w-full place-items-center text-slate-500">
+                  {{ strtoupper($ext ?: 'FILE') }}
+                </div>
+              @endif
+              <figcaption class="flex items-center justify-between gap-2 px-3 py-2 text-xs">
+                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-medium text-slate-700">
+                  {{ $tag }}
+                </span>
+                <span class="truncate text-slate-600">{{ $name }}</span>
+                @if($url !== '#')
+                  <a href="{{ $url }}" target="_blank" rel="noopener"
+                     class="inline-flex items-center rounded-md border border-sky-300 bg-sky-50 px-2 py-1 font-medium text-sky-800 hover:bg-sky-100">
+                    เปิด
+                  </a>
+                @endif
+              </figcaption>
+            </figure>
+          @endforeach
+        </div>
+      @else
+        <p class="mt-3 text-slate-500">ไม่มีไฟล์แนบ</p>
+      @endif
+    </div>
+  </section>
+
+  {{-- ===== Timeline ===== --}}
+  <section class="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div class="p-4">
+      <h3 class="text-base font-semibold text-slate-900">ประวัติการดำเนินการ</h3>
+
+      <div class="mt-3 space-y-3">
+        @forelse($req->logs as $log)
+          @php
+            $tone = match($log->action) {
+              'complete_request' => 'bg-emerald-600',
+              'cancel_request'   => 'bg-rose-600',
+              'assign_technician','start_request' => 'bg-amber-600',
+              default => 'bg-slate-400'
+            };
+          @endphp
+          <article class="relative border-l-2 border-slate-200 pl-6">
+            <span class="absolute -left-1.5 top-2 inline-block h-3 w-3 rounded-full {{ $tone }}"></span>
+            <header class="flex flex-wrap items-center gap-2 text-sm">
+              <strong>#{{ $log->id }}</strong>
+              <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700">
+                {{ $log->action }}
+              </span>
+              <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700">
+                <time datetime="{{ $log->created_at->toIso8601String() }}">{{ $log->created_at->format('Y-m-d H:i') }}</time>
+              </span>
+              @if($log->user_id)
+                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700">
+                  by {{ $log->user_id }}
+                </span>
+              @endif
+            </header>
+            @if($log->note)
+              <p class="mt-1 text-slate-700">{{ $log->note }}</p>
+            @endif
+          </article>
+        @empty
+          <p class="text-slate-500">ยังไม่มีบันทึก</p>
+        @endforelse
+      </div>
+    </div>
+  </section>
+
 </div>
 @endsection
 
 @push('scripts')
-<script src="https://unpkg.com/lucide@latest"></script>
 <script>
-  lucide.createIcons({attrs:{width:18,height:18,'stroke-width':1.8}});
-
   // toggle technician input visibility/required by action
-  const actionSel = document.getElementById('action');
-  const techWrap  = document.getElementById('techWrap');
-  const techInput = document.getElementById('technician_id');
-  function syncTech(){
-    const show = actionSel?.value === 'assign';
-    if(!techWrap) return;
-    techWrap.style.display = show ? '' : 'none';
-    if(techInput){
-      techInput.required = show;
-      techInput.toggleAttribute('aria-required', show);
-      if(!show) techInput.value = '';
+  (function(){
+    const sel = document.getElementById('action');
+    const wrap = document.getElementById('techWrap');
+    const input = document.getElementById('technician_id');
+    function sync(){
+      const show = sel && sel.value === 'assign';
+      if(!wrap) return;
+      wrap.classList.toggle('hidden', !show);
+      if(input){
+        input.required = !!show;
+        if(!show) input.value = '';
+      }
     }
-  }
-  actionSel?.addEventListener('change', syncTech);
-  syncTech();
+    sel && sel.addEventListener('change', sync);
+    sync();
+  })();
 
-  // copy repair id
-  const copyBtn = document.getElementById('copyIdBtn');
-  copyBtn?.addEventListener('click', async () => {
-    const idText = document.getElementById('rid')?.textContent?.replace('#','') ?? '{{ $req->id }}';
-    try{
-      await navigator.clipboard.writeText(idText);
-      copyBtn.classList.add('good');
-      copyBtn.innerHTML = '<i data-lucide="check"></i> Copied';
-      lucide.createIcons();
-      setTimeout(()=>{
-        copyBtn.classList.remove('good');
-        copyBtn.innerHTML = '<i data-lucide="copy"></i> Copy ID';
-        lucide.createIcons();
-      }, 1400);
-    }catch(e){}
-  });
+  // copy id
+  (function(){
+    const btn = document.getElementById('copyIdBtn');
+    btn?.addEventListener('click', async () => {
+      const idText = (document.getElementById('rid')?.textContent || '{{ $req->id }}').replace('#','');
+      try{
+        await navigator.clipboard.writeText(idText);
+        btn.classList.add('bg-slate-900','text-white','border-slate-900');
+        btn.textContent = 'Copied';
+        setTimeout(()=> {
+          btn.classList.remove('bg-slate-900','text-white','border-slate-900');
+          btn.textContent = 'Copy ID';
+        }, 1200);
+      }catch(e){}
+    });
+  })();
 </script>
 @endpush

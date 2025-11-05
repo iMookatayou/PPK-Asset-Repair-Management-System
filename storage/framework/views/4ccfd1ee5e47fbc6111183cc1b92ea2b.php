@@ -86,28 +86,36 @@
   </a>
 
   
-  <?php $active = $is('admin.users.*'); ?>
-  <a href="<?php echo e($rl('admin.users.index', url('/admin/users'))); ?>" class="<?php echo e($base); ?> <?php echo e($active ? $on : $off); ?>">
+  <?php $active = $is('profile.*'); ?>
+  <a href="<?php echo e($rl('profile.edit', url('/profile'))); ?>" class="<?php echo e($base); ?> <?php echo e($active ? $on : $off); ?>">
     <span class="<?php echo e($dot($active)); ?>"></span>
     <span class="w-8 h-8 flex items-center justify-center">
-      
-      <svg class="<?php echo e($ico($active)); ?>" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <svg class="<?php echo e($ico($active)); ?>" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+          fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
     </span>
-    <span class="truncate">Users</span>
+    <span class="truncate">Profile</span>
   </a>
 
   
-  <?php $active = $is('users.*'); ?>
-  <a href="<?php echo e($rl('users.index', url('/users'))); ?>" class="<?php echo e($base); ?> <?php echo e($active ? $on : $off); ?>">
-    <span class="<?php echo e($dot($active)); ?>"></span>
-    <span class="w-8 h-8 flex items-center justify-center">
-      <svg class="<?php echo e($ico($active)); ?>" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-        <path d="M9 11l2 2 4-4"/>
-      </svg>
-    </span>
-    <span class="truncate">Manage Users</span>
-  </a>
+  <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('manage-users')): ?>
+    <?php $active = $is('admin.users.*'); ?>
+    <a href="<?php echo e($rl('admin.users.index', url('/admin/users'))); ?>" class="<?php echo e($base); ?> <?php echo e($active ? $on : $off); ?>">
+      <span class="<?php echo e($dot($active)); ?>"></span>
+      <span class="w-8 h-8 flex items-center justify-center">
+        <svg class="<?php echo e($ico($active)); ?>" xmlns="http://www.w3.org/2000/svg" fill="none"
+            viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <path d="M9 11l2 2 4-4"/>
+        </svg>
+      </span>
+      <span class="truncate">Manage Users</span>
+    </a>
+  <?php endif; ?>
 
 </nav>
 <?php /**PATH C:\Users\Developer\development\Asset-Repair-Management-System\resources\views/components/sidebar.blade.php ENDPATH**/ ?>

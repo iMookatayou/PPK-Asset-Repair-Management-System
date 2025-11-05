@@ -26,7 +26,7 @@ class AuthServiceProvider extends ServiceProvider
         Gate::define('manage-users', function (User $user): bool {
             return in_array($user->role, [
                 'admin', 
-                // 'technician', // uncomment ถ้าให้ช่างซ่อมจัดการ Users ได้
+                'technician',
             ], true);
         });
 

@@ -8,43 +8,53 @@
   <title>@yield('title', 'Sign in') • PPK Hospital System</title>
   @vite(['resources/css/app.css', 'resources/js/app.js'])
 
+  <!-- ===== Auth Loader (drop-in, no-conflict) ===== -->
+  <script>
+    // ถ้าเข้าหน้านี้ด้วยการ Reload ให้โชว์ loader ตั้งแต่เฟรมแรก
+    (function () {
+      try {
+        var nav = (performance.getEntriesByType && performance.getEntriesByType('navigation')[0]) || null;
+        var isReload = nav ? nav.type === 'reload' : (performance.navigation && performance.navigation.type === 1);
+        if (isReload) document.documentElement.classList.add('authldr-start');
+      } catch (_) {}
+    })();
+  </script>
+
   <style>
-    /* ===== Button mini spinner (เฉพาะปุ่ม) ===== */
-    .btn-with-spinner { position: relative; }
-    .btn-with-spinner[aria-busy="true"] { pointer-events: none; opacity: .9; }
-    .btn-with-spinner .mini-spinner {
-      width: 16px; height: 16px;
-      border: 2px solid currentColor;
-      border-top-color: transparent;
-      border-radius: 50%;
-      animation: auth-spin .7s linear infinite;
-      display: none;
-      vertical-align: -2px;
+    /* ===== Overlay ทั้งหน้า (ไม่ชนของเดิม ใช้ prefix authldr-) ===== */
+    .authldr-overlay{
+      position:fixed; inset:0;
+      background:rgba(255,255,255,.6);
+      backdrop-filter:blur(2px);
+      display:flex; align-items:center; justify-content:center;
+      z-index:99990; /* เว้นที่ให้ toast ของคุณถ้ามีใช้ z-index สูงกว่า */
+      visibility:hidden; opacity:0;
+      transition:opacity .2s ease, visibility .2s;
     }
-    .btn-with-spinner[aria-busy="true"] .mini-spinner { display: inline-block; }
+    .authldr-overlay.show{ visibility:visible; opacity:1; }
+    .authldr-start #authldrOverlay{ visibility:visible; opacity:1; }
 
-    @keyframes auth-spin { to { transform: rotate(360deg); } }
+    .authldr-spinner{
+      width:40px; height:40px;
+      border:4px solid #0E2B51; border-top-color:transparent;
+      border-radius:50%;
+      animation:authldr-spin .8s linear infinite;
+    }
+    @keyframes authldr-spin{ to{ transform:rotate(360deg) } }
 
-    /* ===== Optional: overlay ทั้งหน้า (ปิดไว้ก่อน) ===== */
-    .auth-overlay {
-      position: fixed; inset: 0;
-      background: rgba(255,255,255,.6);
-      backdrop-filter: blur(2px);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 9999;
-      visibility: hidden; opacity: 0;
-      transition: opacity .2s ease, visibility .2s;
+    /* ===== Mini spinner บนปุ่ม submit ===== */
+    .authldr-btn[aria-busy="true"]{ pointer-events:none; opacity:.92; }
+    .authldr-mini{
+      width:16px; height:16px;
+      border:2px solid currentColor; border-top-color:transparent;
+      border-radius:50%;
+      animation:authldr-spin .7s linear infinite;
+      display:none; vertical-align:-2px;
     }
-    .auth-overlay.show { visibility: visible; opacity: 1; }
-    .auth-overlay .spinner {
-      width: 38px; height: 38px;
-      border: 4px solid #0E2B51;
-      border-top-color: transparent;
-      border-radius: 50%;
-      animation: auth-spin .7s linear infinite;
-    }
+    .authldr-btn[aria-busy="true"] .authldr-mini{ display:inline-block; }
   </style>
 </head>
+
 <body class="h-full bg-[#0E2B51] bg-gradient-to-b from-[#0E2B51] to-[#123860] text-slate-800">
 
   <main class="min-h-screen flex items-center justify-center p-5">
@@ -77,59 +87,88 @@
     </div>
   </main>
 
-  {{-- Optional overlay ทั้งหน้า (ปิดไว้ก่อน) --}}
-  <div id="authOverlay" class="auth-overlay" aria-hidden="true">
-    <div class="spinner"></div>
+  <!-- Overlay -->
+  <div id="authldrOverlay" class="authldr-overlay" aria-hidden="true">
+    <div class="authldr-spinner"></div>
   </div>
 
+  <!-- Logic: โชว์ Loader ตอน submit / enter / และตอนรีเฟรช -->
   <script>
     (function () {
-      // หา form หลักในคอนเทนต์ auth
+      const overlay = document.getElementById('authldrOverlay');
+
+      // ให้เรียกใช้ได้จากภายนอกถ้าต้องการ
+      window.authLoader = {
+        show: () => overlay?.classList.add('show'),
+        hide: () => overlay?.classList.remove('show'),
+      };
+
+      // หา form หลักภายใน <main>
       const form = document.querySelector('main form');
       if (!form) return;
 
-      // หา submit button (รองรับทั้ง <button> และ <input type="submit">)
-      let submitBtn = form.querySelector('button[type="submit"], [type="submit"]');
-      if (!submitBtn) return;
+      // หา submit button (รองรับทั้ง button และ input[type=submit])
+      let btn = form.querySelector('button[type="submit"], [type="submit"]');
+      if (btn && btn.tagName === 'BUTTON' && !btn.getAttribute('type')) {
+        btn.setAttribute('type', 'submit');
+      }
 
-      // เปิดใช้งาน mini spinner บนปุ่ม (ถ้ายังไม่มี)
-      submitBtn.classList.add('btn-with-spinner');
-      if (!submitBtn.querySelector('.mini-spinner')) {
-        const spin = document.createElement('span');
-        spin.className = 'mini-spinner';
-        spin.setAttribute('aria-hidden', 'true');
-
-        // แทรกไว้หน้าข้อความปุ่ม พร้อมเว้นช่องไฟ
-        submitBtn.prepend(spin);
-        if (submitBtn.textContent.trim().length > 0) {
-          submitBtn.insertBefore(document.createTextNode(' '), spin.nextSibling);
+      // ใส่ mini-spinner ลงบนปุ่ม โดยไม่แตะคลาสเดิมของคุณ
+      if (btn) {
+        btn.classList.add('authldr-btn');
+        if (!btn.querySelector('.authldr-mini')) {
+          const spin = document.createElement('span');
+          spin.className = 'authldr-mini';
+          spin.setAttribute('aria-hidden', 'true');
+          btn.prepend(spin);
+          if (btn.textContent.trim().length) {
+            btn.insertBefore(document.createTextNode(' '), spin.nextSibling);
+          }
         }
       }
 
-      // เมื่อ submit: แสดง spinner บนปุ่ม + กันกดซ้ำ
-      form.addEventListener('submit', function () {
-        // ถ้าฟอร์มมี data-no-loader ให้ข้าม
-        if (form.hasAttribute('data-no-loader')) return;
+      function engage() {
+        if (form.hasAttribute('data-no-loader')) return; // ฟอร์มไหนไม่อยากโชว์ ใส่แอตทริบิวต์นี้
+        if (btn) { btn.setAttribute('aria-busy','true'); btn.disabled = true; }
+        requestAnimationFrame(() => overlay.classList.add('show'));
+      }
 
-        submitBtn.setAttribute('aria-busy', 'true');
-        submitBtn.disabled = true;
+      // 1) คลิกปุ่ม
+      btn?.addEventListener('click', () => {
+        if (typeof form.checkValidity !== 'function' || form.checkValidity()) engage();
+      });
 
-        // ถ้าต้องการ overlay ทั้งหน้า ให้ปลดคอมเมนต์บรรทัดด้านล่าง
-        // document.getElementById('authOverlay')?.classList.add('show');
-      }, { once: true });
+      // 2) กด Enter ในฟอร์ม (ยกเว้น textarea)
+      form.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+          if (typeof form.checkValidity !== 'function' || form.checkValidity()) engage();
+        }
+      });
+
+      // 3) จับ submit แบบ capture ครอบทุกเคส
+      document.addEventListener('submit', (e) => {
+        if (e.target === form) engage();
+      }, true);
+
+      // รีเฟรช/ออกหน้า: พยายามโชว์ (บางเบราว์เซอร์ไม่ repaint ก็ไม่เป็นไร)
+      window.addEventListener('beforeunload', () => overlay.classList.add('show'));
+
+      // ป้องกันค้างจาก reload-first-frame
+      window.addEventListener('DOMContentLoaded', () => {
+        document.documentElement.classList.remove('authldr-start');
+      });
+
+      // กลับมาจาก bfcache (เช่นกด Back) ให้รีเซ็ตปุ่ม/overlay
+      window.addEventListener('pageshow', () => {
+        if (btn) { btn.removeAttribute('aria-busy'); btn.disabled = false; }
+        overlay?.classList.remove('show');
+      });
     })();
   </script>
 
   <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js" defer></script>
-    <x-toast />
+<x-toast />
 
-      @if (session('toast'))
-        <script>
-          const t = @json(session('toast'));
-          t.position = 'tc'; // บังคับบนกึ่งกลางจากฝั่ง layout อีกชั้น
-          if (window.showToast) { window.showToast(t); }
-          else { window.dispatchEvent(new CustomEvent('app:toast', { detail: t })); }
-        </script>
-      @endif
+  {{-- (ถ้าคุณมี <x-toast /> หรือสคริปต์อื่น ๆ อยู่เดิม ให้คงไว้ใต้ตรงนี้ได้เลย) --}}
 </body>
 </html>

@@ -25,6 +25,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{req}/logs',        [MaintenanceLogController::class, 'index'])->name('logs');
     });
 
+    Route::prefix('api/assets')->name('api.assets.')->group(function () {
+        Route::get('/', [AssetController::class, 'index'])->name('index');
+        Route::post('/', [AssetController::class, 'store'])->name('store');
+        Route::get('/{asset}', [AssetController::class, 'show'])->name('show');
+        Route::put('/{asset}', [AssetController::class, 'update'])->name('update');
+        Route::delete('/{asset}', [AssetController::class, 'destroy'])->name('destroy');
+    });
+
     Route::post('/attachments',                [AttachmentController::class, 'store'])->name('attachments.store');
     Route::delete('/attachments/{attachment}', [AttachmentController::class, 'destroy'])->name('attachments.destroy');
 });
