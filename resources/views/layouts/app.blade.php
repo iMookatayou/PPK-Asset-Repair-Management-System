@@ -1,22 +1,22 @@
-{{-- resources/views/layouts/app.blade.php --}}
 <!doctype html>
 <html lang="th" data-theme="govclean">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#0E2B51">
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
   <title>@yield('title', config('app.name', 'Asset Repair'))</title>
 
-  {{-- Page-level extra heads (favicons, meta, etc.) --}}
   @yield('head')
 
   @vite(['resources/css/app.css','resources/js/app.js'])
   @stack('styles')
-
   @stack('head')
 
   <style>
-    /* ===== เพิ่มฟอนต์ Sarabun (Local Fonts) ===== */
     @font-face {
       font-family: 'Sarabun';
       font-style: normal;
@@ -55,10 +55,17 @@
 
     :root{
       color-scheme: light;
-      --topbar-h: 96px;
+      --nav-h: 86px;    
     }
 
-    /* ===== Layout grid ===== */
+    body{ padding-top: var(--nav-h); }
+
+    .sticky-under-topbar{ position: sticky; top: calc(var(--nav-h) + .5rem); z-index: 10; }
+
+    @media (max-width: 992px){
+      :root{ --nav-h: 72px; }
+    }
+
     .layout{
       display:grid;
       grid-template-columns: 260px 1fr;
@@ -68,40 +75,35 @@
       color: hsl(var(--bc));
     }
     .content{ padding:1rem; }
-
-    /* ===== Sidebar (3 โหมด: expanded / compact / collapsed) ===== */
     .sidebar{
       background:#ffffff;
       border-right:1px solid hsl(var(--b2));
-      width:260px;             /* expanded */
+      width:260px;           
       transition:width .2s ease;
     }
-    /* Compact (180px) */
+
     @media (min-width:1024px){
       .sidebar.compact{ width:180px !important; }
       .layout.with-compact{ grid-template-columns:180px 1fr !important; }
     }
-    /* Collapsed (76px) */
     @media (min-width:1024px){
       .sidebar.collapsed{ width:76px !important; }
       .layout.with-collapsed{ grid-template-columns:76px 1fr !important; }
       .layout.with-expanded{ grid-template-columns:260px 1fr !important; }
     }
 
-    /* Mobile: off-canvas */
     @media (max-width:1024px){
       .layout{ grid-template-columns:1fr; }
       .sidebar{
-        position:fixed; inset:0 auto 0 0; width:270px;
+        position:fixed; inset:var(--nav-h) auto 0 0; width:270px; 
         transform:translateX(-100%); transition:.2s; z-index:50;
         box-shadow: 4px 0 24px rgba(0,0,0,.06);
       }
       .sidebar.open{ transform:translateX(0); }
-      .backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; z-index:40; }
+      .backdrop{ position:fixed; inset:var(--nav-h) 0 0 0; background:rgba(0,0,0,.45); display:none; z-index:40; }
       .backdrop.show{ display:block; }
     }
 
-    /* Hover expand (desktop) */
     @media (min-width:1024px){
       .sidebar.collapsed.hover-expand{ width:260px !important; }
       .sidebar.collapsed.hover-expand .menu-text{ display:inline !important; }
@@ -109,7 +111,6 @@
       .sidebar.hover-expand{ box-shadow: 4px 0 12px rgba(0,0,0,.06); }
     }
 
-    /* Sidebar menu items */
     .sidebar .menu{ padding:.5rem 0; }
     .sidebar .menu-item{
       display:grid; grid-template-columns:48px 1fr; align-items:center;
@@ -126,7 +127,6 @@
     }
     .sidebar .menu-item .menu-text{ overflow:hidden; text-overflow:ellipsis; opacity:1; transition:opacity .18s ease; }
 
-    /* ปรับคอลัมน์ตามโหมด */
     @media (min-width:1024px){
       .sidebar.collapsed .menu-item{ grid-template-columns:48px 0px; gap:0; padding-inline:.5rem; }
       .sidebar.collapsed .menu-item .menu-text{ opacity:0; pointer-events:none; }
@@ -135,81 +135,31 @@
       .sidebar.compact .menu-item .menu-text{ font-size: .92rem; }
     }
 
-    /* ===== Topbar / Footer / Loader unchanged … ===== */
-    .topbar--hero{ position:sticky; top:0; z-index:30; background:#0E2B51; color:#fff; border-bottom:1px solid rgba(255,255,255,.08); box-shadow:0 10px 30px rgba(0,0,0,.18); backdrop-filter:saturate(120%) blur(6px); }
-    .topbar--inner{ min-height:var(--topbar-h); display:flex; align-items:center; }
-    .brand-logo{ width:60px; height:60px; object-fit:contain; }
-    .brand-title{ font-weight:900; letter-spacing:.2px; line-height:1; color:#fff; }
-    .brand-sub{ font-size:.82rem; color:#d8e7f9; margin-top:2px; }
-    .glass-btn{ background: rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.28); color:#fff; }
-    .glass-btn:hover{ background: rgba(255,255,255,.18); }
     .footer{ background:#0E2B51; display:flex; align-items:center; justify-content:center; min-height:44px; padding:.75rem 1rem; font-weight:600; font-size:.875rem; color:#fff!important; }
+
     .loader-overlay{ position:fixed; inset:0; background:rgba(255,255,255,.6); backdrop-filter:blur(2px); display:flex; align-items:center; justify-content:center; z-index:99999; visibility:hidden; opacity:0; transition:opacity .2s ease, visibility .2s; }
     .loader-overlay.show{ visibility:visible; opacity:1; }
     .loader-spinner{ width:38px; height:38px; border:4px solid #0E2B51; border-top-color:transparent; border-radius:50%; animation:spin .7s linear infinite; }
     @keyframes spin{ to{ transform:rotate(360deg) } }
-    .sticky-under-topbar{ position: sticky; top: calc(var(--topbar-h) + .5rem); z-index: 10; }
+
+    /* --- เสริมให้ navbar/dropdown ไม่ถูกคลิปซ้อน --- */
+    .app-navbar, .navbar-hero { z-index: 2000; } /* x-navbar fixed-top */
+    .dropdown-menu { z-index: 2100; }
   </style>
 </head>
 
 <body class="bg-base-200 text-base-content">
-  {{-- Skip to content (a11y) --}}
-  <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2
-     focus:bg-white focus:text-black focus:px-3 focus:py-2 focus:rounded-md focus:shadow">
-    ข้ามไปยังเนื้อหา
-  </a>
+  @if (View::hasSection('navbar'))
+    @yield('navbar')
+  @else
+    <x-navbar
+      :appName="config('app.name', 'Phrapokklao - Information Technology Group')"
+      subtitle="Asset Repair Management"
+      logo="{{ asset('/images/logoppk.png') }}"
+      :showLogout="Auth::check()"
+    />
+  @endif
 
-  {{-- ======= TOPBAR ======= --}}
-  <header class="topbar--hero" role="banner">
-    <div class="topbar--inner px-4 gap-4 flex-wrap">
-      {{-- Left: logo + title + badges --}}
-      <div class="flex items-center gap-4 flex-wrap">
-        <a href="{{ url('/') }}" class="flex items-center gap-3 no-underline">
-          <img src="{{ asset('/images/logoppk.png') }}" alt="ตราหน่วยงาน" class="brand-logo" width="60" height="60" decoding="async">
-          <div class="leading-tight">
-            <div class="brand-title text-xl md:text-2xl">
-              {{ config('app.name','Asset Repair Dashboard') }}
-            </div>
-            <div class="brand-sub">Asset Repair Management</div>
-          </div>
-        </a>
-
-        <div class="hidden md:flex items-center gap-2 text-[13px]">
-          @hasSection('topbadges')
-            @yield('topbadges')
-          @else
-            <span class="status-badge status-total">Total: <strong>300</strong></span>
-            <span class="status-badge status-pending">Pending: <strong>103</strong></span>
-            <span class="status-badge status-progress">In&nbsp;progress: <strong>107</strong></span>
-            <span class="status-badge status-done">Completed: <strong>90</strong></span>
-          @endif
-        </div>
-      </div>
-
-      {{-- Right: mobile menu + logout --}}
-      <div class="flex items-center gap-2 ml-auto">
-        <button id="btnSidebar"
-                class="lg:hidden inline-flex items-center px-2 py-1 rounded-md glass-btn transition-colors"
-                aria-controls="side" aria-expanded="false" title="เมนู">
-          ☰
-        </button>
-
-        <form method="POST" action="{{ route('logout') }}">
-          @csrf
-          <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md glass-btn transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none"
-                 viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round"
-                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1" />
-            </svg>
-            <span class="hidden md:inline">Logout</span>
-          </button>
-        </form>
-      </div>
-    </div>
-  </header>
-
-  {{-- ======= LAYOUT GRID ======= --}}
   <div id="layout" class="layout" role="presentation">
     <aside id="side" class="sidebar" aria-label="Sidebar navigation">
       @hasSection('sidebar')
@@ -236,18 +186,13 @@
     </main>
   </div>
 
-  {{-- ======= FOOTER ======= --}}
-  <footer class="footer" role="contentinfo">
-    @hasSection('footer')
-      @yield('footer')
-    @else
-      © {{ date('Y') }} {{ config('app.name','Asset Repair Dashboard') }} • Build {{ app()->version() }}
-    @endif
-  </footer>
+  <x-footer />
 
-  {{-- ======= Scripts ======= --}}
+  {{-- ===== Core JS ===== --}}
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  {{-- ===== Sidebar & Loader ===== --}}
   <script>
-    // Mobile sidebar
     const btn = document.getElementById('btnSidebar');
     const side = document.getElementById('side');
     const bd   = document.getElementById('backdrop');
@@ -258,7 +203,6 @@
     btn && btn.addEventListener('click', ()=> side.classList.contains('open') ? closeSide() : openSide());
     bd && bd.addEventListener('click', closeSide);
 
-    // Desktop collapsed state
     const KEY = 'app.sidebar.collapsed';
     const layout = document.getElementById('layout');
     function applyCollapsedState(collapsed){
@@ -280,7 +224,6 @@
       applyCollapsedState(saved === '1');
     }
 
-    // Hover expand (desktop)
     let hoverBound = false, hoverTimeout;
     function onEnter(){
       if (side.classList.contains('collapsed')) {
@@ -329,7 +272,6 @@
     handleResize(mql);
     mql.addEventListener?.('change', handleResize);
 
-    // Global Loader API
     window.Loader = {
       show(){ document.getElementById('loaderOverlay')?.classList.add('show') },
       hide(){ document.getElementById('loaderOverlay')?.classList.remove('show') }
@@ -350,25 +292,43 @@
     window.addEventListener('beforeunload', () => Loader.show());
   </script>
 
-   @stack('scripts')
+  {{-- ===== Init Bootstrap Dropdowns (หลังโหลด bundle แล้ว) ===== --}}
+  <script>
+    (function () {
+      if (!window.bootstrap || !window.bootstrap.Dropdown) return;
+      document.querySelectorAll('[data-bs-toggle="dropdown"]').forEach(function (el) {
+        if (!bootstrap.Dropdown.getInstance(el)) {
+          new bootstrap.Dropdown(el, { autoClose: 'outside' });
+        }
+      });
+    })();
+  </script>
 
-  {{-- Global Loader (เหลืออันเดียว) --}}
+  @stack('scripts')
+
   <div id="loaderOverlay" class="loader-overlay" aria-hidden="true">
     <div class="loader-spinner" role="status" aria-label="กำลังโหลด"></div>
   </div>
 
   <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js" defer></script>
-<x-toast />
-
+  <x-toast />
   @if (session('toast'))
     <script>
       const t = @json(session('toast'));
-      t.position = 'tc';
+      t.position = 'center';
       if (window.showToast) { window.showToast(t); }
       else { window.dispatchEvent(new CustomEvent('app:toast', { detail: t })); }
     </script>
   @endif
 
   @includeWhen(Auth::check(), 'partials.chat-fab')
+
+  @push('styles')
+  <link href="https://unpkg.com/cropperjs@1.6.2/dist/cropper.min.css" rel="stylesheet">
+  @endpush
+
+  @push('scripts')
+  <script src="https://unpkg.com/cropperjs@1.6.2/dist/cropper.min.js"></script>
+  @endpush
 </body>
 </html>

@@ -4,20 +4,52 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+// use Illuminate\Database\Eloquent\SoftDeletes; // เปิดถ้ามีคอลัมน์ deleted_at
 
 class MaintenanceRequest extends Model
 {
     use HasFactory;
+    // use SoftDeletes;
 
     /**
      * Fillable fields
      */
     protected $fillable = [
-        'asset_id', 'reporter_id', 'title', 'description',
-        'priority', 'status', 'technician_id',
-        'request_date', 'assigned_date', 'completed_date',
-        'accepted_at', 'started_at', 'on_hold_at', 'resolved_at', 'closed_at',
-        'remark', 'cost',
+        // อ้างอิง/พื้นฐาน
+        'request_no',
+        'asset_id',
+        'department_id',
+        'reporter_id',
+        'title',
+        'description',
+        'priority',
+        'status',
+        'technician_id',
+
+        // ผู้แจ้ง (กรณีคนนอก)
+        'reporter_name',
+        'reporter_phone',
+        'reporter_email',
+
+        // ที่ตั้ง/หน่วยงาน
+        'location_text',
+
+        // ไทม์ไลน์
+        'request_date',
+        'assigned_date',
+        'completed_date',
+        'accepted_at',
+        'started_at',
+        'on_hold_at',
+        'resolved_at',
+        'closed_at',
+
+        // หมายเหตุ/ผลการซ่อม/ต้นทาง/ข้อมูลเสริม
+        'remark',
+        'resolution_note',
+        'cost',
+        'source',
+        'extra',
     ];
 
     /**
@@ -33,6 +65,7 @@ class MaintenanceRequest extends Model
         'resolved_at'    => 'datetime',
         'closed_at'      => 'datetime',
         'cost'           => 'decimal:2',
+        'extra'          => 'array',
     ];
 
     /**
@@ -61,9 +94,6 @@ class MaintenanceRequest extends Model
 
     /**
      * UI groups mapping (สำคัญสำหรับแท็บ)
-     * - Pending     : งานรอคิว/เพิ่งรับ (รวม accepted และ null)
-     * - In progress : กำลังทำ/พักไว้
-     * - Completed   : ปิดงานแล้ว/เสร็จสิ้น
      */
     public const GROUP_PENDING    = ['pending', 'accepted', null];
     public const GROUP_INPROGRESS = ['in_progress', 'started', 'on_hold'];
@@ -72,12 +102,16 @@ class MaintenanceRequest extends Model
     /**
      * Relationships
      */
-    public function asset()       { return $this->belongsTo(Asset::class); }
-    public function reporter()    { return $this->belongsTo(User::class, 'reporter_id'); }
-    public function technician()  { return $this->belongsTo(User::class, 'technician_id'); }
-    public function attachments() { return $this->hasMany(Attachment::class, 'request_id'); }
-    public function logs()        { return $this->hasMany(MaintenanceLog::class, 'request_id'); }
+    public function asset()        { return $this->belongsTo(Asset::class); }
+    public function department()   { return $this->belongsTo(Department::class); }
+    public function reporter()     { return $this->belongsTo(User::class, 'reporter_id'); }
+    public function technician()   { return $this->belongsTo(User::class, 'technician_id'); }
+    public function logs()         { return $this->hasMany(MaintenanceLog::class, 'request_id'); }
 
+    public function attachments()
+    {
+        return $this->morphMany(\App\Models\Attachment::class, 'attachable')->orderBy('order_column');
+    }
     /**
      * Helpers
      */
@@ -87,6 +121,25 @@ class MaintenanceRequest extends Model
             return self::STATUS_RESOLVED;
         }
         return (string) $this->status;
+    }
+
+    /**
+     * Auto-generate request_no ถ้ายังไม่มี
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $model) {
+            if (empty($model->request_no)) {
+                // รูปแบบ MR-YYYY-XXXXXX (จาก id จะยังไม่มีตอน creating)
+                // ใช้เวลา + random ชั่วคราว แล้วค่อย normalize ใน updated event ถ้าต้อง
+                $year = now()->format('Y');
+                $rand = strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
+                $model->request_no = "MR-{$year}-{$rand}";
+            }
+            if (empty($model->source)) {
+                $model->source = 'web';
+            }
+        });
     }
 
     /**
@@ -114,7 +167,6 @@ class MaintenanceRequest extends Model
      */
     public function scopePendingGroup($q)
     {
-        // ครอบคลุม pending, accepted และยังไม่ตั้งสถานะ (null)
         return $q->where(function ($w) {
             $w->whereIn('status', ['pending', 'accepted'])
               ->orWhereNull('status');

@@ -7,14 +7,12 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
-
         Schema::create('assets', function (Blueprint $table) {
             $table->id();
 
             $table->string('asset_code', 100)->unique();
             $table->string('name');
             $table->string('type', 100)->nullable();
-            $table->string('category', 100)->nullable();  
             $table->string('brand', 100)->nullable();
             $table->string('model', 100)->nullable();
             $table->string('serial_number', 100)->nullable()->unique();
@@ -38,17 +36,13 @@ return new class extends Migration {
 
             $table->timestamps();
 
-            $table->index('type');
-            $table->index('category');
-            $table->index('location');
-            $table->index('department_id');
-            $table->index('category_id');
+            $table->index(['type', 'location', 'department_id', 'category_id']);
+            $table->index(['asset_code', 'serial_number']);
         });
     }
 
     public function down(): void
     {
         Schema::dropIfExists('assets');
-        Schema::dropIfExists('asset_categories');
     }
 };

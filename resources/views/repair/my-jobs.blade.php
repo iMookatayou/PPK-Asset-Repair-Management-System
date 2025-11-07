@@ -52,10 +52,6 @@
           <p class="text-sm text-slate-500">Browse, filter and manage repair jobs assigned to you</p>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-        <a href="{{ route('maintenance.requests.index') }}" class="{{ $btnGhost }}">All Requests</a>
-        <a href="{{ route('maintenance.requests.create') }}" class="hidden sm:inline-flex {{ $btnPrimary }}">+ New Request</a>
-      </div>
     </div>
 
     {{-- ===== Filters row (moved all controls to TOP) ===== --}}

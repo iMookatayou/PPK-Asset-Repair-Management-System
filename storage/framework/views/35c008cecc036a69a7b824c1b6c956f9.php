@@ -1,40 +1,73 @@
-{{-- resources/views/components/navbar.blade.php --}}
-@props([
+
+<?php $attributes ??= new \Illuminate\View\ComponentAttributeBag;
+
+$__newAttributes = [];
+$__propNames = \Illuminate\View\ComponentAttributeBag::extractPropNames(([
   'appName'    => 'Phrapokklao - Information Technology Group',
   'subtitle'   => 'Asset Repair Management',
   'logo'       => asset('images/logoppk.png'),
   'showLogout' => Auth::check(),
-])
+]));
 
-@php $user = Auth::user(); @endphp
+foreach ($attributes->all() as $__key => $__value) {
+    if (in_array($__key, $__propNames)) {
+        $$__key = $$__key ?? $__value;
+    } else {
+        $__newAttributes[$__key] = $__value;
+    }
+}
+
+$attributes = new \Illuminate\View\ComponentAttributeBag($__newAttributes);
+
+unset($__propNames);
+unset($__newAttributes);
+
+foreach (array_filter(([
+  'appName'    => 'Phrapokklao - Information Technology Group',
+  'subtitle'   => 'Asset Repair Management',
+  'logo'       => asset('images/logoppk.png'),
+  'showLogout' => Auth::check(),
+]), 'is_string', ARRAY_FILTER_USE_KEY) as $__key => $__value) {
+    $$__key = $$__key ?? $__value;
+}
+
+$__defined_vars = get_defined_vars();
+
+foreach ($attributes->all() as $__key => $__value) {
+    if (array_key_exists($__key, $__defined_vars)) unset($$__key);
+}
+
+unset($__defined_vars, $__key, $__value); ?>
+
+<?php $user = Auth::user(); ?>
 
 <nav class="navbar navbar-expand-lg navbar-dark fixed-top navbar-hero">
   <div class="container-fluid">
-    {{-- BRAND --}}
-    <a class="navbar-brand d-flex align-items-center gap-3" href="{{ url('/') }}" data-no-loader>
-      <img src="{{ $logo }}" alt="Logo" class="brand-logo">
+    
+    <a class="navbar-brand d-flex align-items-center gap-3" href="<?php echo e(url('/')); ?>" data-no-loader>
+      <img src="<?php echo e($logo); ?>" alt="Logo" class="brand-logo">
       <span class="d-flex flex-column lh-sm">
-        <strong>{{ $appName }}</strong>
-        <small class="brand-kicker fw-normal">{{ $subtitle }}</small>
+        <strong><?php echo e($appName); ?></strong>
+        <small class="brand-kicker fw-normal"><?php echo e($subtitle); ?></small>
       </span>
     </a>
 
-    {{-- MOBILE SIDEBAR TOGGLER --}}
+    
     <button id="btnSidebar" class="btn btn-outline-light btn-sm d-lg-none me-2" type="button" title="เมนู">
       ☰
     </button>
 
-    {{-- NAV COLLAPSER --}}
+    
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topNav"
             aria-controls="topNav" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
 
-    {{-- RIGHT SIDE --}}
+    
     <div class="collapse navbar-collapse" id="topNav">
       <ul class="navbar-nav ms-auto align-items-center gap-lg-3">
-        @auth
-          {{-- === Profile Popover Trigger (manual JS; ไม่ใช้ data-bs-*) === --}}
+        <?php if(auth()->guard()->check()): ?>
+          
           <li class="nav-item">
             <a href="#"
                id="profilePopoverBtn"
@@ -42,51 +75,51 @@
                role="button"
                data-no-loader
                aria-describedby="profilePopover">
-              <img src="{{ $user->avatar_url ?? asset('images/default-avatar.png') }}" alt="Avatar" class="avatar-img">
-              <span class="d-none d-md-inline fw-semibold">{{ $user->name }}</span>
+              <img src="<?php echo e($user->avatar_url ?? asset('images/default-avatar.png')); ?>" alt="Avatar" class="avatar-img">
+              <span class="d-none d-md-inline fw-semibold"><?php echo e($user->name); ?></span>
               <i class="bi bi-caret-down-fill ms-1"></i>
             </a>
           </li>
-        @else
+        <?php else: ?>
           <li class="nav-item">
-            <a href="{{ route('login') }}" class="btn btn-light btn-sm" data-no-loader>เข้าสู่ระบบ</a>
+            <a href="<?php echo e(route('login')); ?>" class="btn btn-light btn-sm" data-no-loader>เข้าสู่ระบบ</a>
           </li>
-        @endauth
+        <?php endif; ?>
       </ul>
     </div>
   </div>
 </nav>
 
-@auth
-  {{-- เทมเพลตเนื้อหา Popover (ซ่อนไว้)—ใช้ฟอนต์ Sarabun ชัดเจน --}}
+<?php if(auth()->guard()->check()): ?>
+  
   <div id="profilePopoverContent" class="d-none">
     <div class="p-2 ff-sarabun" style="min-width: 260px;">
       <div class="d-flex align-items-center gap-2 mb-2">
-        <img src="{{ $user->avatar_url ?? asset('images/default-avatar.png') }}" class="rounded-circle" width="40" height="40" alt="Avatar">
+        <img src="<?php echo e($user->avatar_url ?? asset('images/default-avatar.png')); ?>" class="rounded-circle" width="40" height="40" alt="Avatar">
         <div>
-          <div class="fw-semibold">{{ $user->name }}</div>
-          <div class="small text-muted">{{ $user->email }}</div>
+          <div class="fw-semibold"><?php echo e($user->name); ?></div>
+          <div class="small text-muted"><?php echo e($user->email); ?></div>
         </div>
       </div>
 
-      {{-- เหลือเมนูเดียว: โปรไฟล์ของฉัน -> show.blade.php --}}
-      <a href="{{ route('profile.show') }}" class="dropdown-item py-2 d-flex align-items-center gap-2" data-no-loader>
+      
+      <a href="<?php echo e(route('profile.show')); ?>" class="dropdown-item py-2 d-flex align-items-center gap-2" data-no-loader>
         <i class="bi bi-person-lines-fill"></i> โปรไฟล์ของฉัน
       </a>
 
-      @if($showLogout)
+      <?php if($showLogout): ?>
         <div class="mt-2">
-          <form method="POST" action="{{ route('logout') }}" class="mb-0" data-no-loader>
-            @csrf
+          <form method="POST" action="<?php echo e(route('logout')); ?>" class="mb-0" data-no-loader>
+            <?php echo csrf_field(); ?>
             <button class="btn btn-outline-danger w-100 d-flex align-items-center justify-content-center gap-2">
               <i class="bi bi-box-arrow-right"></i> ออกจากระบบ
             </button>
           </form>
         </div>
-      @endif
+      <?php endif; ?>
     </div>
   </div>
-@endauth
+<?php endif; ?>
 
 <style>
   /* === Navbar Hero Theme === */
@@ -125,8 +158,8 @@
   .popover .popover-body { padding: 0; }
 </style>
 
-@auth
-  @push('scripts')
+<?php if(auth()->guard()->check()): ?>
+  <?php $__env->startPush('scripts'); ?>
   <script>
     (function () {
       // ต้องมี bootstrap.bundle (layout ของคุณโหลดไว้แล้ว)
@@ -180,5 +213,6 @@
       });
     })();
   </script>
-  @endpush
-@endauth
+  <?php $__env->stopPush(); ?>
+<?php endif; ?>
+<?php /**PATH C:\Users\Developer\development\Asset-Repair-Management-System\resources\views/components/navbar.blade.php ENDPATH**/ ?>

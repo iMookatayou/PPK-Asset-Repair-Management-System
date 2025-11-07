@@ -12,164 +12,161 @@
     $arrow = $sortBy === $key ? ($sortDir === 'asc' ? '↑' : '↓') : '';
     return "<a href=\"{$q}\" class=\"inline-flex items-center gap-1 hover:text-zinc-900\">{$label} <span class=\"text-xs text-zinc-400\">{$arrow}</span></a>";
   };
+
+  // สไตล์ป้ายสถานะ (ราชการ: ring-1 + bg-white)
+  $statusBadge = fn(?string $s) => match(strtolower((string)$s)) {
+    'active'     => 'ring-emerald-300 text-emerald-800 bg-white',
+    'in_repair'  => 'ring-amber-300 text-amber-800 bg-white',
+    'disposed'   => 'ring-rose-300 text-rose-800 bg-white',
+    default      => 'ring-zinc-300 text-zinc-700 bg-white',
+  };
 ?>
 
 
-<div class="w-full px-4 md:px-6 lg:px-8 py-5 min-h-[calc(100vh-6rem)] flex flex-col gap-5">
+<div class="pt-3 md:pt-4"></div>
+
+<div class="w-full px-4 md:px-6 lg:px-8 flex flex-col gap-5">
 
   
-  <div class="rounded-xl border bg-base-100/80 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-base-100/60">
-    <div class="px-4 md:px-6 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="size-10 grid place-items-center rounded-lg bg-primary/10 text-primary">
-          <svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                  d="M6 7h12M6 11h8m-8 4h12M4 5v14a2 2 0 0 0 2 2h12l2-2V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2Z"/>
+  <div class="rounded-lg border border-zinc-300 bg-white">
+    <div class="px-5 py-4">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+
+        <div class="flex items-start gap-3">
+          <div class="grid h-9 w-9 place-items-center rounded-md bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 7h12M6 11h8m-8 4h12M4 5v14a2 2 0 0 0 2 2h12l2-2V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2Z"/>
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-[17px] font-semibold text-zinc-900">Assets</h1>
+            <p class="text-[13px] text-zinc-600">ทรัพย์สินครุภัณฑ์ • ค้นหา กรอง และจัดการข้อมูล</p>
+          </div>
+        </div>
+
+        <a href="<?php echo e(route('assets.create')); ?>"
+           class="inline-flex items-center gap-2 rounded-md border border-emerald-700 bg-emerald-700 px-4 py-2 text-[13px] font-medium text-white hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/>
           </svg>
-        </div>
-        <div>
-          <h1 class="text-lg md:text-xl font-semibold">Assets</h1>
-          <p class="text-sm opacity-70">Browse, filter and maintain inventory</p>
-        </div>
+          เพิ่มทรัพย์สิน
+        </a>
       </div>
 
-      <a href="<?php echo e(route('assets.create')); ?>"
-         class="hidden md:inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-white
-                hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-        + New Asset
-      </a>
+      
+      <div class="mt-4 h-px bg-zinc-200"></div>
+
+      
+      <form method="GET" class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-12" role="search" aria-label="Filter assets">
+        
+        <div class="md:col-span-5 min-w-0">
+          <label for="q" class="mb-1 block text-[12px] text-zinc-600">คำค้นหา</label>
+          <div class="relative">
+            <input id="q" type="text" name="q" value="<?php echo e(request('q')); ?>"
+                   placeholder="เช่น รหัส/ชื่อ/Serial number"
+                   class="w-full rounded-md border border-zinc-300 pl-12 pr-3 py-2 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-600">
+            <span class="pointer-events-none absolute inset-y-0 left-0 flex w-9 items-center justify-center text-zinc-400">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M21 21l-4.3-4.3M17 10a7 7 0 11-14 0 7 7 0 0114 0z"/>
+              </svg>
+            </span>
+          </div>
+        </div>
+
+        
+        <div class="md:col-span-3">
+          <label for="status" class="mb-1 block text-[12px] text-zinc-600">สถานะ</label>
+          <?php $statuses = ['' => 'ทั้งหมด','active'=>'พร้อมใช้งาน','in_repair'=>'อยู่ระหว่างซ่อม','disposed'=>'จำหน่าย']; ?>
+          <select id="status" name="status"
+                  class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
+            <?php $__currentLoopData = $statuses; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $k=>$v): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+              <option value="<?php echo e($k); ?>" <?php if(request('status')===$k): echo 'selected'; endif; ?>><?php echo e($v); ?></option>
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+          </select>
+        </div>
+
+        
+        <div class="md:col-span-3">
+          <label for="category" class="mb-1 block text-[12px] text-zinc-600">หมวดหมู่</label>
+          <input id="category" type="text" name="category" value="<?php echo e(request('category')); ?>"
+                 placeholder="เช่น คอมพิวเตอร์ / เครื่องพิมพ์"
+                 class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-600">
+        </div>
+
+        
+        <div class="md:col-span-1 flex items-end justify-end gap-2">
+          <?php if(request()->hasAny(['q','status','category','sort_by','sort_dir'])): ?>
+            <a href="<?php echo e(route('assets.index')); ?>"
+               class="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50">
+              ล้างค่า
+            </a>
+          <?php endif; ?>
+          <button class="rounded-md border border-emerald-700 bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800">
+            กรองข้อมูล
+          </button>
+        </div>
+      </form>
     </div>
-    <div class="h-px bg-gradient-to-r from-transparent via-base-200 to-transparent"></div>
   </div>
 
   
-  <form method="GET" class="rounded-xl border bg-white shadow-sm p-4" role="search" aria-label="Filter assets">
-    <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
-      <div class="md:col-span-2">
-        <label for="q" class="block text-sm text-zinc-700">Search</label>
-        <input id="q" type="text" name="q" value="<?php echo e(request('q')); ?>"
-               placeholder="Search code / name / serial..."
-               class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2
-                      focus:outline-none focus:ring-2 focus:ring-[#0E2B51]">
-      </div>
-
-      <div>
-        <label for="status" class="block text-sm text-zinc-700">Status</label>
-        <?php $statuses = ['' => 'All','active'=>'Active','in_repair'=>'In Repair','disposed'=>'Disposed']; ?>
-        <select id="status" name="status"
-                class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2
-                       focus:outline-none focus:ring-2 focus:ring-[#0E2B51]">
-          <?php $__currentLoopData = $statuses; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $k=>$v): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-            <option value="<?php echo e($k); ?>" <?php if(request('status')===$k): echo 'selected'; endif; ?>><?php echo e($v); ?></option>
-          <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-        </select>
-      </div>
-
-      <div>
-        <label for="category" class="block text-sm text-zinc-700">Category</label>
-        <input id="category" type="text" name="category" value="<?php echo e(request('category')); ?>"
-               placeholder="e.g. Computer"
-               class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2
-                      focus:outline-none focus:ring-2 focus:ring-[#0E2B51]">
-      </div>
-
-      <div class="md:col-span-3"></div>
-      <div class="flex items-end justify-end gap-2">
-        <?php if(request()->hasAny(['q','status','category','sort_by','sort_dir'])): ?>
-          <a href="<?php echo e(route('assets.index')); ?>"
-             class="inline-flex items-center justify-center rounded-lg px-3 py-2
-                    border border-zinc-300 hover:bg-zinc-50">
-            Reset
-          </a>
-        <?php endif; ?>
-        <button class="inline-flex items-center justify-center rounded-lg px-3 py-2
-                       bg-zinc-900 text-white hover:bg-zinc-800">
-          Filter
-        </button>
-      </div>
-    </div>
-  </form>
-
-  
-  <div class="hidden md:flex flex-col rounded-xl border bg-white shadow-sm flex-1 overflow-hidden">
-    <div class="overflow-x-auto overflow-y-auto flex-1">
-      <table class="min-w-full divide-y divide-zinc-200 text-sm">
-        <thead class="sticky top-0 z-10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/70">
-          <tr class="text-left text-zinc-600">
-            <th class="px-4 py-3"><?php echo $th('id','#'); ?></th>
-            <th class="px-4 py-3"><?php echo $th('asset_code','Asset Code'); ?></th>
-            <th class="px-4 py-3"><?php echo $th('name','Name'); ?></th>
-            <th class="px-4 py-3 hidden xl:table-cell"><?php echo $th('category','Category'); ?></th>
-            <th class="px-4 py-3 hidden lg:table-cell">Location</th>
-            <th class="px-4 py-3"><?php echo $th('status','Status'); ?></th>
-            <th class="px-4 py-3 text-right">Action</th>
+  <div class="hidden md:block rounded-lg border border-zinc-300 bg-white overflow-hidden">
+    <div class="relative overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-zinc-50">
+          <tr class="text-zinc-700 border-b border-zinc-200">
+            <th class="p-3 text-left font-medium"><?php echo $th('id','#'); ?></th>
+            <th class="p-3 text-left font-medium"><?php echo $th('asset_code','Asset Code'); ?></th>
+            <th class="p-3 text-left font-medium"><?php echo $th('name','Name'); ?></th>
+            <th class="p-3 text-left font-medium hidden xl:table-cell"><?php echo $th('category','Category'); ?></th>
+            <th class="p-3 text-left font-medium hidden lg:table-cell">Location</th>
+            <th class="p-3 text-left font-medium"><?php echo $th('status','Status'); ?></th>
+            <th class="p-3 text-right font-medium">การดำเนินการ</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-zinc-100 bg-white">
+        <tbody>
           <?php $__empty_1 = true; $__currentLoopData = $assets; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $a): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-            <tr class="hover:bg-zinc-50">
-              <td class="px-4 py-3 text-zinc-500"><?php echo e($a->id); ?></td>
-              <td class="px-4 py-3 font-medium text-zinc-800"><?php echo e($a->asset_code); ?></td>
-              <td class="px-4 py-3">
+            <tr class="align-top hover:bg-zinc-50 border-b last:border-0">
+              <td class="p-3 text-zinc-700"><?php echo e($a->id); ?></td>
+              <td class="p-3 font-medium text-zinc-900"><?php echo e($a->asset_code); ?></td>
+              <td class="p-3">
                 <a class="text-emerald-700 hover:underline" href="<?php echo e(route('assets.show',$a)); ?>"><?php echo e($a->name); ?></a>
                 <div class="text-xs text-zinc-500">S/N: <?php echo e($a->serial_number ?? '—'); ?></div>
               </td>
-              <td class="px-4 py-3 hidden xl:table-cell"><?php echo e($a->category ?? '—'); ?></td>
-              <td class="px-4 py-3 hidden lg:table-cell"><?php echo e($a->location ?? '—'); ?></td>
-              <td class="px-4 py-3">
-                <?php
-                  $badge = [
-                    'active'    => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-                    'in_repair' => 'bg-amber-50 text-amber-700 ring-amber-200',
-                    'disposed'  => 'bg-rose-50 text-rose-700 ring-rose-200',
-                  ][$a->status] ?? 'bg-zinc-50 text-zinc-700 ring-zinc-200';
-                ?>
-                <span class="rounded-full px-2 py-1 text-xs ring-1 <?php echo e($badge); ?>">
-                  <?php echo e(ucfirst(str_replace('_',' ',$a->status))); ?>
+              <td class="p-3 hidden xl:table-cell text-zinc-700"><?php echo e($a->category ?? '—'); ?></td>
+              <td class="p-3 hidden lg:table-cell text-zinc-700"><?php echo e($a->location ?? '—'); ?></td>
+              <td class="p-3">
+                <span class="rounded-full px-2 py-1 text-[11px] ring-1 <?php echo e($statusBadge($a->status)); ?>">
+                  <?php echo e(ucfirst(str_replace('_',' ', $a->status))); ?>
 
                 </span>
               </td>
-              <td class="px-4 py-3 text-right whitespace-nowrap">
-                <a href="<?php echo e(route('assets.edit',$a)); ?>" class="text-emerald-700 hover:underline">Edit</a>
+              <td class="p-3 text-right whitespace-nowrap">
+                <a href="<?php echo e(route('assets.edit',$a)); ?>" class="text-emerald-700 hover:underline">แก้ไข</a>
               </td>
             </tr>
           <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
             <tr>
-              <td colspan="7" class="px-4 py-10 text-center text-zinc-500">No assets found.</td>
+              <td colspan="7" class="p-10 text-center text-zinc-600">ไม่พบทรัพย์สิน</td>
             </tr>
           <?php endif; ?>
         </tbody>
       </table>
     </div>
-
-    
-    <div class="px-4 py-3 border-t bg-white">
-      <div class="flex justify-center">
-        <?php echo e($assets->withQueryString()->links()); ?>
-
-      </div>
-    </div>
   </div>
 
   
-  <div class="grid grid-cols-1 gap-3 md:hidden flex-1 overflow-y-auto">
+  <div class="md:hidden grid grid-cols-1 gap-3">
     <?php $__empty_1 = true; $__currentLoopData = $assets; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $a): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-      <div class="rounded-xl border bg-white shadow-sm p-4">
+      <div class="rounded-lg border border-zinc-300 bg-white p-4">
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
             <div class="text-xs text-zinc-500">#<?php echo e($a->id); ?> — <?php echo e($a->asset_code); ?></div>
             <a class="font-medium text-zinc-900 hover:underline" href="<?php echo e(route('assets.show',$a)); ?>"><?php echo e($a->name); ?></a>
             <div class="text-xs text-zinc-500">S/N: <?php echo e($a->serial_number ?? '—'); ?></div>
           </div>
-          <?php
-            $badge = [
-              'active'    => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-              'in_repair' => 'bg-amber-50 text-amber-700 ring-amber-200',
-              'disposed'  => 'bg-rose-50 text-rose-700 ring-rose-200',
-            ][$a->status] ?? 'bg-zinc-50 text-zinc-700 ring-zinc-200';
-          ?>
-          <span class="rounded-full px-2 py-1 text-xs ring-1 <?php echo e($badge); ?>">
-            <?php echo e(ucfirst(str_replace('_',' ',$a->status))); ?>
+          <span class="rounded-full px-2 py-1 text-[11px] ring-1 <?php echo e($statusBadge($a->status)); ?>">
+            <?php echo e(ucfirst(str_replace('_',' ', $a->status))); ?>
 
           </span>
         </div>
@@ -183,23 +180,23 @@
 
         <div class="mt-3 text-right">
           <a href="<?php echo e(route('assets.edit',$a)); ?>"
-             class="inline-flex items-center rounded-lg px-3 py-2 border border-zinc-300 hover:bg-zinc-50">
-            Edit
+             class="inline-flex items-center rounded-md px-3 py-2 border border-zinc-300 hover:bg-zinc-50">
+            แก้ไข
           </a>
         </div>
       </div>
     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-      <div class="rounded-xl border bg-white shadow-sm p-8 text-center text-zinc-500">
-        No assets found.
+      <div class="rounded-lg border border-zinc-300 bg-white p-8 text-center text-zinc-600">
+        ไม่พบทรัพย์สิน
       </div>
     <?php endif; ?>
-
-    <div class="flex justify-center pb-2">
-      <?php echo e($assets->withQueryString()->links()); ?>
-
-    </div>
   </div>
 
+  
+  <div class="mt-4">
+    <?php echo e($assets->links()); ?>
+
+  </div>
 </div>
 <?php $__env->stopSection(); ?>
 

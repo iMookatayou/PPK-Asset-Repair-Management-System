@@ -3,399 +3,357 @@
 namespace App\Http\Controllers;
 
 use App\Models\MaintenanceRequest as MR;
-use App\Models\MaintenanceLog;
+use App\Models\Attachment;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
 
 class MaintenanceRequestController extends Controller
 {
-    /**
-     * API: GET /api/repair-requests
-     * Filters: ?status=&priority=&q=
-     */
-    public function index()
-    {
-        $status   = request('status');
-        $priority = request('priority');
-        $q        = request('q');
-
-        $list = MR::with(['asset','reporter','technician'])
-            ->when($status, fn($qb)=>$qb->where('status',$status))
-            ->when($priority, fn($qb)=>$qb->where('priority',$priority))
-            ->when($q, fn($qb)=>$qb->where(function($w) use ($q){
-                $w->where('title','like',"%$q%")
-                  ->orWhere('description','like',"%$q%");
-            }))
-            ->orderByDesc('request_date')
-            ->paginate(20);
-
-        return response()->json($list);
-    }
-
-    /**
-     * API: POST /api/repair-requests
-     */
-    public function store(Request $request)
-    {
-        $data = $request->validate([
-            'asset_id'     => 'required|exists:assets,id',
-            'reporter_id'  => 'required|exists:users,id',
-            'title'        => 'required|string|max:255',
-            'description'  => 'nullable|string',
-            'priority'     => ['required', Rule::in([
-                MR::PRIORITY_LOW,
-                MR::PRIORITY_MEDIUM,
-                MR::PRIORITY_HIGH,
-                MR::PRIORITY_URGENT,
-            ])],
-        ]);
-
-        $req = DB::transaction(function () use ($data, $request) {
-            $req = MR::create($data + [
-                'status'       => MR::STATUS_PENDING,
-                'request_date' => now(),
-            ]);
-
-            MaintenanceLog::create([
-                'request_id' => $req->id,
-                'user_id'    => $request->user()->id ?? $req->reporter_id,
-                'action'     => 'create_request',
-                'note'       => $req->title,
-            ]);
-
-            return $req;
-        });
-
-        return response()->json(['message'=>'created','data'=>$req], 201);
-    }
-
-    /**
-     * API: GET /api/repair-requests/{req}
-     */
-    public function show(MR $req)
-    {
-        return response()->json(
-            $req->load(['asset','reporter','technician','attachments','logs' => fn($q)=>$q->latest()])
-        );
-    }
-
-    /**
-     * API: PUT/PATCH /api/repair-requests/{req}
-     * (generic update — รองรับฟิลด์สถานะ/เวลาใหม่)
-     */
-    public function update(Request $request, MR $req)
-    {
-        $data = $request->validate([
-            'status'         => ['sometimes', Rule::in([
-                MR::STATUS_PENDING,
-                MR::STATUS_ACCEPTED,
-                MR::STATUS_IN_PROGRESS,
-                MR::STATUS_ON_HOLD,
-                MR::STATUS_RESOLVED,
-                MR::STATUS_CLOSED,
-                MR::STATUS_CANCELLED,
-                MR::STATUS_COMPLETED, // legacy mapping → resolved
-            ])],
-            'technician_id'  => 'nullable|exists:users,id',
-            'remark'         => 'nullable|string',
-            'assigned_date'  => 'nullable|date',
-            'completed_date' => 'nullable|date',
-            'accepted_at'    => 'nullable|date',
-            'started_at'     => 'nullable|date',
-            'on_hold_at'     => 'nullable|date',
-            'resolved_at'    => 'nullable|date',
-            'closed_at'      => 'nullable|date',
-        ]);
-
-        DB::transaction(function () use ($request, $req, $data) {
-            // auto-accept เมื่อมี technician ครั้งแรก
-            if (array_key_exists('technician_id', $data) && $data['technician_id'] && !$req->assigned_date) {
-                $data['assigned_date'] = $data['assigned_date'] ?? now();
-                $data['accepted_at']   = $data['accepted_at']   ?? now();
-                $data['status']        = $data['status']        ?? MR::STATUS_ACCEPTED;
-            }
-
-            // map resolved/closed ให้ลง timestamp อัตโนมัติ
-            if (($data['status'] ?? null) === MR::STATUS_RESOLVED && empty($data['resolved_at'])) {
-                $data['resolved_at'] = now();
-            }
-            if (($data['status'] ?? null) === MR::STATUS_CLOSED && empty($data['closed_at'])) {
-                $data['closed_at'] = now();
-            }
-
-            // legacy: completed → resolved
-            if (($data['status'] ?? null) === MR::STATUS_COMPLETED && empty($data['resolved_at'])) {
-                $data['status']      = MR::STATUS_RESOLVED;
-                $data['resolved_at'] = now();
-            }
-
-            $req->update($data);
-
-            MaintenanceLog::create([
-                'request_id' => $req->id,
-                'user_id'    => $request->user()->id ?? null,
-                'action'     => 'update_request',
-                'note'       => $req->status,
-            ]);
-        });
-
-        return response()->json(['message'=>'updated']);
-    }
-
-    /**
-     * API: POST /api/repair-requests/{req}/transition
-     * body: action(assign|accept|start|hold|resolve|close|cancel|reassign), technician_id?, remark?
-     */
-    public function transition(Request $request, MR $req)
-    {
-        $data = $request->validate([
-            'action'        => 'required|in:assign,accept,start,hold,resolve,close,cancel,reassign',
-            'technician_id' => 'nullable|exists:users,id',
-            'remark'        => 'nullable|string',
-        ]);
-
-        DB::transaction(function () use ($request, $req, $data) {
-            $action = $data['action'];
-            $note   = $data['remark'] ?? null;
-
-            if (in_array($req->status, [MR::STATUS_CLOSED, MR::STATUS_CANCELLED], true) && $action !== 'cancel') {
-                abort(422, 'Request already closed.');
-            }
-
-            switch ($action) {
-                case 'assign':
-                    if (empty($data['technician_id'])) abort(422, 'technician_id is required for assign');
-                    $req->update([
-                        'technician_id' => $data['technician_id'],
-                        'status'        => MR::STATUS_ACCEPTED,
-                        'assigned_date' => $req->assigned_date ?? now(),
-                        'accepted_at'   => $req->accepted_at ?? now(),
-                        'remark'        => $note ?: $req->remark,
-                    ]);
-                    $this->log($req->id, $request->user()->id ?? null, 'assign_technician', (string)$data['technician_id']);
-                    break;
-
-                case 'accept':
-                    if (!in_array($req->status, [MR::STATUS_PENDING, MR::STATUS_ACCEPTED], true)) {
-                        abort(422, 'Invalid state to accept');
-                    }
-                    $req->update([
-                        'status'      => MR::STATUS_ACCEPTED,
-                        'accepted_at' => $req->accepted_at ?? now(),
-                        'remark'      => $note ?: $req->remark,
-                    ]);
-                    $this->log($req->id, $request->user()->id ?? null, 'accept_request', $note);
-                    break;
-
-                case 'start':
-                    if (!in_array($req->status, [MR::STATUS_ACCEPTED, MR::STATUS_PENDING, MR::STATUS_ON_HOLD], true)) {
-                        abort(422, 'Invalid state to start');
-                    }
-                    $req->update([
-                        'status'     => MR::STATUS_IN_PROGRESS,
-                        'started_at' => $req->started_at ?? now(),
-                        'on_hold_at' => null,
-                        'remark'     => $note ?: $req->remark,
-                    ]);
-                    $this->log($req->id, $request->user()->id ?? null, 'start_request', $note);
-                    break;
-
-                case 'hold':
-                    if (!in_array($req->status, [MR::STATUS_IN_PROGRESS, MR::STATUS_ACCEPTED], true)) {
-                        abort(422, 'Invalid state to hold');
-                    }
-                    $req->update([
-                        'status'     => MR::STATUS_ON_HOLD,
-                        'on_hold_at' => now(),
-                        'remark'     => $note ?: $req->remark,
-                    ]);
-                    $this->log($req->id, $request->user()->id ?? null, 'hold_request', $note);
-                    break;
-
-                case 'resolve':
-                    if ($req->status !== MR::STATUS_IN_PROGRESS) {
-                        abort(422, 'Invalid state to resolve');
-                    }
-                    $req->update([
-                        'status'      => MR::STATUS_RESOLVED,
-                        'resolved_at' => $req->resolved_at ?? now(),
-                        'remark'      => $note ?: $req->remark,
-                    ]);
-                    $this->log($req->id, $request->user()->id ?? null, 'resolve_request', $note);
-                    break;
-
-                case 'close':
-                    if (!in_array($req->status, [MR::STATUS_RESOLVED, MR::STATUS_COMPLETED], true)) {
-                        abort(422, 'Invalid state to close');
-                    }
-                    $req->update([
-                        'status'    => MR::STATUS_CLOSED,
-                        'closed_at' => $req->closed_at ?? now(),
-                        'remark'    => $note ?: $req->remark,
-                    ]);
-                    $this->log($req->id, $request->user()->id ?? null, 'close_request', $note);
-                    break;
-
-                case 'cancel':
-                    $req->update([
-                        'status' => MR::STATUS_CANCELLED,
-                        'remark' => $note ?: $req->remark,
-                    ]);
-                    $this->log($req->id, $request->user()->id ?? null, 'cancel_request', $note);
-                    break;
-
-                case 'reassign':
-                    if (empty($data['technician_id'])) abort(422, 'technician_id is required for reassign');
-                    if (in_array($req->status, [MR::STATUS_CLOSED, MR::STATUS_CANCELLED], true)) {
-                        abort(422, 'Request already closed.');
-                    }
-                    $req->update([
-                        'technician_id' => $data['technician_id'],
-                        'status'        => MR::STATUS_ACCEPTED,
-                        'accepted_at'   => $req->accepted_at ?? now(),
-                        'remark'        => $note ?: $req->remark,
-                    ]);
-                    $this->log($req->id, $request->user()->id ?? null, 'reassign_technician', (string)$data['technician_id']);
-                    break;
-            }
-        });
-
-        return response()->json(['message'=>'transition_ok','data'=>$req->fresh(['asset','reporter','technician'])]);
-    }
-
-    // ====== หน้า List (Blade) ======
+    /** ========== PAGES (Blade) ========== */
     public function indexPage(Request $request)
     {
-        $status   = $request->query('status');
-        $priority = $request->query('priority');
-        $q        = $request->query('q');
+        $status   = $request->string('status')->toString();
+        $priority = $request->string('priority')->toString();
+        $q        = $request->string('q')->toString();
 
-        $list = MR::with(['asset','reporter','technician'])
-            ->when($status, fn($qb)=>$qb->where('status',$status))
-            ->when($priority, fn($qb)=>$qb->where('priority',$priority))
-            ->when($q, fn($qb)=>$qb->where(function($w) use ($q){
-                $w->where('title','like',"%$q%")
-                  ->orWhere('description','like',"%$q%");
-            }))
-            ->orderByRaw('COALESCE(request_date, created_at) DESC')
-            ->paginate(20);
-
-        return view('maintenance.requests.index', compact('list'));
-    }
-
-    // ====== หน้า Show (Blade) ======
-    public function showPage(MR $req)
-    {
-        $req->load(['asset','reporter','technician','attachments','logs'=>fn($q)=>$q->latest()]);
-        return view('maintenance.requests.show', compact('req'));
-    }
-
-    // ====== transition จากหน้า Blade (redirect back) ======
-    public function transitionFromBlade(Request $request, MR $req)
-    {
-        $this->transition($request, $req);
-        return back()->with('ok','บันทึกแล้ว');
-    }
-
-    // ====== upload จากหน้า Blade (redirect back) ======
-    public function uploadAttachmentFromBlade(Request $request, MR $req)
-    {
-        $validated = $request->validate([
-            'type' => ['nullable', Rule::in(['before','after','other'])],
-            'file' => ['required','file','max:10240'],
-        ]);
-
-        $file   = $request->file('file');
-        $path   = $file->storePublicly("maintenance/{$req->id}", ['disk' => 'public']);
-
-        $req->attachments()->create([
-            'type'          => $validated['type'] ?? 'other',
-            'path'          => $path,
-            'original_name' => $file->getClientOriginalName(),
-            'mime'          => $file->getMimeType(),
-            'size'          => $file->getSize(),
-        ]);
-
-        return back()->with('ok','อัปโหลดไฟล์แล้ว');
-    }
-
-    // ====== แผงช่าง: งานของฉัน ======
-    public function myJobsPage(Request $request)
-    {
-        $user = $request->user();
-        abort_unless(in_array($user->role, ['technician','admin'], true), 403);
-
-        $status = $request->query('status'); // optional
-        $list = MR::with(['asset','reporter','technician'])
-            ->where('technician_id', $user->id)
-            ->when($status, fn($q)=>$q->where('status',$status))
-            ->orderByDesc('updated_at')
-            ->paginate(20);
-
-        return view('repair.my-jobs', compact('list','status'));
-    }
-
-    // ====== แผงช่าง: คิวรอรับ (pending) ======
-    public function queuePage(Request $request)
-    {
-        $user = $request->user();
-        abort_unless(in_array($user->role, ['technician','admin'], true), 403);
-
-        // รับพารามิเตอร์ (ถ้าอยากให้มีแท็บเปลี่ยนสถานะได้ในหน้าเดียวกัน)
-        $status = (string) $request->query('status', 'pending'); // default 'pending'
-        $q      = (string) $request->query('q', '');
-
-        // ฐาน query ร่วม (เอาไว้นับสถิติด้วย จะได้ logic เดียวกัน)
-        $base = MR::query()
-            ->with(['asset','reporter'])
-            ->when($q !== '', function ($qq) use ($q) {
-                $like = "%{$q}%";
-                $qq->where(function ($w) use ($like) {
-                    $w->where('title', 'like', $like)
-                    ->orWhere('description', 'like', $like)
-                    ->orWhere('asset_id', 'like', $like);
-                });
-            });
-
-        // รายการตาม "กลุ่มสถานะ"
-        $list = (clone $base)
-            ->when($status === 'pending',     fn($qq) => $qq->pendingGroup())
-            ->when($status === 'in_progress', fn($qq) => $qq->inProgressGroup())
-            ->when($status === 'completed',   fn($qq) => $qq->completedGroup())
-            ->orderByRaw('COALESCE(request_date, created_at) DESC')
+        $list = MR::query()
+            ->with([
+                'asset',
+                'reporter:id,name',
+                'technician:id,name',
+                'attachments' => fn($qq) => $qq->select(
+                    'id','attachable_id','attachable_type','original_name','path','disk','mime','size','is_private','order_column'
+                ),
+            ])
+            ->when($status, fn ($qb) => $qb->where('status', $status))
+            ->when($priority, fn ($qb) => $qb->where('priority', $priority))
+            ->when($q, function ($w) use ($q) {
+                $w->where(fn ($ww) =>
+                    $ww->where('title','like',"%{$q}%")
+                       ->orWhere('description','like',"%{$q}%")
+                );
+            })
+            ->orderByDesc('request_date')
             ->paginate(20)
             ->withQueryString();
 
-        // ตัวเลขสรุป (เอาไปโชว์ใน pills ด้านบน)
-        $stats = [
-            'total'       => (clone $base)->count(),
-            'pending'     => (clone $base)->pendingGroup()->count(),
-            'in_progress' => (clone $base)->inProgressGroup()->count(),
-            'completed'   => (clone $base)->completedGroup()->count(),
-        ];
-
-        // ส่ง $status และ $stats ไปที่ view ด้วย (หน้าที่คุณใช้คอมโพเนนต์ pills ไว้แล้ว)
-        return view('repair.queue', compact('list','status','stats','q'));
+        // ⬅️ view อยู่ที่ resources/views/maintenance/requests/index.blade.php
+        return view('maintenance.requests.index', compact('list','status','priority','q'));
     }
 
-    // ====== helper log ======
-    private function log(int $requestId, ?int $userId, string $action, ?string $note = null): void
+    public function queuePage(Request $request)
     {
-        MaintenanceLog::create([
-            'request_id' => $requestId,
-            'user_id'    => $userId,
-            'action'     => $action,
-            'note'       => $note,
-        ]);
+        $list = MR::query()
+            ->with(['asset','reporter:id,name','technician:id,name'])
+            ->whereIn('status', ['pending','accepted','in_progress','on_hold'])
+            ->orderBy('priority')
+            ->orderByDesc('request_date')
+            ->paginate(20);
+
+        // ⬅️ ไฟล์คุณอยู่ที่ resources/views/repair/queue.blade.php
+        return view('repair.queue', compact('list'));
     }
 
-    // ====== หน้า create (Blade) ======
+    public function myJobsPage(Request $request)
+    {
+        $userId = Auth::id();
+
+        $list = MR::query()
+            ->with(['asset','reporter:id,name','technician:id,name'])
+            ->where('technician_id', $userId)
+            ->orderByDesc('updated_at')
+            ->paginate(20);
+
+        // ⬅️ ไฟล์ชื่อ my-jobs.blade.php (มีขีดกลาง)
+        return view('repair.my-jobs', compact('list'));
+    }
+
+    public function showPage(MR $req)
+    {
+        $req->loadMissing([
+            'asset',
+            'reporter:id,name',
+            'technician:id,name',
+            'attachments',
+            'logs.user:id,name',
+        ]);
+
+        // ⬅️ resources/views/maintenance/requests/show.blade.php
+        return view('maintenance.requests.show', compact('req'));
+    }
+
     public function createPage()
     {
-        $assets = \App\Models\Asset::orderBy('name')->get();
-        $users  = \App\Models\User::whereIn('role',['technician','admin'])->orderBy('name')->get();
+        // ⬅️ resources/views/maintenance/requests/create.blade.php
+        return view('maintenance.requests.create');
+    }
 
-        return view('maintenance.requests.create', compact('assets','users'));
+    /** ========== API & Form handlers ========== */
+    public function index(Request $request)
+    {
+        $status   = $request->string('status')->toString();
+        $priority = $request->string('priority')->toString();
+        $q        = $request->string('q')->toString();
+
+        $list = MR::query()
+            ->with(['asset','reporter:id,name','technician:id,name'])
+            ->when($status, fn ($qb) => $qb->where('status', $status))
+            ->when($priority, fn ($qb) => $qb->where('priority', $priority))
+            ->when($q, fn ($w) =>
+                $w->where(fn ($ww) =>
+                    $ww->where('title','like',"%{$q}%")
+                       ->orWhere('description','like',"%{$q}%")
+                )
+            )
+            ->orderByDesc('request_date')
+            ->paginate(20)
+            ->withQueryString();
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'data'  => $list,
+                'toast' => [
+                    'type' => 'info', 'message' => 'โหลดรายการคำขอบำรุงรักษาแล้ว',
+                    'position' => 'tc','timeout' => 1200,'size' => 'sm',
+                ],
+            ]);
+        }
+
+        // ⬅️ ให้หน้าเว็บใช้ view เดียวกับ indexPage()
+        return view('maintenance.requests.index', compact('list','status','priority','q'));
+    }
+
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'title'        => ['required','string','max:255'],
+            'description'  => ['nullable','string','max:5000'],
+            'asset_id'     => ['nullable','integer','exists:assets,id'],
+            'priority'     => ['required', Rule::in(['low','normal','high','urgent'])],
+            'request_date' => ['nullable','date'],
+            'reporter_id'  => ['nullable','integer','exists:users,id'],
+            'files.*'      => ['file','max:10240','mimetypes:image/*,application/pdf'],
+        ]);
+
+        $actorId = $data['reporter_id'] ?? optional($request->user())->id;
+
+        $req = DB::transaction(function () use ($data, $request, $actorId) {
+            /** @var \App\Models\MaintenanceRequest $req */
+            $req = MR::create([
+                'title'        => $data['title'],
+                'description'  => $data['description'] ?? null,
+                'asset_id'     => $data['asset_id'] ?? null,
+                'priority'     => $data['priority'],
+                'status'       => 'pending',
+                'request_date' => $data['request_date'] ?? now(),
+                'reporter_id'  => $actorId,
+            ]);
+
+            if ($request->hasFile('files')) {
+                foreach ($request->file('files') as $file) {
+                    $disk = 'public';
+                    $path = $file->store("maintenance/{$req->id}", $disk);
+                    $req->attachments()->create([
+                        'original_name' => $file->getClientOriginalName(),
+                        'extension'     => $file->getClientOriginalExtension(),
+                        'path'          => $path,
+                        'disk'          => $disk,
+                        'mime'          => $file->getMimeType(),
+                        'size'          => $file->getSize(),
+                        'uploaded_by'   => $actorId,
+                        'source'        => 'web',
+                        'is_private'    => false,
+                        'order_column'  => 0,
+                    ]);
+                }
+            }
+
+            return $req->fresh(['attachments']);
+        });
+
+        return $this->respondWithToast(
+            $request,
+            ['message'=>'สร้างคำขอเรียบร้อย','type'=>'success','position'=>'tc','timeout'=>1800,'size'=>'sm'],
+            redirect()->route('maintenance.requests.show', ['req' => $req->id]),
+            ['data' => $req],
+            Response::HTTP_CREATED
+        );
+    }
+
+    public function update(Request $request, MR $req)
+    {
+        $data = $request->validate([
+            'title'        => ['sometimes','required','string','max:255'],
+            'description'  => ['nullable','string','max:5000'],
+            'asset_id'     => ['nullable','integer','exists:assets,id'],
+            'priority'     => ['nullable','string', Rule::in(['low','normal','high','urgent'])],
+            'status'       => ['nullable','string', Rule::in(['pending','accepted','in_progress','on_hold','resolved','closed','cancelled'])],
+            'request_date' => ['nullable','date'],
+            'files.*'      => ['file','max:10240','mimetypes:image/*,application/pdf'],
+        ]);
+
+        DB::transaction(function () use ($data, $request, $req) {
+            $req->fill($data)->save();
+
+            if ($request->hasFile('files')) {
+                $actorId = optional($request->user())->id;
+                foreach ($request->file('files') as $file) {
+                    $disk = 'public';
+                    $path = $file->store("maintenance/{$req->id}", $disk);
+                    $req->attachments()->create([
+                        'original_name' => $file->getClientOriginalName(),
+                        'extension'     => $file->getClientOriginalExtension(),
+                        'path'          => $path,
+                        'disk'          => $disk,
+                        'mime'          => $file->getMimeType(),
+                        'size'          => $file->getSize(),
+                        'uploaded_by'   => $actorId,
+                        'source'        => 'web',
+                        'is_private'    => false,
+                        'order_column'  => 0,
+                    ]);
+                }
+            }
+        });
+
+        $req->load('attachments');
+
+        return $this->respondWithToast(
+            $request,
+            ['message'=>'อัปเดตคำขอเรียบร้อย','type'=>'success','position'=>'br','timeout'=>1600,'size'=>'sm'],
+            redirect()->route('maintenance.requests.show', ['req' => $req->id]),
+            ['data' => $req]
+        );
+    }
+
+    public function transition(Request $request, MR $req)
+    {
+        $data = $request->validate([
+            'status'        => ['required', Rule::in(['pending','accepted','in_progress','on_hold','resolved','closed','cancelled'])],
+            'note'          => ['nullable','string','max:2000'],
+            'technician_id' => ['nullable','integer','exists:users,id'],
+        ]);
+
+        DB::transaction(function () use ($req, $data) {
+            $before = $req->status;
+
+            $req->status = $data['status'];
+            if (!empty($data['technician_id'])) {
+                $req->technician_id = $data['technician_id'];
+            }
+            $req->save();
+
+            if (class_exists(\App\Models\MaintenanceLog::class)) {
+                \App\Models\MaintenanceLog::create([
+                    'maintenance_request_id' => $req->id,
+                    'action' => 'transition',
+                    'from'   => $before,
+                    'to'     => $req->status,
+                    'note'   => $data['note'] ?? null,
+                    'user_id'=> optional(Auth::user())->id,
+                ]);
+            }
+        });
+
+        $req->load(['technician:id,name']);
+
+        return $this->respondWithToast(
+            $request,
+            ['message'=>'บันทึกสถานะเรียบร้อย','type'=>'success','position'=>'tc','timeout'=>1800,'size'=>'sm'],
+            redirect()->back(),
+            ['data' => $req]
+        );
+    }
+
+    public function transitionFromBlade(Request $request, MR $req)
+    { return $this->transition($request, $req); }
+
+    public function uploadAttachmentFromBlade(Request $request, MR $req)
+    {
+        $validated = $request->validate([
+            'file'       => ['required','file','max:10240','mimetypes:image/*,application/pdf'],
+            'is_private' => ['nullable','boolean'],
+            'caption'    => ['nullable','string','max:255'],
+            'alt_text'   => ['nullable','string','max:255'],
+        ]);
+
+        $file = $validated['file'];
+        $isPrivate = (bool) ($validated['is_private'] ?? false);
+        $disk = $isPrivate ? 'local' : 'public';
+        $path = $file->store("maintenance/{$req->id}", $disk);
+
+        $req->attachments()->create([
+            'original_name' => $file->getClientOriginalName(),
+            'extension'     => $file->getClientOriginalExtension(),
+            'path'          => $path,
+            'disk'          => $disk,
+            'mime'          => $file->getMimeType(),
+            'size'          => $file->getSize(),
+            'uploaded_by'   => optional($request->user())->id,
+            'source'        => 'web',
+            'is_private'    => $isPrivate,
+            'caption'       => $validated['caption'] ?? null,
+            'alt_text'      => $validated['alt_text'] ?? null,
+            'order_column'  => 0,
+        ]);
+
+        return $this->respondWithToast(
+            $request,
+            ['message'=>'อัปโหลดไฟล์แนบแล้ว','type'=>'success','position'=>'br','timeout'=>1800,'size'=>'sm'],
+            redirect()->back(),
+            ['data' => $req->fresh('attachments')]
+        );
+    }
+
+    public function destroyAttachment(MR $req, Attachment $attachment)
+    {
+        abort_unless(
+            $attachment->attachable_type === MR::class &&
+            (int) $attachment->attachable_id === (int) $req->id,
+            404
+        );
+
+        $attachment->deleteWithFile();
+
+        return $this->respondWithToast(
+            request(),
+            ['message'=>'ลบไฟล์แนบแล้ว','type'=>'success','position'=>'br','timeout'=>1600,'size'=>'sm'],
+            redirect()->back(),
+            ['deleted' => true]
+        );
+    }
+
+    /** ========== Utilities ========== */
+    protected function respondWithToast(
+        Request $request,
+        array $toast,
+        $webRedirect,
+        array $jsonPayload = [],
+        int $status = Response::HTTP_OK
+    ) {
+        if (!$request->expectsJson()) {
+            return $webRedirect->with('toast', [
+                'type'     => $toast['type']    ?? 'info',
+                'message'  => $toast['message'] ?? '',
+                'position' => $toast['position'] ?? 'tc',
+                'timeout'  => $toast['timeout']  ?? 2000,
+                'size'     => $toast['size']     ?? 'sm',
+            ]);
+        }
+
+        $payload = array_merge($jsonPayload, [
+            'toast' => [
+                'type'     => $toast['type']    ?? 'info',
+                'message'  => $toast['message'] ?? '',
+                'position' => $toast['position'] ?? 'tc',
+                'timeout'  => $toast['timeout']  ?? 2000,
+                'size'     => $toast['size']     ?? 'sm',
+            ],
+        ]);
+
+        return response()->json($payload, $status);
     }
 }

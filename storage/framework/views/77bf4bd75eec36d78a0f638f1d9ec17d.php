@@ -2,10 +2,11 @@
   <div class="container">
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
       <div class="fw-semibold small">
-        © {{ date('Y') }} Phrapokklao Hospital — Information Technology Group
+        © <?php echo e(date('Y')); ?> Phrapokklao Hospital — Information Technology Group
       </div>
       <div class="small opacity-75">
-        Asset Repair Management System • Build {{ app()->version() }}
+        Asset Repair Management System • Build <?php echo e(app()->version()); ?>
+
       </div>
     </div>
   </div>
@@ -28,3 +29,4 @@
     text-decoration: underline;
   }
 </style>
+<?php /**PATH C:\Users\Developer\development\Asset-Repair-Management-System\resources\views/components/footer.blade.php ENDPATH**/ ?>

@@ -6,13 +6,19 @@
   $roles   = $roles   ?? ['admin','technician','staff'];
   $filters = $filters ?? ['s'=>'','role'=>'','department'=>''];
 
-  $CTL = 'h-9 text-sm rounded-lg border border-zinc-300 px-3 focus:border-emerald-500 focus:ring-emerald-500';
+  // Base controls
+  $CTL = 'h-10 text-sm rounded-lg border border-zinc-300 px-3 focus:border-emerald-500 focus:ring-emerald-500';
   $SEL = $CTL . ' pr-9';
-  $BTN = 'h-9 text-xs md:text-sm inline-flex items-center gap-2 rounded-lg px-2.5 md:px-3 font-medium focus:outline-none focus:ring-2 whitespace-nowrap';
+  // ปุ่มฐาน + เพิ่ม leading/px ให้ตัวหนังสือไม่ซ้อน และบังคับ min-width บางปุ่ม
+  $BTN = 'h-10 text-xs md:text-sm inline-flex items-center gap-2 rounded-lg px-3 md:px-3.5 font-medium leading-5
+          focus:outline-none focus:ring-2 whitespace-nowrap';
 @endphp
 
 @section('content')
-  {{-- ===== Header (เรียบหรู ไม่มีเส้นสี) ===== --}}
+  {{-- ===== Spacer กันชน Topbar ===== --}}
+  <div class="pt-3 md:pt-4"></div>
+
+  {{-- ===== Header (เรียบหรู) ===== --}}
   <div class="mb-5 rounded-2xl border border-zinc-200 bg-white shadow-sm">
     <div class="flex items-start justify-between gap-3 px-5 py-4">
       <div class="flex items-start gap-3">
@@ -31,7 +37,7 @@
 
       <div class="flex shrink-0 items-center">
         <a href="{{ route('admin.users.create') }}"
-           class="{{ $BTN }} bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500">
+           class="{{ $BTN }} min-w-[108px] justify-center bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500">
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 5v14M5 12h14"/>
           </svg>
@@ -74,7 +80,7 @@
            class="w-full {{ $CTL }}" />
 
     <div class="col-span-1 flex items-center gap-2">
-      <button class="{{ $BTN }} bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500" title="Filter">
+      <button class="{{ $BTN }} min-w-[96px] justify-center bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500" title="Filter">
         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M3 5h18M6 12h12M10 19h4"/>
         </svg>
@@ -83,7 +89,7 @@
       </button>
 
       <a href="{{ route('admin.users.index') }}"
-         class="{{ $BTN }} border border-zinc-300 text-zinc-700 hover:bg-zinc-50 focus:ring-emerald-500"
+         class="{{ $BTN }} min-w-[88px] justify-center border border-zinc-300 text-zinc-700 hover:bg-zinc-50 focus:ring-emerald-500"
          title="Reset">
         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M3 12a9 9 0 1 0 3-6.7M3 5v5h5"/>
@@ -98,13 +104,13 @@
   <form method="POST" action="{{ route('admin.users.bulk') }}">
     @csrf
     <div class="mb-2 flex flex-wrap items-center gap-2">
-      <select name="action" class="{{ $SEL }} py-2">
+      <select name="action" class="{{ $SEL }} py-2 min-w-[120px]">
         <option value="" selected>Action</option>
         <option value="change_role">Role</option>
         <option value="delete">Delete</option>
       </select>
 
-      <select name="role" class="{{ $SEL }} py-2">
+      <select name="role" class="{{ $SEL }} py-2 min-w-[120px]">
         <option value="">-- role --</option>
         @foreach ($roles as $r)
           <option value="{{ $r }}">{{ ucfirst($r) }}</option>
@@ -112,7 +118,7 @@
       </select>
 
       <button type="submit"
-        class="{{ $BTN }} bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-500"
+        class="{{ $BTN }} min-w-[96px] justify-center bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-500"
         onclick="return confirm('Confirm bulk action?');">
         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 5v14M5 12h14"/>
@@ -133,7 +139,8 @@
             <th class="px-3 py-2 hidden lg:table-cell">Department</th>
             <th class="px-3 py-2 hidden md:table-cell">Role</th>
             <th class="px-3 py-2 hidden xl:table-cell">Created</th>
-            <th class="px-3 py-2 text-right">Actions</th>
+            {{-- กันคอลัมน์ปุ่มไม่ให้แคบเกินไป --}}
+            <th class="px-3 py-2 text-right min-w-[180px]">Actions</th>
           </tr>
         </thead>
 
@@ -169,17 +176,18 @@
               <td class="px-3 py-2">
                 <div class="flex items-center justify-end gap-1.5">
                   <a href="{{ route('admin.users.edit', $u) }}"
-                     class="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 px-2 md:px-2.5 py-1.5 text-[11px] md:text-xs font-medium text-emerald-700 hover:bg-emerald-50 whitespace-nowrap">
+                     class="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 px-2.5 md:px-3 py-1.5 text-[11px] md:text-xs font-medium text-emerald-700 hover:bg-emerald-50 whitespace-nowrap min-w-[74px] justify-center">
                     <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/>
                     </svg>
                     <span class="hidden sm:inline">Edit</span>
+                    <span class="sm:hidden">Edit</span>
                   </a>
                   @if($u->id !== auth()->id())
                     <form method="POST" action="{{ route('admin.users.destroy', $u) }}" onsubmit="return confirm('Delete this user?');">
                       @csrf @method('DELETE')
                       <button
-                        class="inline-flex items-center gap-1.5 rounded-md border border-rose-300 px-2 md:px-2.5 py-1.5 text-[11px] md:text-xs font-medium text-rose-600 hover:bg-rose-50 whitespace-nowrap"
+                        class="inline-flex items-center gap-1.5 rounded-md border border-rose-300 px-2.5 md:px-3 py-1.5 text-[11px] md:text-xs font-medium text-rose-600 hover:bg-rose-50 whitespace-nowrap min-w-[74px] justify-center"
                         type="submit">
                         <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                           <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/>

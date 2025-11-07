@@ -13,6 +13,7 @@ use App\Http\Controllers\MaintenanceLogController;
 use App\Http\Controllers\Repair\DashboardController as RepairDashboardController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\AssetController;
+use App\Http\Controllers\AttachmentController;
 
 // Admin User Controller
 use App\Http\Controllers\Admin\UserController as AdminUserController;
@@ -66,8 +67,12 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/{req}/attachments', [MaintenanceRequestController::class, 'uploadAttachmentFromBlade'])->name('attachments');
 
             Route::get('/{req}/logs', [MaintenanceLogController::class, 'index'])->name('logs');
+            Route::delete('/{req}/attachments/{attachment}', [MaintenanceRequestController::class, 'destroyAttachment'])->name('attachments.destroy');
         });
     });
+
+    // ===== Attachments (serve private files after auth) =====
+    Route::get('/attachments/{attachment}', [AttachmentController::class, 'show'])->name('attachments.show');
 
     // Chat
     Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');

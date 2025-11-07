@@ -1,61 +1,177 @@
+{{-- resources/views/chat/show.blade.php --}}
 @extends('layouts.app')
 @section('title', $thread->title)
 
-@section('content')
-<div class="max-w-5xl mx-auto space-y-4">
-  <div class="section-card">
-    <div class="section-head p-3">{{ $thread->title }}</div>
+@php
+  $totalMessages = $messages->count();
+  $lastAt = $messages->last()?->created_at ?? $thread->created_at;
+@endphp
 
-    <div class="section-body p-0">
-      <div id="chatBox" class="h-[64vh] overflow-y-auto p-4 space-y-3 bg-white">
-        @foreach($messages as $m)
-          <div class="flex gap-2">
-            <div class="shrink-0 w-8 h-8 rounded-full bg-slate-200 grid place-items-center text-xs">
-              {{ strtoupper(mb_substr($m->user->name,0,1)) }}
+{{-- ===== Page Header: sticky ใต้ navbar หลักของแอป ===== --}}
+@section('page-header')
+  {{-- ตั้งค่า offset ความสูง navbar หลักของแอป (ปรับเลขตามจริงที่ layout ใช้) --}}
+  {{-- ถ้า layout ของคุณกำหนดไว้แล้ว ให้ลบบรรทัดนี้ได้ --}}
+  <style>:root{ --app-top: 64px; }</style>
+
+  <div class="sticky z-30 border-b border-slate-200 bg-white/90 backdrop-blur"
+       style="top: var(--app-top, 0px)">
+    <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+      <div class="py-2.5 sm:py-3">
+        <div class="flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 text-[11px] text-slate-500">
+              <a href="{{ route('chat.index') }}" class="hover:underline">ห้องแชต</a>
+              <span>›</span>
+              <span class="truncate" title="{{ $thread->title }}">รายละเอียด</span>
             </div>
-            <div>
-              <div class="text-sm">
-                <span class="font-medium">{{ $m->user->name }}</span>
-                <span class="text-xs text-gray-500">• {{ $m->created_at->format('Y-m-d H:i') }}</span>
-              </div>
-              <div class="text-[15px] leading-snug whitespace-pre-line">{{ $m->body }}</div>
+            <h1 class="mt-0.5 truncate text-base font-semibold text-slate-900 sm:text-lg" title="{{ $thread->title }}">
+              {{ $thread->title }}
+            </h1>
+            <div class="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+              <span>สร้างเมื่อ {{ $thread->created_at->format('Y-m-d H:i') }}</span>
+              <span class="select-none">·</span>
+              <span>อัปเดตล่าสุด {{ $lastAt->format('Y-m-d H:i') }}</span>
+              <span class="select-none">·</span>
+              <span>{{ number_format($totalMessages) }} ข้อความ</span>
+              @if($thread->is_locked)
+                <span class="select-none">·</span>
+                <span class="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-amber-700">ล็อกแล้ว</span>
+              @else
+                <span class="select-none">·</span>
+                <span class="inline-flex items-center rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-emerald-700">เปิดรับข้อความ</span>
+              @endif
             </div>
           </div>
-        @endforeach
-      </div>
 
-      @if(!$thread->is_locked)
-        <form method="POST" action="{{ route('chat.messages.store',$thread) }}" class="border-t p-3 flex gap-2">
-          @csrf
-          <input id="msgInput" name="body" required maxlength="3000" placeholder="พิมพ์ข้อความ..."
-                 class="flex-1 rounded-lg border px-3 py-2">
-          <button class="rounded-lg bg-[#0E2B51] text-white px-3 py-2">ส่ง</button>
-        </form>
-      @else
-        <div class="border-t p-3 text-center text-gray-500">กระทู้นี้ถูกล็อก</div>
-      @endif
+          <div class="flex items-center gap-2">
+            <a href="{{ route('chat.index') }}"
+               class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
+              <svg viewBox="0 0 24 24" class="h-4 w-4"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Back
+            </a>
+            <button id="btnHeaderRefresh" type="button"
+               class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+               title="โหลดข้อความใหม่">
+              <svg viewBox="0 0 24 24" class="h-4 w-4"><path d="M21 12a9 9 0 1 1-2.64-6.36" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 3v6h-6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Refresh
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
+@endsection
+
+@section('content')
+<div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+  {{-- การ์ดหลัก --}}
+  <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+
+    {{-- แถบเครื่องมือภายในการ์ด (เอา sticky ออกเพื่อไม่ซ้อน) --}}
+    <div class="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-2">
+      <div class="flex items-center gap-2 text-xs text-slate-600">
+        <span class="rounded-md bg-slate-100 px-2 py-0.5">ห้องแชต</span>
+        <span class="hidden sm:inline">•</span>
+        <span class="hidden truncate sm:inline" title="{{ $thread->title }}">{{ $thread->title }}</span>
+      </div>
+      <button id="btnScrollBottom"
+              type="button"
+              class="hidden rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-50"
+              title="เลื่อนไปข้อความล่าสุด">
+        ไปท้ายแชต
+      </button>
+    </div>
+
+    {{-- กล่องข้อความ: คุมความสูงด้วย calc กันพื้นขาวเวิ้งว้าง --}}
+    <div class="p-0">
+      <div id="chatBox"
+           class="overflow-y-auto bg-white p-4"
+           style="max-height: calc(100vh - var(--app-top, 0px) - 220px); min-height: 40vh;">
+        @if($messages->isEmpty())
+          <div class="grid place-items-center py-12">
+            <div class="text-center">
+              <div class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-slate-100">
+                <svg viewBox="0 0 24 24" class="h-6 w-6 text-slate-500"><path d="M21 15a4 4 0 0 1-4 4H7l-4 4V5a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v10Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <p class="text-sm font-medium text-slate-800">ยังไม่มีข้อความ</p>
+              <p class="mt-1 text-xs text-slate-500">พิมพ์ข้อความแรกเพื่อเริ่มการสนทนา</p>
+            </div>
+          </div>
+        @else
+          <div class="space-y-3">
+            @foreach($messages as $m)
+              <div class="flex gap-2">
+                <div class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-200 text-xs">
+                  {{ strtoupper(mb_substr($m->user->name,0,1)) }}
+                </div>
+                <div>
+                  <div class="text-sm">
+                    <span class="font-medium">{{ $m->user->name }}</span>
+                    <span class="text-xs text-gray-500">• {{ $m->created_at->format('Y-m-d H:i') }}</span>
+                  </div>
+                  <div class="whitespace-pre-line text-[15px] leading-snug">{{ $m->body }}</div>
+                </div>
+              </div>
+            @endforeach
+          </div>
+        @endif
+      </div>
+    </div>
+
+    {{-- ฟอร์ม / แถบล็อก --}}
+    @if(!$thread->is_locked)
+      <form method="POST" action="{{ route('chat.messages.store',$thread) }}"
+            class="flex items-start gap-2 border-t border-slate-200 bg-slate-50 px-3 py-3">
+        @csrf
+        <label for="msgInput" class="sr-only">พิมพ์ข้อความ</label>
+        <input id="msgInput" name="body" required maxlength="3000" placeholder="พิมพ์ข้อความ..."
+               class="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-[#0E2B51] focus:ring-[#0E2B51]" />
+        <button class="rounded-lg bg-[#0E2B51] px-3 py-2 text-white hover:opacity-95">ส่ง</button>
+      </form>
+    @else
+      <div class="border-t border-slate-200 bg-slate-50 px-4 py-3 text-center text-slate-600">
+        กระทู้นี้ถูกล็อก ไม่สามารถส่งข้อความใหม่ได้
+      </div>
+    @endif
+  </div>
+
+  {{-- แจ้งผล --}}
+  @if (session('status'))
+    <div class="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">
+      {{ session('status') }}
+    </div>
+  @endif
+  @if ($errors->any())
+    <div class="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700">
+      <ul class="list-disc pl-5">
+        @foreach ($errors->all() as $e)<li>{{ $e }}</li>@endforeach
+      </ul>
+    </div>
+  @endif
 </div>
 
+{{-- ===== Scripts ===== --}}
 <script>
-  // ===== Simple polling (อัปเดตทุก 2 วินาที) — อัปเกรดเป็น WebSocket ได้ภายหลัง
-  const threadId = {{ $thread->id }};
   const box = document.getElementById('chatBox');
+  const btnScrollBottom = document.getElementById('btnScrollBottom');
+  const btnHeaderRefresh = document.getElementById('btnHeaderRefresh');
+
+  const threadId = {{ $thread->id }};
   let lastId = {{ $messages->last()?->id ?? 0 }};
   let autoScroll = true;
+  let polling = null;
 
   function appendMessage(m){
     const row = document.createElement('div');
     row.className = 'flex gap-2';
     row.innerHTML = `
-      <div class="shrink-0 w-8 h-8 rounded-full bg-slate-200 grid place-items-center text-xs">
-        ${ (m.user?.name || '?').slice(0,1).toUpperCase() }
+      <div class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-200 text-xs">
+        ${(m.user?.name || '?').slice(0,1).toUpperCase()}
       </div>
       <div>
         <div class="text-sm">
-          <span class="font-medium">${ m.user?.name || 'Unknown' }</span>
-          <span class="text-xs text-gray-500">• ${ new Date(m.created_at).toLocaleString() }</span>
+          <span class="font-medium">${m.user?.name || 'Unknown'}</span>
+          <span class="text-xs text-gray-500">• ${new Date(m.created_at).toLocaleString()}</span>
         </div>
         <div class="text-[15px] leading-snug whitespace-pre-line"></div>
       </div>`;
@@ -65,23 +181,58 @@
 
   async function poll(){
     try{
-      const res = await fetch(`{{ route('chat.messages',$thread) }}?after_id=${lastId}`);
+      const res = await fetch(`{{ route('chat.messages',$thread) }}?after_id=${lastId}`, { headers:{ 'Accept':'application/json' }});
       if(!res.ok) return;
       const data = await res.json();
       if(Array.isArray(data) && data.length){
         data.forEach(m => { appendMessage(m); lastId = Math.max(lastId, m.id); });
-        if (autoScroll) box.scrollTop = box.scrollHeight;
+        if (autoScroll) {
+          box.scrollTop = box.scrollHeight;
+        } else if (btnScrollBottom) {
+          btnScrollBottom.classList.remove('hidden');
+        }
       }
-    }catch(e){ /* เงียบไว้ */ }
+    }catch(e){}
   }
 
-  box.addEventListener('scroll', () => {
+  function updateAutoScrollFlag(){
     const nearBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
     autoScroll = nearBottom;
+    if (nearBottom && btnScrollBottom) btnScrollBottom.classList.add('hidden');
+  }
+  box.addEventListener('scroll', updateAutoScrollFlag);
+
+  if(btnScrollBottom){
+    btnScrollBottom.addEventListener('click', () => {
+      box.scrollTop = box.scrollHeight;
+      autoScroll = true;
+      btnScrollBottom.classList.add('hidden');
+    });
+  }
+  if(btnHeaderRefresh){
+    btnHeaderRefresh.addEventListener('click', () => { poll(); });
+  }
+
+  window.addEventListener('pageshow', () => {
+    // ฟิตความสูงครั้งแรกให้เต็ม viewport อย่างพอดี
+    box.style.maxHeight = `calc(100vh - (getComputedStyle(document.documentElement).getPropertyValue('--app-top') || '0px') - 220px)`;
+    box.scrollTop = box.scrollHeight;
+    polling = setInterval(poll, 2000);
+  });
+  window.addEventListener('pagehide', () => {
+    if (polling) clearInterval(polling);
   });
 
-  setInterval(poll, 2000);
-  // เลื่อนลงล่างสุดครั้งแรก
-  box.scrollTop = box.scrollHeight;
+  // ส่งด้วย Ctrl/Cmd + Enter
+  const input = document.getElementById('msgInput');
+  if (input) {
+    input.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        const form = input.closest('form');
+        if (form) form.submit();
+      }
+    });
+  }
 </script>
 @endsection

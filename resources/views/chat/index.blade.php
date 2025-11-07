@@ -54,9 +54,6 @@
             class="flex-1 px-3 h-11 text-sm bg-transparent outline-none border-0 rounded-l-xl"
             aria-label="Search threads"
           >
-          @if(request('q'))
-            <a href="{{ route('chat.index') }}" class="btn-outline mr-2">Clear</a>
-          @endif
           <button type="submit"
                   class="h-11 px-4 text-sm font-medium text-white bg-emerald-700 rounded-r-xl hover:bg-emerald-800 active:translate-y-[0.5px]">
             Search

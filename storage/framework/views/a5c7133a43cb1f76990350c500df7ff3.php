@@ -52,10 +52,6 @@
           <p class="text-sm text-slate-500">Browse, filter and manage repair jobs assigned to you</p>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-        <a href="<?php echo e(route('maintenance.requests.index')); ?>" class="<?php echo e($btnGhost); ?>">All Requests</a>
-        <a href="<?php echo e(route('maintenance.requests.create')); ?>" class="hidden sm:inline-flex <?php echo e($btnPrimary); ?>">+ New Request</a>
-      </div>
     </div>
 
     

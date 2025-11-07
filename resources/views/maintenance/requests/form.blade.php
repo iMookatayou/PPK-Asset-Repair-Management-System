@@ -1,26 +1,27 @@
 @php
   /** @var \App\Models\MaintenanceRequest|null $req */
-  $priorities = ['low' => 'Low', 'medium' => 'Medium', 'high' => 'High', 'urgent' => 'Urgent'];
+  $priorities = ['low' => 'Low', 'normal' => 'Normal', 'high' => 'High', 'urgent' => 'Urgent'];
   $defaultReporter = old('reporter_id', (string)($req->reporter_id ?? auth()->id()));
+  $assetList = is_iterable($assets ?? null) ? $assets : [];
+  $userList  = is_iterable($users ?? null)  ? $users  : [];
 @endphp
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
   {{-- Asset --}}
   <div>
     <label for="asset_id" class="block text-sm font-medium text-slate-700">
-      Asset <span class="text-rose-600" aria-hidden="true">*</span>
+      Asset
     </label>
     <select
       id="asset_id"
       name="asset_id"
-      required
       class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-emerald-600 focus:ring-emerald-600
              @error('asset_id') border-rose-400 ring-rose-200 @enderror"
       aria-invalid="@error('asset_id') true @else false @enderror"
       aria-describedby="@error('asset_id') asset_id_error @enderror"
     >
-      <option value="" disabled {{ old('asset_id', $req->asset_id ?? '') === '' ? 'selected' : '' }} hidden>-- Choose Asset --</option>
-      @foreach ($assets as $a)
+      <option value="" {{ old('asset_id', $req->asset_id ?? '') === '' ? 'selected' : '' }}>-- Choose Asset --</option>
+      @foreach ($assetList as $a)
         <option value="{{ $a->id }}" @selected((string)old('asset_id', (string)($req->asset_id ?? '')) === (string)$a->id)>
           {{ $a->code ? '#'.$a->code : '#'.$a->id }} — {{ $a->name ?? $a->model ?? 'Asset' }}
         </option>
@@ -31,22 +32,21 @@
     @enderror
   </div>
 
-  {{-- Reporter --}}
+  {{-- Reporter (optional; จะ fallback เป็นผู้ใช้ปัจจุบันถ้าไม่เลือก) --}}
   <div>
     <label for="reporter_id" class="block text-sm font-medium text-slate-700">
-      Reporter <span class="text-rose-600" aria-hidden="true">*</span>
+      Reporter (optional)
     </label>
     <select
       id="reporter_id"
       name="reporter_id"
-      required
       class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-emerald-600 focus:ring-emerald-600
              @error('reporter_id') border-rose-400 ring-rose-200 @enderror"
       aria-invalid="@error('reporter_id') true @else false @enderror"
       aria-describedby="@error('reporter_id') reporter_id_error @enderror"
     >
-      <option value="" disabled {{ $defaultReporter === '' ? 'selected' : '' }} hidden>-- Reporter --</option>
-      @foreach ($users as $u)
+      <option value="">-- Current user --</option>
+      @foreach ($userList as $u)
         <option value="{{ $u->id }}" @selected((string)$defaultReporter === (string)$u->id)>{{ $u->name }}</option>
       @endforeach
     </select>
@@ -100,7 +100,7 @@
     @enderror
   </div>
 
-  {{-- Priority --}}
+  {{-- Priority (use: low|normal|high|urgent) --}}
   <div>
     <label for="priority" class="block text-sm font-medium text-slate-700">
       Priority <span class="text-rose-600" aria-hidden="true">*</span>
@@ -114,7 +114,7 @@
       aria-invalid="@error('priority') true @else false @enderror"
       aria-describedby="@error('priority') priority_error @enderror"
     >
-      @php $priorityValue = old('priority', $req->priority ?? 'medium'); @endphp
+      @php $priorityValue = old('priority', $req->priority ?? 'normal'); @endphp
       @foreach ($priorities as $k => $label)
         <option value="{{ $k }}" @selected($priorityValue === $k)>{{ $label }}</option>
       @endforeach

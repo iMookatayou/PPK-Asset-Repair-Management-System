@@ -1,252 +1,248 @@
-<?php $__env->startSection('title', 'Maintenance Requests'); ?>
+<?php $__env->startSection('title','Maintenance Requests'); ?>
 
 <?php $__env->startSection('content'); ?>
 <?php
-  $priorityClass = function(string $p) {
-    return match($p) {
-      'low'    => 'border-emerald-200 bg-emerald-50 text-emerald-700',
-      'medium' => 'border-sky-200 bg-sky-50 text-sky-700',
-      'high'   => 'border-amber-200 bg-amber-50 text-amber-700',
-      'urgent' => 'border-rose-200 bg-rose-50 text-rose-700',
-      default  => 'border-zinc-200 bg-white text-zinc-700',
-    };
+  use Illuminate\Support\Str;
+
+  // ====== Badge styles ======
+  $statusClass = fn(?string $s) => match(strtolower((string)$s)) {
+    'pending'     => 'ring-1 ring-zinc-300 text-zinc-800 bg-white',
+    'accepted'    => 'ring-1 ring-indigo-300 text-indigo-800 bg-white',
+    'in_progress' => 'ring-1 ring-sky-300 text-sky-800 bg-white',
+    'on_hold'     => 'ring-1 ring-amber-300 text-amber-800 bg-white',
+    'resolved'    => 'ring-1 ring-emerald-300 text-emerald-800 bg-white',
+    'closed'      => 'ring-1 ring-emerald-300 text-emerald-800 bg-white',
+    'cancelled'   => 'ring-1 ring-zinc-300 text-zinc-700 bg-zinc-50',
+    default       => 'ring-1 ring-zinc-300 text-zinc-700 bg-white',
   };
-  $statusClass = function(string $s) {
-    return match($s) {
-      'pending'     => 'border-zinc-300 bg-white text-zinc-700',
-      'in_progress' => 'border-blue-200 bg-blue-50 text-blue-700',
-      'completed'   => 'border-emerald-200 bg-emerald-50 text-emerald-700',
-      'cancelled'   => 'border-zinc-300 bg-zinc-50 text-zinc-700',
-      default       => 'border-zinc-200 bg-white text-zinc-700',
-    };
+
+  $statusLabel = fn(?string $s) => [
+    'pending'     => 'รอคิว',
+    'accepted'    => 'รับงานแล้ว',
+    'in_progress' => 'ระหว่างดำเนินการ',
+    'on_hold'     => 'พักไว้',
+    'resolved'    => 'แก้ไขแล้ว',
+    'closed'      => 'ปิดงาน',
+    'cancelled'   => 'ยกเลิก',
+  ][strtolower((string)$s)] ?? '-';
+
+  $priorityClass = fn(?string $p) => match(strtolower((string)$p)) {
+    'low'    => 'ring-1 ring-zinc-300 text-zinc-700 bg-white',
+    'normal' => 'ring-1 ring-sky-300 text-sky-800 bg-white',
+    'high'   => 'ring-1 ring-amber-300 text-amber-800 bg-white',
+    'urgent' => 'ring-1 ring-rose-300 text-rose-800 bg-white',
+    default  => 'ring-1 ring-zinc-300 text-zinc-700 bg-white',
   };
+
+  $priorityLabel = fn(?string $p) => [
+    'low'    => 'ต่ำ',
+    'normal' => 'ปกติ',
+    'high'   => 'สูง',
+    'urgent' => 'เร่งด่วน',
+  ][strtolower((string)$p)] ?? '-';
 ?>
 
 
-<div class="w-full px-4 md:px-6 lg:px-8 py-5 min-h-[calc(100vh-6rem)] flex flex-col gap-5">
+<div class="pt-3 md:pt-4"></div>
+
+<div class="w-full px-4 md:px-6 lg:px-8 flex flex-col gap-5">
 
   
-  <div class="rounded-xl border bg-white shadow-sm">
-    <div class="px-4 md:px-6 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="size-10 grid place-items-center rounded-lg bg-emerald-50 text-emerald-700">
-          <svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7h16M6 11h12M8 15h8m-6 4h4"/>
-          </svg>
-        </div>
-        <div>
-          <h1 class="text-lg md:text-xl font-semibold">Maintenance Requests</h1>
-          <p class="text-sm text-zinc-500">Browse, filter and review incoming requests</p>
-        </div>
-      </div>
-
-      <a href="<?php echo e(route('maintenance.requests.create')); ?>"
-         class="hidden md:inline-flex items-center rounded-lg bg-emerald-600 px-3 py-2 text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-         onclick="showLoader()">
-        + New Request
-      </a>
-    </div>
-    <div class="h-px bg-gradient-to-r from-transparent via-zinc-200 to-transparent"></div>
-
-    
-    <form method="GET" action="<?php echo e(route('maintenance.requests.index')); ?>"
-          class="p-4 md:p-5" role="search" aria-label="Filter maintenance requests"
-          onsubmit="showLoader()">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-3">
-        <div class="lg:col-span-5">
-          <label for="q" class="block text-sm text-zinc-600">Search</label>
-          <input id="q" type="text" name="q" value="<?php echo e(request('q')); ?>"
-                 placeholder="Search name/title/description…"
-                 class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0E2B51]" />
-        </div>
-
-        <div class="lg:col-span-3">
-          <label for="status" class="block text-sm text-zinc-600">Status</label>
-          <select id="status" name="status"
-                  class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0E2B51]">
-            <option value="">All Status</option>
-            <?php $__currentLoopData = ['pending'=>'Pending','in_progress'=>'In progress','completed'=>'Completed','cancelled'=>'Cancelled']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $k=>$v): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-              <option value="<?php echo e($k); ?>" <?php if(request('status') === $k): echo 'selected'; endif; ?>><?php echo e($v); ?></option>
-            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-          </select>
-        </div>
-
-        <div class="lg:col-span-2">
-          <label for="priority" class="block text-sm text-zinc-600">Priority</label>
-          <select id="priority" name="priority"
-                  class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0E2B51]">
-            <option value="">All Priority</option>
-            <?php $__currentLoopData = ['low'=>'Low','medium'=>'Medium','high'=>'High','urgent'=>'Urgent']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $k=>$v): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-              <option value="<?php echo e($k); ?>" <?php if(request('priority') === $k): echo 'selected'; endif; ?>><?php echo e($v); ?></option>
-            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-          </select>
-        </div>
-
-        <div class="lg:col-span-2 flex items-end">
-          <div class="flex w-full gap-2">
-            <button type="submit"
-                    class="inline-flex items-center justify-center rounded-lg px-4 py-2 border border-zinc-300 hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-full">
-              Filter
-            </button>
-            <?php if(request()->hasAny(['q','status','priority'])): ?>
-              <a href="<?php echo e(route('maintenance.requests.index')); ?>"
-                 class="inline-flex items-center justify-center rounded-lg px-4 py-2 border border-zinc-300 hover:bg-zinc-50 w-28">
-                Reset
-              </a>
-            <?php endif; ?>
+  <div class="rounded-lg border border-zinc-300 bg-white">
+    <div class="px-5 py-4">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        
+        <div class="flex items-start gap-3">
+          <div class="grid h-9 w-9 place-items-center rounded-md bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M6 11h12M8 15h8m-6 4h4"/>
+            </svg>
           </div>
-        </div>
-      </div>
-    </form>
-  </div>
-
-  
-  <div class="hidden md:flex flex-col rounded-xl border bg-white shadow-sm flex-1 overflow-hidden">
-    <div class="overflow-x-auto overflow-y-auto flex-1">
-      <table class="min-w-full text-sm">
-        <thead class="sticky top-0 z-10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/70">
-          <tr class="text-left text-zinc-700 border-b">
-            <th class="p-3 font-semibold">#</th>
-            <th class="p-3 font-semibold">Title</th>
-            <th class="p-3 font-semibold">Email</th>
-            <th class="p-3 font-semibold">Department</th>
-            <th class="p-3 font-semibold">Priority</th>
-            <th class="p-3 font-semibold">Status</th>
-            <th class="p-3 font-semibold">Reporter</th>
-            <th class="p-3 font-semibold">Technician</th>
-            <th class="p-3 font-semibold">Requested</th>
-            <th class="p-3 font-semibold"><span class="sr-only">Actions</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php $__empty_1 = true; $__currentLoopData = $list; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-            <tr class="border-t hover:bg-zinc-50">
-              <td class="p-3 align-top text-zinc-700"><?php echo e($row->id); ?></td>
-
-              <td class="p-3 align-top">
-                <div class="font-medium text-zinc-900"><?php echo e($row->title); ?></div>
-                <?php if($row->description): ?>
-                  <div class="text-zinc-500 line-clamp-2"><?php echo e($row->description); ?></div>
-                <?php endif; ?>
-              </td>
-
-              <td class="p-3 align-top text-zinc-700"><?php echo e($row->reporter->email ?? '-'); ?></td>
-              <td class="p-3 align-top text-zinc-700"><?php echo e($row->reporter->department->name ?? $row->department->name ?? '-'); ?></td>
-
-              <td class="p-3 align-top">
-                <span class="inline-flex items-center rounded-full border px-2 py-0.5 capitalize <?php echo e($priorityClass($row->priority ?? '')); ?>">
-                  <?php echo e(str_replace('_',' ', $row->priority)); ?>
-
-                </span>
-              </td>
-
-              <td class="p-3 align-top">
-                <span class="inline-flex items-center rounded-full border px-2 py-0.5 capitalize <?php echo e($statusClass($row->status ?? '')); ?>">
-                  <?php echo e(str_replace('_',' ', $row->status)); ?>
-
-                </span>
-              </td>
-
-              <td class="p-3 align-top text-zinc-700"><?php echo e($row->reporter->name ?? '-'); ?></td>
-              <td class="p-3 align-top text-zinc-700"><?php echo e($row->technician->name ?? '-'); ?></td>
-
-              <td class="p-3 align-top text-zinc-700 whitespace-nowrap">
-                <?php $when = optional($row->request_date ?? $row->created_at); ?>
-                <?php if($when): ?>
-                  <time datetime="<?php echo e($when->toIso8601String()); ?>"><?php echo e($when->format('Y-m-d H:i')); ?></time>
-                <?php else: ?>
-                  -
-                <?php endif; ?>
-              </td>
-
-              <td class="p-3 align-top text-right">
-                <a href="<?php echo e(route('maintenance.requests.show', $row)); ?>"
-                   class="text-emerald-700 hover:underline focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded px-1 py-0.5"
-                   onclick="showLoader()">
-                  View
-                </a>
-              </td>
-            </tr>
-          <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-            <tr>
-              <td colspan="10" class="p-10 text-center text-zinc-500">No data</td>
-            </tr>
-          <?php endif; ?>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="px-4 py-3 border-t bg-white">
-      <div class="flex justify-center">
-        <?php echo e($list->withQueryString()->links()); ?>
-
-      </div>
-    </div>
-  </div>
-
-  
-  <div class="grid grid-cols-1 gap-3 md:hidden flex-1 overflow-y-auto">
-    <?php $__empty_1 = true; $__currentLoopData = $list; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-      <div class="rounded-xl border bg-white shadow-sm p-4">
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <div class="font-medium text-zinc-900"><?php echo e($row->title); ?></div>
-            <?php if($row->description): ?>
-              <div class="text-sm text-zinc-500 line-clamp-2"><?php echo e($row->description); ?></div>
-            <?php endif; ?>
-          </div>
-          <span class="inline-flex items-center rounded-full border px-2 py-0.5 capitalize text-xs <?php echo e($statusClass($row->status ?? '')); ?>">
-            <?php echo e(str_replace('_',' ', $row->status)); ?>
-
-          </span>
-        </div>
-
-        <div class="mt-3 grid grid-cols-2 gap-2 text-sm">
-          <div class="text-zinc-500">Priority</div>
           <div>
-            <span class="inline-flex items-center rounded-full border px-2 py-0.5 capitalize text-xs <?php echo e($priorityClass($row->priority ?? '')); ?>">
-              <?php echo e(str_replace('_',' ', $row->priority)); ?>
-
-            </span>
-          </div>
-
-          <div class="text-zinc-500">Reporter</div>
-          <div><?php echo e($row->reporter->name ?? '-'); ?></div>
-
-          <div class="text-zinc-500">Technician</div>
-          <div><?php echo e($row->technician->name ?? '-'); ?></div>
-
-          <div class="text-zinc-500">Requested</div>
-          <div>
-            <?php $when = optional($row->request_date ?? $row->created_at); ?>
-            <?php if($when): ?>
-              <time datetime="<?php echo e($when->toIso8601String()); ?>"><?php echo e($when->format('Y-m-d H:i')); ?></time>
-            <?php else: ?>
-              -
-            <?php endif; ?>
+            <h1 class="text-[17px] font-semibold text-zinc-900">Maintenance Requests</h1>
+            <p class="text-[13px] text-zinc-600">รายการคำขอบำรุงรักษา • ค้นหา กรอง และตรวจทานคำขอ</p>
           </div>
         </div>
 
-        <div class="mt-3 text-right">
-          <a href="<?php echo e(route('maintenance.requests.show', $row)); ?>"
-             class="inline-flex items-center rounded-lg px-3 py-2 border border-zinc-300 hover:bg-zinc-50"
+        
+        <div class="flex shrink-0 items-center">
+          <a href="<?php echo e(route('maintenance.requests.create')); ?>"
+             class="inline-flex items-center gap-2 rounded-md border border-emerald-700 bg-emerald-700 px-4 py-2 text-[13px] font-medium text-white hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-600"
              onclick="showLoader()">
-            View
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/>
+            </svg>
+            สร้างคำขอใหม่
           </a>
         </div>
       </div>
-    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-      <div class="rounded-xl border bg-white shadow-sm p-8 text-center text-zinc-500">
-        No data
-      </div>
-    <?php endif; ?>
 
-    <div class="flex justify-center pb-2">
-      <?php echo e($list->withQueryString()->links()); ?>
+      
+      <div class="mt-4 h-px bg-zinc-200"></div>
 
+      
+      <form method="GET" action="<?php echo e(route('maintenance.requests.index')); ?>"
+            class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-12" onsubmit="showLoader()">
+
+        
+        <div class="md:col-span-6 min-w-0">
+          <label for="q" class="mb-1 block text-[12px] text-zinc-600">คำค้นหา</label>
+          <div class="relative">
+            <input id="q" type="text" name="q" value="<?php echo e($q); ?>"
+                   placeholder="เช่น ชื่อเรื่อง, รายละเอียด, อีเมลผู้แจ้ง"
+                   class="w-full rounded-md border border-zinc-300 pl-12 pr-3 py-2 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-600">
+            <span class="pointer-events-none absolute inset-y-0 left-0 flex w-9 items-center justify-center text-zinc-400">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M21 21l-4.3-4.3M17 10a7 7 0 11-14 0 7 7 0 0114 0z"/>
+              </svg>
+            </span>
+          </div>
+        </div>
+
+        
+        <div class="md:col-span-3">
+          <label for="status" class="mb-1 block text-[12px] text-zinc-600">สถานะ</label>
+          <select id="status" name="status"
+                  class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
+            <option value="">ทั้งหมด</option>
+            <?php $__currentLoopData = [
+              'pending'     => 'รอคิว',
+              'accepted'    => 'รับงานแล้ว',
+              'in_progress' => 'ระหว่างดำเนินการ',
+              'on_hold'     => 'พักไว้',
+              'resolved'    => 'แก้ไขแล้ว',
+              'closed'      => 'ปิดงาน',
+              'cancelled'   => 'ยกเลิก',
+            ]; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $k=>$v): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+              <option value="<?php echo e($k); ?>" <?php if($status===$k): echo 'selected'; endif; ?>><?php echo e($v); ?></option>
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+          </select>
+        </div>
+
+        
+        <div class="md:col-span-2">
+          <label for="priority" class="mb-1 block text-[12px] text-zinc-600">ความสำคัญ</label>
+          <select id="priority" name="priority"
+                  class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
+            <option value="">ทั้งหมด</option>
+            <?php $__currentLoopData = ['low'=>'ต่ำ','normal'=>'ปกติ','high'=>'สูง','urgent'=>'เร่งด่วน']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $k=>$v): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+              <option value="<?php echo e($k); ?>" <?php if($priority===$k): echo 'selected'; endif; ?>><?php echo e($v); ?></option>
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+          </select>
+        </div>
+
+        
+        <div class="md:col-span-1 flex items-end gap-2">
+          <button type="submit"
+                  class="rounded-md border border-emerald-700 bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800">
+            กรองข้อมูล
+          </button>
+          <?php if(request()->hasAny(['q','status','priority'])): ?>
+            <a href="<?php echo e(route('maintenance.requests.index')); ?>"
+               class="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50">
+              ล้างค่า
+            </a>
+          <?php endif; ?>
+        </div>
+      </form>
     </div>
   </div>
 
+  
+  <div class="rounded-lg border border-zinc-300 bg-white overflow-hidden">
+    <div class="relative overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-zinc-50">
+          <tr class="text-zinc-700 border-b border-zinc-200">
+            <th class="p-3 text-left font-medium w-[6%]">#</th>
+            <th class="p-3 text-left font-medium w-[30%]">เรื่อง</th>
+            <th class="p-3 text-left font-medium w-[18%]">อีเมล</th>
+            <th class="p-3 text-left font-medium w-[14%]">หน่วยงาน</th>
+            <th class="p-3 text-left font-medium w-[10%]">ความสำคัญ</th>
+            <th class="p-3 text-left font-medium w-[10%]">สถานะ</th>
+            <th class="p-3 text-right font-medium whitespace-nowrap min-w-[140px]">การดำเนินการ</th>
+          </tr>
+        </thead>
+
+        <tbody>
+        <?php $__empty_1 = true; $__currentLoopData = $list; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+          <tr class="align-top hover:bg-zinc-50 border-b last:border-0">
+            <td class="p-3 text-zinc-700"><?php echo e($row->id); ?></td>
+
+            
+            <td class="p-3">
+              <a href="<?php echo e(route('maintenance.requests.show', $row)); ?>"
+                 class="block max-w-full truncate font-medium text-zinc-900 hover:underline">
+                <?php echo e(Str::limit($row->title, 90)); ?>
+
+              </a>
+              <?php if($row->description): ?>
+                <p class="mt-1 text-xs leading-relaxed text-zinc-600">
+                  <?php echo e(Str::limit($row->description, 140)); ?>
+
+                </p>
+              <?php endif; ?>
+
+              
+              <?php if(!empty($row->category)): ?>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <span class="rounded-full bg-white px-2 py-1 text-[11px] ring-1 ring-zinc-300 text-zinc-700">
+                    <?php echo e($row->category); ?>
+
+                  </span>
+                </div>
+              <?php endif; ?>
+            </td>
+
+            
+            <td class="p-3 text-zinc-700"><?php echo e($row->reporter?->email ?? '-'); ?></td>
+
+            
+            <?php
+              $deptName = $row->department?->name; // ถ้ามี FK department บน MaintenanceRequest
+            ?>
+            <td class="p-3 text-zinc-700"><?php echo e($deptName ?? '—'); ?></td>
+
+            <td class="p-3">
+              <span class="rounded-full bg-white px-2 py-1 text-[11px] <?php echo e($priorityClass($row->priority ?? null)); ?>">
+                <?php echo e($priorityLabel($row->priority ?? null)); ?>
+
+              </span>
+            </td>
+
+            <td class="p-3">
+              <span class="rounded-full bg-white px-2 py-1 text-[11px] <?php echo e($statusClass($row->status ?? null)); ?>">
+                <?php echo e($statusLabel($row->status ?? null)); ?>
+
+              </span>
+            </td>
+
+            
+            <td class="p-3 text-right whitespace-nowrap">
+              <a href="<?php echo e(route('maintenance.requests.show', $row)); ?>"
+                 class="inline-flex items-center gap-1 text-emerald-700 hover:underline" onclick="showLoader()">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
+                </svg>
+                <span class="whitespace-nowrap">ดูรายละเอียด</span>
+              </a>
+            </td>
+          </tr>
+        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+          <tr>
+            <td colspan="7" class="p-12 text-center text-zinc-600">ไม่พบข้อมูล</td>
+          </tr>
+        <?php endif; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  
+  <div class="mt-4">
+    <?php echo e($list->withQueryString()->links()); ?>
+
+  </div>
 </div>
 <?php $__env->stopSection(); ?>
 
@@ -254,7 +250,6 @@
 <div id="loaderOverlay" class="loader-overlay">
   <div class="loader-spinner"></div>
 </div>
-
 <style>
   .loader-overlay{position:fixed;inset:0;background:rgba(255,255,255,.6);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;z-index:99999;visibility:hidden;opacity:0;transition:opacity .2s,visibility .2s}
   .loader-overlay.show{visibility:visible;opacity:1}
@@ -262,15 +257,9 @@
   @keyframes spin{to{transform:rotate(360deg)}}
 </style>
 <script>
-  function showLoader(){document.getElementById("loaderOverlay").classList.add("show")}
-  function hideLoader(){document.getElementById("loaderOverlay").classList.remove("show")}
-  document.addEventListener("DOMContentLoaded", hideLoader);
-  document.addEventListener("click", e => {
-    const link = e.target.closest("a");
-    if (!link) return;
-    const url = link.getAttribute("href");
-    if (url && !link.target && !url.startsWith("#") && link.host === location.host) showLoader();
-  });
+  function showLoader(){document.getElementById('loaderOverlay').classList.add('show')}
+  function hideLoader(){document.getElementById('loaderOverlay').classList.remove('show')}
+  document.addEventListener('DOMContentLoaded', hideLoader);
 </script>
 <?php $__env->stopSection(); ?>
 
