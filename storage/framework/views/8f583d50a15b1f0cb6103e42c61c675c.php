@@ -86,37 +86,31 @@
           <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
 
             
-            <?php $field='asset_id'; ?>
+            <?php $field='asset_id'; $assetList = is_iterable($assets ?? null) ? collect($assets) : collect(); ?>
             <div>
               <label for="<?php echo e($field); ?>" class="block text-sm font-medium text-slate-700">
                 ทรัพย์สิน <span class="ml-1 text-xs text-slate-500">(ไม่บังคับ)</span>
               </label>
-              <select id="<?php echo e($field); ?>" name="<?php echo e($field); ?>"
-                      class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-emerald-600 focus:ring-emerald-600 <?php $__errorArgs = [$field];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> border-rose-400 ring-rose-200 <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>"
-                      <?php $__errorArgs = [$field];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> aria-describedby="<?php echo e($field); ?>_error" aria-invalid="true" <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>>
-                <option value="">— เลือกทรัพย์สิน —</option>
-                <?php $assetList = is_iterable($assets ?? null) ? $assets : []; ?>
-                <?php $__currentLoopData = $assetList; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $a): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                  <option value="<?php echo e($a->id); ?>" <?php if(old($field) == $a->id): echo 'selected'; endif; ?>">
-                    <?php echo e($a->asset_code ?? '—'); ?> — <?php echo e($a->name); ?>
-
-                  </option>
-                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-              </select>
+              <?php if (isset($component)) { $__componentOriginal65b27876dc3636d5d043082d984d84ad = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal65b27876dc3636d5d043082d984d84ad = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.search-select','data' => ['name' => 'asset_id','id' => 'asset_id','items' => $assetList->map(fn($a)=> (object)['id'=>$a->id,'name'=>($a->asset_code ?? '—').' — '.($a->name ?? '')]),'labelField' => 'name','valueField' => 'id','value' => old('asset_id'),'placeholder' => '— เลือกทรัพย์สิน —']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('search-select'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['name' => 'asset_id','id' => 'asset_id','items' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($assetList->map(fn($a)=> (object)['id'=>$a->id,'name'=>($a->asset_code ?? '—').' — '.($a->name ?? '')])),'label-field' => 'name','value-field' => 'id','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(old('asset_id')),'placeholder' => '— เลือกทรัพย์สิน —']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal65b27876dc3636d5d043082d984d84ad)): ?>
+<?php $attributes = $__attributesOriginal65b27876dc3636d5d043082d984d84ad; ?>
+<?php unset($__attributesOriginal65b27876dc3636d5d043082d984d84ad); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal65b27876dc3636d5d043082d984d84ad)): ?>
+<?php $component = $__componentOriginal65b27876dc3636d5d043082d984d84ad; ?>
+<?php unset($__componentOriginal65b27876dc3636d5d043082d984d84ad); ?>
+<?php endif; ?>
               <?php $__errorArgs = [$field];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
@@ -128,37 +122,31 @@ unset($__errorArgs, $__bag); ?>
             </div>
 
             
-            <?php $field='reporter_id'; ?>
+            <?php $field='reporter_id'; $userList = is_iterable($users ?? null) ? collect($users) : collect(); ?>
             <div>
               <label for="<?php echo e($field); ?>" class="block text-sm font-medium text-slate-700">
                 ผู้แจ้ง (ถ้าทำเรื่องแทน) <span class="ml-1 text-xs text-slate-500">(ไม่บังคับ)</span>
               </label>
-              <select id="<?php echo e($field); ?>" name="<?php echo e($field); ?>"
-                      class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-emerald-600 focus:ring-emerald-600 <?php $__errorArgs = [$field];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> border-rose-400 ring-rose-200 <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>"
-                      <?php $__errorArgs = [$field];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> aria-describedby="<?php echo e($field); ?>_error" aria-invalid="true" <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>>
-                <option value="">— ใช้ผู้ใช้งานปัจจุบัน —</option>
-                <?php $userList = is_iterable($users ?? null) ? $users : []; ?>
-                <?php $__currentLoopData = $userList; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $u): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                  <option value="<?php echo e($u->id); ?>" <?php if(old($field, auth()->id()) == $u->id): echo 'selected'; endif; ?>">
-                    <?php echo e($u->name); ?>
-
-                  </option>
-                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-              </select>
+              <?php if (isset($component)) { $__componentOriginal65b27876dc3636d5d043082d984d84ad = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal65b27876dc3636d5d043082d984d84ad = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.search-select','data' => ['name' => 'reporter_id','id' => 'reporter_id','items' => $userList->map(fn($u)=> (object)['id'=>$u->id,'name'=>$u->name]),'labelField' => 'name','valueField' => 'id','value' => old('reporter_id', auth()->id()),'placeholder' => '— ใช้ผู้ใช้งานปัจจุบัน —']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('search-select'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['name' => 'reporter_id','id' => 'reporter_id','items' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($userList->map(fn($u)=> (object)['id'=>$u->id,'name'=>$u->name])),'label-field' => 'name','value-field' => 'id','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(old('reporter_id', auth()->id())),'placeholder' => '— ใช้ผู้ใช้งานปัจจุบัน —']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal65b27876dc3636d5d043082d984d84ad)): ?>
+<?php $attributes = $__attributesOriginal65b27876dc3636d5d043082d984d84ad; ?>
+<?php unset($__attributesOriginal65b27876dc3636d5d043082d984d84ad); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal65b27876dc3636d5d043082d984d84ad)): ?>
+<?php $component = $__componentOriginal65b27876dc3636d5d043082d984d84ad; ?>
+<?php unset($__componentOriginal65b27876dc3636d5d043082d984d84ad); ?>
+<?php endif; ?>
               <?php $__errorArgs = [$field];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :

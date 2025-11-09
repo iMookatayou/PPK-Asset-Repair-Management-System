@@ -226,9 +226,9 @@ class DemoDataSeeder extends Seeder
         ];
         $priorities = [MR::PRIORITY_LOW, MR::PRIORITY_MEDIUM, MR::PRIORITY_HIGH, MR::PRIORITY_URGENT];
 
-        $now = Carbon::now();
+    $now = Carbon::now();
 
-        $makeTimeline = function (string $status, Carbon $base) {
+    $makeTimeline = function (string $status, Carbon $base) {
             $assigned = $accepted = $started = $onHold = $resolved = $closed = $completed = null;
             $assignedChance = random_int(0, 100) < 75;
 
@@ -262,11 +262,32 @@ class DemoDataSeeder extends Seeder
             return [$assigned,$accepted,$started,$onHold,$resolved,$closed,$completed];
         };
 
-        $runningNo = 1001;
-        $makeRequestNo = function() use (&$runningNo) {
-            $no = sprintf('MR-%s-%04d', now()->format('ym'), $runningNo);
-            $runningNo++;
-            return $no;
+        // Prepare idempotent, unique request number generator per period (MR-yyMM-####)
+        $existingSet = [];
+        $prefixCounters = [];
+        if (Schema::hasTable('maintenance_requests') && Schema::hasColumn('maintenance_requests','request_no')) {
+            $existing = DB::table('maintenance_requests')->pluck('request_no')->filter()->all();
+            foreach ($existing as $no) {
+                $existingSet[$no] = true;
+                if (preg_match('/^MR-(\d{4})-(\d{4})$/', $no, $m)) {
+                    $prefix = $m[1];
+                    $suffix = (int) $m[2];
+                    $prefixCounters[$prefix] = max($prefixCounters[$prefix] ?? 1000, $suffix);
+                }
+            }
+        }
+        $usedInRun = [];
+        $makeRequestNo = function (Carbon $date) use (&$prefixCounters, &$existingSet, &$usedInRun) {
+            $prefix = $date->format('ym');
+            $last = $prefixCounters[$prefix] ?? 1000;
+            do {
+                $last++;
+                $candidate = sprintf('MR-%s-%04d', $prefix, $last);
+            } while (isset($existingSet[$candidate]) || isset($usedInRun[$candidate]));
+            $prefixCounters[$prefix] = $last;
+            $existingSet[$candidate] = true;
+            $usedInRun[$candidate] = true;
+            return $candidate;
         };
 
         DB::transaction(function () use (
@@ -331,7 +352,7 @@ class DemoDataSeeder extends Seeder
                 }
                 if ($hasLocationText) $row['location_text'] = fake()->randomElement(['ตึก A ชั้น 2','ตึก B ห้อง IT','หน้า ER','Ward 3','OPD 5']);
 
-                if ($hasRequestNo) $row['request_no'] = $makeRequestNo();
+                if ($hasRequestNo) $row['request_no'] = $makeRequestNo($createdAt);
                 $row['title']       = 'แจ้งซ่อม #'.$i;
                 $row['description'] = 'รายละเอียดปัญหาเบื้องต้น';
                 if ($hasPriority)  $row['priority'] = $priority;

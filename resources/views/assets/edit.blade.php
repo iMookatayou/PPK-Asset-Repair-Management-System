@@ -36,16 +36,21 @@
 
 @section('content')
   <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-    {{-- Error summary --}}
+    {{-- Error -> Toast --}}
     @if ($errors->any())
-      <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-800">
-        <p class="font-medium">มีข้อผิดพลาดในการบันทึกข้อมูล:</p>
-        <ul class="mt-2 list-disc pl-5 text-sm">
-          @foreach ($errors->all() as $error)
-            <li>{{ $error }}</li>
-          @endforeach
-        </ul>
-      </div>
+      @push('scripts')
+      <script>
+        (function(){
+          const msgs = @json($errors->all());
+          const msg  = msgs.length ? ('มีข้อผิดพลาดในการบันทึก: ' + msgs.join(' • ')) : 'มีข้อผิดพลาดในการบันทึกข้อมูล';
+          if (window.showToast) {
+            window.showToast({ type:'error', message: msg, position:'uc', timeout: 3600, size:'lg' });
+          } else {
+            window.dispatchEvent(new CustomEvent('app:toast',{ detail:{ type:'error', message: msg, position:'uc', timeout:3600, size:'lg' } }));
+          }
+        })();
+      </script>
+      @endpush
     @endif
 
     <form method="POST" action="{{ route('assets.update', $asset) }}"

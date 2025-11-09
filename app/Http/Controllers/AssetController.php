@@ -251,7 +251,8 @@ class AssetController extends Controller
 
     public function storePage(Request $request)
     {
-        $data = $request->validate([
+        // Manual validate to control toast on failure (instead of automatic redirect block)
+        $validator = Validator::make($request->all(), [
             'asset_code'      => ['required','string','max:100','unique:assets,asset_code'],
             'name'            => ['required','string','max:255'],
             'type'            => ['nullable','string','max:100'],
@@ -265,7 +266,18 @@ class AssetController extends Controller
             'warranty_expire' => ['nullable','date','after_or_equal:purchase_date'],
             'status'          => ['nullable', Rule::in(['active','in_repair','disposed'])],
         ]);
+        if ($validator->fails()) {
+            $errors = $validator->errors();
+            $fieldsHuman = [
+                'asset_code' => 'รหัสครุภัณฑ์', 'name' => 'ชื่อครุภัณฑ์', 'serial_number' => 'Serial',
+                'category_id' => 'หมวดหมู่', 'department_id' => 'หน่วยงาน', 'warranty_expire' => 'หมดประกัน'
+            ];
+            $bad = collect(array_keys($errors->toArray()))->map(fn($f) => $fieldsHuman[$f] ?? $f)->implode(', ');
+            $msg = $bad ? ('ข้อมูลไม่ถูกต้อง: '.$bad) : 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง';
+            return redirect()->back()->withErrors($validator)->withInput()->with('toast', Toast::error($msg, 2600));
+        }
 
+        $data = $validator->validated();
         $asset = \App\Models\Asset::create($data);
         return redirect()
             ->route('assets.show', $asset)
@@ -295,6 +307,10 @@ class AssetController extends Controller
 
         $attachments = $attQuery->get();
 
+        // หากมี status เดิมที่หน้าอื่นส่งมา (เช่นบางหน้าใช้ session('status')), แปลงเป็น toast
+        if (session('status') && !session()->has('toast')) {
+            session()->flash('toast', Toast::success(session('status')));
+        }
         return view('assets.show', compact('asset','logs','attachments'));
     }
 
@@ -322,7 +338,7 @@ class AssetController extends Controller
 
     public function updatePage(Request $request, \App\Models\Asset $asset)
     {
-        $data = $request->validate([
+        $validator = Validator::make($request->all(), [
             'asset_code'      => ['sometimes','string','max:100','unique:assets,asset_code,'.$asset->id],
             'name'            => ['sometimes','string','max:255'],
             'type'            => ['nullable','string','max:100'],
@@ -336,7 +352,17 @@ class AssetController extends Controller
             'warranty_expire' => ['nullable','date','after_or_equal:purchase_date'],
             'status'          => ['nullable', Rule::in(['active','in_repair','disposed'])],
         ]);
-
+        if ($validator->fails()) {
+            $errors = $validator->errors();
+            $fieldsHuman = [
+                'asset_code' => 'รหัสครุภัณฑ์', 'name' => 'ชื่อครุภัณฑ์', 'serial_number' => 'Serial',
+                'category_id' => 'หมวดหมู่', 'department_id' => 'หน่วยงาน', 'warranty_expire' => 'หมดประกัน'
+            ];
+            $bad = collect(array_keys($errors->toArray()))->map(fn($f) => $fieldsHuman[$f] ?? $f)->implode(', ');
+            $msg = $bad ? ('ข้อมูลไม่ถูกต้อง: '.$bad) : 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง';
+            return redirect()->back()->withErrors($validator)->withInput()->with('toast', Toast::error($msg, 2600));
+        }
+        $data = $validator->validated();
         $asset->update($data);
         return redirect()
             ->route('assets.show', $asset)

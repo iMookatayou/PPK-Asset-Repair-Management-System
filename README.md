@@ -7,6 +7,50 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Run with Docker (local)
+
+Quick start:
+
+1) Copy env and set app key (inside container after up)
+
+2) Start stack
+
+3) Generate key and migrate
+
+4) Open app and Vite
+
+Commands (PowerShell):
+
+```powershell
+# 0) Prepare env (first time)
+Copy-Item .env.docker.example .env -Force
+
+# 1) Start containers
+docker compose up -d
+
+# 2) App key and DB migrations (first time)
+docker compose exec app php artisan key:generate
+docker compose exec app php artisan migrate --seed
+
+# Optional: run tests
+docker compose exec app php artisan test -q
+```
+
+URLs:
+- App: http://localhost:8080
+- Vite Dev (hot reload): http://localhost:5173
+- DB: host=localhost port=3307 db=arm user=arm pass=arm
+
+Services:
+- app (php-fpm), web (nginx), node (vite), db (mariadb), redis
+
+Notes:
+- Change ports in `docker-compose.yml` if they conflict locally.
+- For production build, run `npm run build` in the node container or GitHub Actions and serve `public/build`.
+ - A root `Dockerfile` is provided for building a production PHP-FPM image (multi-stage). The compose stack uses `./.docker/Dockerfile` for local dev.
+
+---
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

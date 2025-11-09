@@ -35,14 +35,20 @@
   <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
     
     <?php if($errors->any()): ?>
-      <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-800">
-        <p class="font-medium">มีข้อผิดพลาดในการบันทึกข้อมูล:</p>
-        <ul class="mt-2 list-disc pl-5 text-sm">
-          <?php $__currentLoopData = $errors->all(); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $error): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-            <li><?php echo e($error); ?></li>
-          <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-        </ul>
-      </div>
+      <?php $__env->startPush('scripts'); ?>
+      <script>
+        (function(){
+          const msgs = <?php echo json_encode($errors->all(), 15, 512) ?>;
+          const msg  = msgs.length ? ('มีข้อผิดพลาดในการบันทึก: ' + msgs.join(' • ')) : 'มีข้อผิดพลาดในการบันทึกข้อมูล';
+          if (window.showToast) {
+            window.showToast({ type:'error', message: msg, position:'uc', timeout: 3600, size:'lg' });
+          } else {
+            // fallback: dispatch app:toast event
+            window.dispatchEvent(new CustomEvent('app:toast',{ detail:{ type:'error', message: msg, position:'uc', timeout:3600, size:'lg' } }));
+          }
+        })();
+      </script>
+      <?php $__env->stopPush(); ?>
     <?php endif; ?>
 
     <form method="POST" action="<?php echo e(route('assets.store')); ?>"

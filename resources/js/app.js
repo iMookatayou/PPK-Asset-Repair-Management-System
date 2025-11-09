@@ -60,6 +60,7 @@ import '../css/app.css'
 			if (empty) empty.classList.toggle('hidden', shown !== 0);
 		};
 
+				// Open/close triggers
 				toggleBtn.addEventListener('click', (e) => { e.preventDefault(); panel.classList.contains('hidden') ? open() : close(); });
 				textInput.addEventListener('focus', () => { if (panel.classList.contains('hidden')) open(); });
 				textInput.addEventListener('click', () => { if (panel.classList.contains('hidden')) open(); });
@@ -72,6 +73,13 @@ import '../css/app.css'
 					} else if (e.key === 'Escape') {
 						close();
 					}
+				});
+				// Close when input loses focus and focus isn't moving to an option inside the panel
+				textInput.addEventListener('blur', () => {
+					setTimeout(() => {
+						const ae = document.activeElement;
+						if (!root.contains(ae)) close();
+					}, 80); // small delay to allow option focus after click
 				});
 		list.addEventListener('click', (e) => {
 			const li = e.target.closest('[data-ss-option]');

@@ -24,19 +24,26 @@ class AssetCategoryController extends Controller
 
     public function store(Request $request)
     {
-        // Validate base fields (excluding slug), then derive slug and validate its uniqueness deterministically
-        $base = $request->validate([
+        $validatorBase = Validator::make($request->all(), [
             'name'        => 'required|string|max:100|unique:asset_categories,name',
             'description' => 'nullable|string|max:1000',
             'color'       => 'nullable|string|max:20',
             'is_active'   => 'boolean',
         ]);
+        if ($validatorBase->fails()) {
+            return back()->withErrors($validatorBase)->withInput()->with('toast', \App\Support\Toast::error('ข้อมูลไม่ถูกต้อง: name', 2600));
+        }
+        $base = $validatorBase->validated();
 
         $slug = Str::slug($request->input('slug') ?: $base['name']);
-        Validator::make(
+        $validatorSlug = Validator::make(
             ['slug' => $slug],
             ['slug' => ['required','string','max:120', Rule::unique('asset_categories','slug')]]
-        )->validate();
+        );
+        if ($validatorSlug->fails()) {
+            return back()->withErrors($validatorSlug)->withInput()->with('toast', \App\Support\Toast::error('Slug ไม่ถูกต้อง หรือซ้ำ', 2600));
+        }
+        $validatorSlug->validated();
 
         $data = array_merge($base, ['slug' => $slug]);
 
@@ -53,20 +60,27 @@ class AssetCategoryController extends Controller
 
     public function update(Request $request, AssetCategory $asset_category)
     {
-        // Validate base fields (excluding slug), then re-derive/accept slug and validate uniqueness ignoring current record
-        $base = $request->validate([
+        $validatorBase = Validator::make($request->all(), [
             'name'        => 'required|string|max:100|unique:asset_categories,name,'.$asset_category->id,
             'description' => 'nullable|string|max:1000',
             'color'       => 'nullable|string|max:20',
             'is_active'   => 'boolean',
         ]);
+        if ($validatorBase->fails()) {
+            return back()->withErrors($validatorBase)->withInput()->with('toast', \App\Support\Toast::error('ข้อมูลไม่ถูกต้อง', 2600));
+        }
+        $base = $validatorBase->validated();
 
         $slugInput = $request->input('slug');
         $slug = Str::slug($slugInput ?: $base['name']);
-        Validator::make(
+        $validatorSlug = Validator::make(
             ['slug' => $slug],
             ['slug' => ['required','string','max:120', Rule::unique('asset_categories','slug')->ignore($asset_category->id)]]
-        )->validate();
+        );
+        if ($validatorSlug->fails()) {
+            return back()->withErrors($validatorSlug)->withInput()->with('toast', \App\Support\Toast::error('Slug ไม่ถูกต้อง หรือซ้ำ', 2600));
+        }
+        $validatorSlug->validated();
 
         $data = array_merge($base, ['slug' => $slug]);
 

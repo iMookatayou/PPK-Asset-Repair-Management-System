@@ -1,0 +1,91 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: .docker/Dockerfile
+      args:
+        PHP_VERSION: "8.2"
+    image: arm-system/php-app
+    container_name: arm-app
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+    volumes:
+      - ./:/var/www/html
+      - ./storage:/var/www/html/storage
+      # If present, override Laravel env inside the container without touching your local .env
+      - ./.env.docker:/var/www/html/.env
+    expose:
+      - "9000"
+    depends_on:
+      - db
+
+  web:
+    image: nginx:1.25-alpine
+    container_name: arm-web
+    ports:
+      - "8000:80"
+    volumes:
+      - ./:/var/www/html
+      - ./.docker/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app
+
+  node:
+    image: node:20-alpine
+    container_name: arm-node
+    working_dir: /app
+    command: sh -c "npm ci || npm install && npm run dev"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./:/app
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - VITE_HOST=0.0.0.0
+    depends_on:
+      - web
+
+  db:
+    image: mariadb:11
+    container_name: arm-db
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: arm
+      MYSQL_USER: arm
+      MYSQL_PASSWORD: arm
+    volumes:
+      - dbdata:/var/lib/mysql
+
+  redis:
+    image: redis:7-alpine
+    container_name: arm-redis
+    ports:
+      - "6379:6379"
+
+  worker:
+    # Give worker its own build instructions so starting it alone still works.
+    build:
+      context: .
+      dockerfile: .docker/Dockerfile
+      args:
+        PHP_VERSION: "8.2"
+    image: arm-system/php-app
+    container_name: arm-worker
+    depends_on:
+      - app
+      - redis
+    working_dir: /var/www/html
+    command: php artisan queue:work --verbose --tries=1 --timeout=90
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+    volumes:
+      - ./:/var/www/html
+      # If present, override Laravel env inside the container without touching your local .env
+      - ./.env.docker:/var/www/html/.env
+
+volumes:
+  dbdata:

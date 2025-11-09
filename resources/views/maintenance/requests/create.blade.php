@@ -87,43 +87,31 @@
 
           <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
 
-            {{-- ทรัพย์สิน (nullable) --}}
-            @php $field='asset_id'; @endphp
+            {{-- ทรัพย์สิน (nullable) ใช้ search-select --}}
+            @php $field='asset_id'; $assetList = is_iterable($assets ?? null) ? collect($assets) : collect(); @endphp
             <div>
               <label for="{{ $field }}" class="block text-sm font-medium text-slate-700">
                 ทรัพย์สิน <span class="ml-1 text-xs text-slate-500">(ไม่บังคับ)</span>
               </label>
-              <select id="{{ $field }}" name="{{ $field }}"
-                      class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-emerald-600 focus:ring-emerald-600 @error($field) border-rose-400 ring-rose-200 @enderror"
-                      @error($field) aria-describedby="{{ $field }}_error" aria-invalid="true" @enderror>
-                <option value="">— เลือกทรัพย์สิน —</option>
-                @php $assetList = is_iterable($assets ?? null) ? $assets : []; @endphp
-                @foreach($assetList as $a)
-                  <option value="{{ $a->id }}" @selected(old($field) == $a->id)">
-                    {{ $a->asset_code ?? '—' }} — {{ $a->name }}
-                  </option>
-                @endforeach
-              </select>
+              <x-search-select name="asset_id" id="asset_id"
+                :items="$assetList->map(fn($a)=> (object)['id'=>$a->id,'name'=>($a->asset_code ?? '—').' — '.($a->name ?? '')])"
+                label-field="name" value-field="id"
+                :value="old('asset_id')"
+                placeholder="— เลือกทรัพย์สิน —" />
               @error($field) <p id="{{ $field }}_error" class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
             </div>
 
-            {{-- ผู้แจ้ง (ออปชัน) : ถ้าไม่ส่งจะใช้ผู้ใช้งานปัจจุบันใน Controller --}}
-            @php $field='reporter_id'; @endphp
+            {{-- ผู้แจ้ง (ออปชัน) ใช้ search-select --}}
+            @php $field='reporter_id'; $userList = is_iterable($users ?? null) ? collect($users) : collect(); @endphp
             <div>
               <label for="{{ $field }}" class="block text-sm font-medium text-slate-700">
                 ผู้แจ้ง (ถ้าทำเรื่องแทน) <span class="ml-1 text-xs text-slate-500">(ไม่บังคับ)</span>
               </label>
-              <select id="{{ $field }}" name="{{ $field }}"
-                      class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-emerald-600 focus:ring-emerald-600 @error($field) border-rose-400 ring-rose-200 @enderror"
-                      @error($field) aria-describedby="{{ $field }}_error" aria-invalid="true" @enderror>
-                <option value="">— ใช้ผู้ใช้งานปัจจุบัน —</option>
-                @php $userList = is_iterable($users ?? null) ? $users : []; @endphp
-                @foreach($userList as $u)
-                  <option value="{{ $u->id }}" @selected(old($field, auth()->id()) == $u->id)">
-                    {{ $u->name }}
-                  </option>
-                @endforeach
-              </select>
+              <x-search-select name="reporter_id" id="reporter_id"
+                :items="$userList->map(fn($u)=> (object)['id'=>$u->id,'name'=>$u->name])"
+                label-field="name" value-field="id"
+                :value="old('reporter_id', auth()->id())"
+                placeholder="— ใช้ผู้ใช้งานปัจจุบัน —" />
               @error($field) <p id="{{ $field }}_error" class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
             </div>
           </div>

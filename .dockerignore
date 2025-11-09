@@ -1,0 +1,21 @@
+# Ignore everything not needed in PHP build context
+.git
+.gitignore
+node_modules
+vendor
+storage/app/public
+storage/framework/cache
+storage/framework/sessions
+storage/framework/views
+storage/logs
+public/storage
+# Local env & IDE
+.env
+.env.*
+!.env.docker.example
+.idea
+.vscode
+.DS_Store
+# Tests & coverage (keep if running in container CI)
+coverage
+.phpunit.result.cache
