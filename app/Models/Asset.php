@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Asset extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     /**
      * ถ้าตาราง attachments / maintenance_logs อ้างใบงานด้วยคีย์อื่น
@@ -19,7 +20,6 @@ class Asset extends Model
         'asset_code',
         'name',
         'type',
-        'category',        // legacy string
         'brand',
         'model',
         'serial_number',
@@ -65,19 +65,20 @@ class Asset extends Model
     }
 
     /**
-     * ไฟล์แนบของทรัพย์สิน “ผ่าน” ใบงานซ่อม
-     * attachments.{request_id|maintenance_request_id} -> maintenance_requests.id
+     * ไฟล์แนบของทรัพย์สิน “ผ่าน” ใบงานซ่อม (polymorphic)
+     * attachments.attachable_id -> maintenance_requests.id AND attachments.attachable_type = MaintenanceRequest::class
+     * NOTE: ตาราง attachments ไม่มีคอลัมน์ request_id อีกต่อไป (ใช้ morph: attachable_type/attachable_id)
      */
     public function requestAttachments()
     {
         return $this->hasManyThrough(
-            Attachment::class,          // ปลายทาง
-            MaintenanceRequest::class,  // ผ่าน
-            'asset_id',                 // FK บน maintenance_requests -> assets.id
-            self::REQ_FK,               // FK บน attachments -> maintenance_requests.id
-            'id',                       // local key บน assets
-            'id'                        // local key บน maintenance_requests
-        );
+            Attachment::class,          // ปลายทาง (ไฟล์แนบ)
+            MaintenanceRequest::class,  // ผ่าน (ใบงาน)
+            'asset_id',                 // maintenance_requests.asset_id -> assets.id
+            'attachable_id',            // attachments.attachable_id -> maintenance_requests.id
+            'id',                       // assets.id
+            'id'                        // maintenance_requests.id
+        )->where('attachments.attachable_type', (new MaintenanceRequest())->getMorphClass());
     }
 
     /**
@@ -122,7 +123,9 @@ class Asset extends Model
 
     public function scopeCategory($q, ?string $category)
     {
-        return $category ? $q->where('category', $category) : $q;
+        // legacy: ก่อนใช้ category_id มีคอลัมน์ category (string) ใน model
+        // ปัจจุบันตัดออกเพื่อหลีกเลี่ยงความสับสน หากต้องการ filter หมวดหมู่ให้ใช้ where('category_id', ..) หรือ join กับ asset_categories
+        return $q; // no-op
     }
 
     public function scopeLocation($q, ?string $location)
@@ -141,7 +144,6 @@ class Asset extends Model
             'id'              => 'id',
             'asset_code'      => 'asset_code',
             'name'            => 'name',
-            'category'        => 'category',
             'status'          => 'status',
             'purchase_date'   => 'purchase_date',
             'warranty_expire' => 'warranty_expire',

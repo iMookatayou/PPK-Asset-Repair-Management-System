@@ -45,7 +45,7 @@
 
       {{-- Footer --}}
       <div class="border-t px-3 py-2 text-right">
-        <a href="{{ route('chat.index') }}"
+        <a href="{{ route('chat.index') }}" data-no-loader
            class="text-[13px] text-[#0E2B51] hover:underline">Go All topics</a>
       </div>
     </div>
@@ -67,12 +67,17 @@
 
   function openDrawer() {
     isOpen = true;
+    drawer.removeAttribute('inert');
+    drawer.setAttribute('aria-hidden','false');
     drawer.classList.remove('translate-y-4','opacity-0','pointer-events-none');
     drawer.classList.add('translate-y-0','opacity-100');
     unreadTotal = 0; renderBadge();
   }
   function closeDrawer() {
     isOpen = false;
+    // ทำให้เนื้อหาภายใน drawer ไม่โฟกัส/คลิกได้เมื่อปิด เพื่อลดโอกาสนำทางโดยไม่ตั้งใจ
+    drawer.setAttribute('inert','');
+    drawer.setAttribute('aria-hidden','true');
     drawer.classList.add('translate-y-4','opacity-0','pointer-events-none');
     drawer.classList.remove('translate-y-0','opacity-100');
   }
@@ -104,6 +109,7 @@
     for (const it of items) {
       const a = document.createElement('a');
       a.href = it.show_url;
+      a.setAttribute('data-no-loader','');
       a.className = 'group flex items-start gap-3 rounded-xl px-3 py-2 hover:bg-zinc-50';
       a.innerHTML = `
         <div class="mt-0.5 h-8 w-8 shrink-0 rounded-full bg-slate-200 grid place-items-center text-xs text-slate-700">
@@ -160,7 +166,7 @@
   search.addEventListener('input', applyFilter);
 
   // init
-  closeDrawer();
+  closeDrawer(); // sets inert/aria-hidden for safety when closed
   poll();
   setInterval(poll, 5000); // 5 วิ/ครั้ง
 })();

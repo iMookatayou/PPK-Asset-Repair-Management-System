@@ -35,9 +35,10 @@ return new class extends Migration {
             $table->enum('status', ['active','in_repair','disposed'])->default('active');
 
             $table->timestamps();
+            $table->softDeletes(); // allow safe logical deletion while keeping historical links
 
             $table->index(['type', 'location', 'department_id', 'category_id']);
-            $table->index(['asset_code', 'serial_number']);
+            // ไม่สร้าง composite index asset_code+serial_number (ซ้ำกับ unique รายคอลัมน์)
         });
     }
 

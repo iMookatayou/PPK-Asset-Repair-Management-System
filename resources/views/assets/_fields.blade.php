@@ -25,24 +25,21 @@
       @error('type') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
     </div>
 
-    <div>
-      <label class="block text-sm font-medium text-slate-700" for="category">หมวด (legacy)</label>
-      <input id="category" name="category" type="text" class="mt-1 w-full rounded-lg border px-3 py-2"
-             value="{{ old('category', $asset->category ?? '') }}">
-      @error('category') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
+    {{-- legacy category string removed; use select below for category_id --}}
+    <div class="hidden">
+      <input type="text" disabled aria-hidden="true">
     </div>
   </div>
 
   {{-- category_id + department_id (ถ้า controller ส่ง $categories, $departments มา) --}}
   @isset($categories)
     <div>
-      <label class="block text-sm font-medium text-slate-700" for="category_id">หมวด (FK)</label>
-      <select id="category_id" name="category_id" class="mt-1 w-full rounded-lg border px-3 py-2">
-        <option value="">— ไม่ระบุ —</option>
-        @foreach($categories as $c)
-          <option value="{{ $c->id }}" @selected(old('category_id', $asset->category_id ?? null) == $c->id)>{{ $c->name }}</option>
-        @endforeach
-      </select>
+      <label class="block text-sm font-medium text-slate-700" for="category_id">หมวดหมู่</label>
+      <x-search-select name="category_id" id="category_id"
+        :items="$categories"
+        label-field="name" value-field="id"
+        :value="old('category_id', $asset->category_id ?? null)"
+        placeholder="— ไม่ระบุ —" />
       @error('category_id') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
     </div>
   @endisset
@@ -50,12 +47,16 @@
   @isset($departments)
     <div>
       <label class="block text-sm font-medium text-slate-700" for="department_id">หน่วยงาน</label>
-      <select id="department_id" name="department_id" class="mt-1 w-full rounded-lg border px-3 py-2">
-        <option value="">— ไม่ระบุ —</option>
-        @foreach($departments as $d)
-          <option value="{{ $d->id }}" @selected(old('department_id', $asset->department_id ?? null) == $d->id)>{{ $d->name }}</option>
-        @endforeach
-      </select>
+      @php $hasDepartments = ($departments instanceof \Illuminate\Support\Collection) ? $departments->isNotEmpty() : count($departments ?? []) > 0; @endphp
+      @if($hasDepartments)
+        <x-search-select name="department_id" id="department_id"
+          :items="$departments"
+          label-field="display_name" value-field="id"
+          :value="old('department_id', $asset->department_id ?? null)"
+          placeholder="— ไม่ระบุ —" />
+      @else
+        <div class="mt-1 w-full rounded-lg border px-3 py-2 text-slate-400">ยังไม่มีข้อมูลหน่วยงาน (กรุณา seed)</div>
+      @endif
       @error('department_id') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
     </div>
   @endisset

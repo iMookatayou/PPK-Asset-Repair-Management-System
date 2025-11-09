@@ -4,12 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-// use Illuminate\Database\Eloquent\SoftDeletes; // เปิดถ้ามีคอลัมน์ deleted_at
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class MaintenanceRequest extends Model
 {
     use HasFactory;
-    // use SoftDeletes;
+    use SoftDeletes;
 
     /**
      * Fillable fields
@@ -66,6 +66,7 @@ class MaintenanceRequest extends Model
         'closed_at'      => 'datetime',
         'cost'           => 'decimal:2',
         'extra'          => 'array',
+        'deleted_at'     => 'datetime',
     ];
 
     /**
@@ -96,22 +97,41 @@ class MaintenanceRequest extends Model
      * UI groups mapping (สำคัญสำหรับแท็บ)
      */
     public const GROUP_PENDING    = ['pending', 'accepted', null];
-    public const GROUP_INPROGRESS = ['in_progress', 'started', 'on_hold'];
+    // ตัด 'started' ออก (ไม่มีสถานะนี้ในระบบปัจจุบัน)
+    public const GROUP_INPROGRESS = ['in_progress', 'on_hold'];
     public const GROUP_COMPLETED  = ['resolved', 'completed', 'closed'];
 
     /**
      * Relationships
      */
-    public function asset()        { return $this->belongsTo(Asset::class); }
-    public function department()   { return $this->belongsTo(Department::class); }
-    public function reporter()     { return $this->belongsTo(User::class, 'reporter_id'); }
-    public function technician()   { return $this->belongsTo(User::class, 'technician_id'); }
-    public function logs()         { return $this->hasMany(MaintenanceLog::class, 'request_id'); }
+    public function asset()      { return $this->belongsTo(Asset::class); }
+    public function department() { return $this->belongsTo(Department::class); }
+    public function reporter()   { return $this->belongsTo(User::class, 'reporter_id'); }
+    public function technician() { return $this->belongsTo(User::class, 'technician_id'); }
 
+    public function logs()
+    {
+        return $this->hasMany(MaintenanceLog::class, 'request_id');
+    }
+
+    // Attachments (polymorphic)
     public function attachments()
     {
-        return $this->morphMany(\App\Models\Attachment::class, 'attachable')->orderBy('order_column');
+        return $this->morphMany(\App\Models\Attachment::class, 'attachable')->ordered();
     }
+
+    /** ไฟล์แนบที่เป็นรูปภาพเท่านั้น */
+    public function imageAttachments()
+    {
+        return $this->attachments()->whereHas('file', fn($q) => $q->where('mime', 'like', 'image/%'));
+    }
+
+    /** ไฟล์แนบล่าสุด 1 รายการ (ถ้ามี) */
+    public function latestAttachment()
+    {
+        return $this->morphOne(\App\Models\Attachment::class, 'attachable')->latestOfMany('id');
+    }
+
     /**
      * Helpers
      */
@@ -130,8 +150,7 @@ class MaintenanceRequest extends Model
     {
         static::creating(function (self $model) {
             if (empty($model->request_no)) {
-                // รูปแบบ MR-YYYY-XXXXXX (จาก id จะยังไม่มีตอน creating)
-                // ใช้เวลา + random ชั่วคราว แล้วค่อย normalize ใน updated event ถ้าต้อง
+                // รูปแบบ MR-YYYY-XXXXXX (ใช้ random ชั่วคราว)
                 $year = now()->format('Y');
                 $rand = strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
                 $model->request_no = "MR-{$year}-{$rand}";
@@ -160,6 +179,16 @@ class MaintenanceRequest extends Model
         if ($from) $q->where('request_date', '>=', $from);
         if ($to)   $q->where('request_date', '<=', $to);
         return $q;
+    }
+
+    /** ค้นหาแบบง่ายใน title/description */
+    public function scopeSearch($q, ?string $term)
+    {
+        if (!$term) return $q;
+        return $q->where(function ($w) use ($term) {
+            $w->where('title', 'like', "%{$term}%")
+              ->orWhere('description', 'like', "%{$term}%");
+        });
     }
 
     /**

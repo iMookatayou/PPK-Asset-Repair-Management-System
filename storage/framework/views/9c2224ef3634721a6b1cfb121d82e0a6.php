@@ -46,31 +46,36 @@ endif;
 unset($__errorArgs, $__bag); ?>
     </div>
 
-    <div>
-      <label class="block text-sm font-medium text-slate-700" for="category">หมวด (legacy)</label>
-      <input id="category" name="category" type="text" class="mt-1 w-full rounded-lg border px-3 py-2"
-             value="<?php echo e(old('category', $asset->category ?? '')); ?>">
-      <?php $__errorArgs = ['category'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> <p class="mt-1 text-sm text-rose-600"><?php echo e($message); ?></p> <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>
+    
+    <div class="hidden">
+      <input type="text" disabled aria-hidden="true">
     </div>
   </div>
 
   
   <?php if(isset($categories)): ?>
     <div>
-      <label class="block text-sm font-medium text-slate-700" for="category_id">หมวด (FK)</label>
-      <select id="category_id" name="category_id" class="mt-1 w-full rounded-lg border px-3 py-2">
-        <option value="">— ไม่ระบุ —</option>
-        <?php $__currentLoopData = $categories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $c): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-          <option value="<?php echo e($c->id); ?>" <?php if(old('category_id', $asset->category_id ?? null) == $c->id): echo 'selected'; endif; ?>><?php echo e($c->name); ?></option>
-        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-      </select>
+      <label class="block text-sm font-medium text-slate-700" for="category_id">หมวดหมู่</label>
+      <?php if (isset($component)) { $__componentOriginal65b27876dc3636d5d043082d984d84ad = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal65b27876dc3636d5d043082d984d84ad = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.search-select','data' => ['name' => 'category_id','id' => 'category_id','items' => $categories,'labelField' => 'name','valueField' => 'id','value' => old('category_id', $asset->category_id ?? null),'placeholder' => '— ไม่ระบุ —']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('search-select'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['name' => 'category_id','id' => 'category_id','items' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($categories),'label-field' => 'name','value-field' => 'id','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(old('category_id', $asset->category_id ?? null)),'placeholder' => '— ไม่ระบุ —']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal65b27876dc3636d5d043082d984d84ad)): ?>
+<?php $attributes = $__attributesOriginal65b27876dc3636d5d043082d984d84ad; ?>
+<?php unset($__attributesOriginal65b27876dc3636d5d043082d984d84ad); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal65b27876dc3636d5d043082d984d84ad)): ?>
+<?php $component = $__componentOriginal65b27876dc3636d5d043082d984d84ad; ?>
+<?php unset($__componentOriginal65b27876dc3636d5d043082d984d84ad); ?>
+<?php endif; ?>
       <?php $__errorArgs = ['category_id'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
@@ -85,12 +90,31 @@ unset($__errorArgs, $__bag); ?>
   <?php if(isset($departments)): ?>
     <div>
       <label class="block text-sm font-medium text-slate-700" for="department_id">หน่วยงาน</label>
-      <select id="department_id" name="department_id" class="mt-1 w-full rounded-lg border px-3 py-2">
-        <option value="">— ไม่ระบุ —</option>
-        <?php $__currentLoopData = $departments; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $d): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-          <option value="<?php echo e($d->id); ?>" <?php if(old('department_id', $asset->department_id ?? null) == $d->id): echo 'selected'; endif; ?>><?php echo e($d->name); ?></option>
-        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-      </select>
+      <?php $hasDepartments = ($departments instanceof \Illuminate\Support\Collection) ? $departments->isNotEmpty() : count($departments ?? []) > 0; ?>
+      <?php if($hasDepartments): ?>
+        <?php if (isset($component)) { $__componentOriginal65b27876dc3636d5d043082d984d84ad = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal65b27876dc3636d5d043082d984d84ad = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.search-select','data' => ['name' => 'department_id','id' => 'department_id','items' => $departments,'labelField' => 'display_name','valueField' => 'id','value' => old('department_id', $asset->department_id ?? null),'placeholder' => '— ไม่ระบุ —']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('search-select'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['name' => 'department_id','id' => 'department_id','items' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($departments),'label-field' => 'display_name','value-field' => 'id','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(old('department_id', $asset->department_id ?? null)),'placeholder' => '— ไม่ระบุ —']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal65b27876dc3636d5d043082d984d84ad)): ?>
+<?php $attributes = $__attributesOriginal65b27876dc3636d5d043082d984d84ad; ?>
+<?php unset($__attributesOriginal65b27876dc3636d5d043082d984d84ad); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal65b27876dc3636d5d043082d984d84ad)): ?>
+<?php $component = $__componentOriginal65b27876dc3636d5d043082d984d84ad; ?>
+<?php unset($__componentOriginal65b27876dc3636d5d043082d984d84ad); ?>
+<?php endif; ?>
+      <?php else: ?>
+        <div class="mt-1 w-full rounded-lg border px-3 py-2 text-slate-400">ยังไม่มีข้อมูลหน่วยงาน (กรุณา seed)</div>
+      <?php endif; ?>
       <?php $__errorArgs = ['department_id'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :

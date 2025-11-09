@@ -21,6 +21,7 @@ class MaintenanceLog extends Model
     public const ACTION_START    = 'start_request';
     public const ACTION_COMPLETE = 'complete_request';
     public const ACTION_CANCEL   = 'cancel_request';
+    public const ACTION_TRANSITION = 'transition';
 
     // เติม created_at อัตโนมัติถ้าไม่ส่งมา
     protected static function booted()

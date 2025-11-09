@@ -31,8 +31,8 @@
       <button onclick="window.print()"
               class="rounded-lg border px-3 py-2 text-zinc-700 hover:bg-zinc-50">Print</button>
 
-      <form method="POST" action="{{ route('assets.destroy', $asset) }}"
-            onsubmit="return confirm('Delete this asset?')">
+  <form method="POST" action="{{ route('assets.destroy', $asset) }}"
+    onsubmit="window.dispatchEvent(new CustomEvent('app:toast',{detail:{type:'info',message:'กำลังลบ...'}})); return confirm('Delete this asset?')">
         @csrf @method('DELETE')
         <button class="rounded-lg border px-3 py-2 text-rose-700 hover:bg-rose-50">Delete</button>
       </form>
@@ -72,8 +72,8 @@
 
       {{-- Meta grid --}}
       <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <x-asset.meta label="Dept"      :value="optional($asset->department)->name ?? '—'" />
-        <x-asset.meta label="Category"  :value="optional($asset->categoryRef)->name ?? ($asset->category ?? '—')" />
+  <x-asset.meta label="Dept"      :value="optional($asset->department)->name ?? '—'" />
+  <x-asset.meta label="Category"  :value="optional($asset->categoryRef)->name ?? '—'" />
         <x-asset.meta label="Location"  :value="$asset->location ?? '—'" />
         <x-asset.meta label="Type"      :value="$asset->type ?? '—'" />
         <x-asset.meta label="Brand / Model" :value="trim(($asset->brand ?? '').' '.($asset->model ?? '')) ?: '—'" />
@@ -106,41 +106,32 @@
   <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
     <div class="rounded-xl border border-zinc-200 bg-white p-5">
       <div class="mb-3 font-medium">Recent Repair Logs</div>
-      @foreach($attachments as $file)
-        @php
-          // ชื่อที่จะแสดง
-          $displayName = $file->original_name
-              ?? $file->filename
-              ?? $file->file_name
-              ?? $file->name
-              ?? ('Attachment #'.$file->id);
-
-          // URL ที่จะเปิด
-          $displayUrl = $file->url
-              ?? $file->public_url     // เผื่อคุณมีคอลัมน์นี้
-              ?? null;                 // ถ้ายังไม่มี ก็ไม่ทำลิงก์
-        @endphp
-
-        <div class="flex items-center justify-between border-b py-2">
-          <div class="truncate text-sm">{{ $displayName }}</div>
-
-          @if($displayUrl)
-            <a href="{{ $displayUrl }}" target="_blank" class="text-emerald-700 hover:underline">Open</a>
-          @else
-            <span class="text-xs text-zinc-500">no link</span>
-          @endif
+      @forelse($logs as $log)
+        <div class="flex items-start justify-between gap-3 border-b py-2">
+          <div class="text-xs text-zinc-500 whitespace-nowrap">{{ $log->created_at?->format('Y-m-d H:i') }}</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium text-zinc-800">{{ str_replace('_',' ', ucfirst($log->action)) }}</div>
+            @if($log->note)
+              <div class="text-xs text-zinc-600 truncate">{{ $log->note }}</div>
+            @endif
+          </div>
         </div>
-      @endforeach
-
+      @empty
+        <div class="text-sm text-zinc-500">No recent logs.</div>
+      @endforelse
     </div>
 
     <div class="rounded-xl border border-zinc-200 bg-white p-5">
       <div class="mb-3 font-medium">Attachments</div>
-      @forelse(($attachments ?? []) as $file)
+      @php $attList = $attachments ?? collect(); @endphp
+      @forelse($attList as $att)
         <div class="flex items-center justify-between border-b py-2">
-          <div class="truncate text-sm">{{ $file->original_name }}</div>
-          <a href="{{ $file->url }}" target="_blank"
-             class="text-emerald-700 hover:underline">Open</a>
+          <div class="truncate text-sm">{{ $att->original_name ?? ('Attachment #'.$att->id) }}</div>
+          @if(!empty($att->url))
+            <a href="{{ $att->url }}" target="_blank" class="text-emerald-700 hover:underline">Open</a>
+          @else
+            <span class="text-xs text-zinc-500">no link</span>
+          @endif
         </div>
       @empty
         <div class="text-sm text-zinc-500">No attachments.</div>

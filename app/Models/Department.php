@@ -9,7 +9,11 @@ class Department extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['code', 'name'];
+    protected $fillable = [
+        'code',
+        'name_th',
+        'name_en',
+    ];
 
     // ===== Relationships =====
     public function assets()
@@ -30,14 +34,50 @@ class Department extends Model
         );
     }
 
+    // ===== Accessors (สำหรับความเข้ากันได้กับโค้ดเดิม) =====
+    // ใช้ $dept->name จะได้ชื่อไทย ถ้าไม่มีไทยจะ fallback เป็นอังกฤษ
+    public function getNameAttribute(): string
+    {
+        return $this->name_th ?: ($this->name_en ?: '');
+    }
+
+    // สำหรับ UI: แสดง "Thai (English)" ถ้ามีทั้งสองภาษา
+    public function getDisplayNameAttribute(): string
+    {
+        $th = trim((string) $this->name_th);
+        $en = trim((string) $this->name_en);
+        if ($th && $en) {
+            return "{$th} ({$en})";
+        }
+        return $th ?: $en;
+    }
+
     // ===== Scopes =====
     public function scopeCode($q, ?string $code)
     {
         return $code ? $q->where('code', $code) : $q;
     }
 
+    // ค้นหาชื่อแบบ like ทั้งไทยและอังกฤษ
     public function scopeNameLike($q, ?string $name)
     {
-        return $name ? $q->where('name', 'like', "%{$name}%") : $q;
+        if (!$name) return $q;
+
+        return $q->where(function ($qq) use ($name) {
+            $qq->where('name_th', 'like', "%{$name}%")
+               ->orWhere('name_en', 'like', "%{$name}%");
+        });
+    }
+
+    // ค้นหาแบบรวม code + ชื่อ (เหมาะกับหน้า index filter เดียว)
+    public function scopeSearch($q, ?string $term)
+    {
+        if (!$term) return $q;
+
+        return $q->where(function ($qq) use ($term) {
+            $qq->where('code', 'like', "%{$term}%")
+               ->orWhere('name_th', 'like', "%{$term}%")
+               ->orWhere('name_en', 'like', "%{$term}%");
+        });
     }
 }

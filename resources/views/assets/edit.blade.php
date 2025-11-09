@@ -49,6 +49,7 @@
     @endif
 
     <form method="POST" action="{{ route('assets.update', $asset) }}"
+      onsubmit="window.dispatchEvent(new CustomEvent('app:toast',{detail:{type:'info',message:'กำลังบันทึก...'}}))"
           class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
       @csrf
       @method('PUT')

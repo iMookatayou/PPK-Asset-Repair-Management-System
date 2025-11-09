@@ -29,9 +29,10 @@
     'cancelled'   => 'ยกเลิก',
   ][strtolower((string)$s)] ?? '-';
 
+  // >>> เปลี่ยน normal -> medium ให้ตรงกับ validation <<<
   $priorityClass = fn(?string $p) => match(strtolower((string)$p)) {
     'low'    => 'ring-1 ring-zinc-300 text-zinc-700 bg-white',
-    'normal' => 'ring-1 ring-sky-300 text-sky-800 bg-white',
+    'medium' => 'ring-1 ring-sky-300 text-sky-800 bg-white',
     'high'   => 'ring-1 ring-amber-300 text-amber-800 bg-white',
     'urgent' => 'ring-1 ring-rose-300 text-rose-800 bg-white',
     default  => 'ring-1 ring-zinc-300 text-zinc-700 bg-white',
@@ -39,7 +40,7 @@
 
   $priorityLabel = fn(?string $p) => [
     'low'    => 'ต่ำ',
-    'normal' => 'ปกติ',
+    'medium' => 'ปานกลาง',
     'high'   => 'สูง',
     'urgent' => 'เร่งด่วน',
   ][strtolower((string)$p)] ?? '-';
@@ -128,7 +129,8 @@
           <select id="priority" name="priority"
                   class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
             <option value="">ทั้งหมด</option>
-            @foreach (['low'=>'ต่ำ','normal'=>'ปกติ','high'=>'สูง','urgent'=>'เร่งด่วน'] as $k=>$v)
+            {{-- >>> เปลี่ยน normal -> medium <<< --}}
+            @foreach (['low'=>'ต่ำ','medium'=>'ปานกลาง','high'=>'สูง','urgent'=>'เร่งด่วน'] as $k=>$v)
               <option value="{{ $k }}" @selected($priority===$k)>{{ $v }}</option>
             @endforeach
           </select>
@@ -163,7 +165,7 @@
             <th class="p-3 text-left font-medium w-[14%]">หน่วยงาน</th>
             <th class="p-3 text-left font-medium w-[10%]">ความสำคัญ</th>
             <th class="p-3 text-left font-medium w-[10%]">สถานะ</th>
-            <th class="p-3 text-right font-medium whitespace-nowrap min-w-[140px]">การดำเนินการ</th>
+            <th class="p-3 text-right font-medium whitespace-nowrap min-w-[200px]">การดำเนินการ</th>
           </tr>
         </thead>
 
@@ -194,14 +196,16 @@
               @endif
             </td>
 
-            {{-- อีเมลผู้แจ้ง: ใช้ null-safe --}}
-            <td class="p-3 text-zinc-700">{{ $row->reporter?->email ?? '-' }}</td>
+            {{-- อีเมลผู้แจ้ง: ใช้จาก Users.email ถ้ามี มิฉะนั้น fallback เป็น reporter_email บนคำขอ --}}
+            <td class="p-3 text-zinc-700">{{ $row->reporter?->email ?? ($row->reporter_email ?? '-') }}</td>
 
-            {{-- หน่วยงาน: ไม่อ้าง reporter->department เพื่อเลี่ยงคอลัมน์ที่ไม่มี --}}
+            {{-- หน่วยงาน: ใช้จาก MaintenanceRequest->department ถ้ามี; ไม่มีก็ลองจาก Asset->department --}}
             @php
-              $deptName = $row->department?->name; // ถ้ามี FK department บน MaintenanceRequest
+              $deptName = $row->department->name
+                          ?? $row->asset?->department?->name
+                          ?? '—';
             @endphp
-            <td class="p-3 text-zinc-700">{{ $deptName ?? '—' }}</td>
+            <td class="p-3 text-zinc-700">{{ $deptName }}</td>
 
             <td class="p-3">
               <span class="rounded-full bg-white px-2 py-1 text-[11px] {{ $priorityClass($row->priority ?? null) }}">
@@ -217,13 +221,26 @@
 
             {{-- การดำเนินการ --}}
             <td class="p-3 text-right whitespace-nowrap">
-              <a href="{{ route('maintenance.requests.show', $row) }}"
-                 class="inline-flex items-center gap-1 text-emerald-700 hover:underline" onclick="showLoader()">
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
-                </svg>
-                <span class="whitespace-nowrap">ดูรายละเอียด</span>
-              </a>
+              <div class="flex justify-end items-center gap-2">
+                <a href="{{ route('maintenance.requests.show', $row) }}"
+                   class="inline-flex items-center gap-1.5 rounded-md border border-indigo-300 px-2.5 md:px-3 py-1.5 text-[11px] md:text-xs font-medium text-indigo-700 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 whitespace-nowrap min-w-[84px] justify-center"
+                   onclick="showLoader()" aria-label="ดูรายละเอียด">
+                  <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
+                  </svg>
+                  <span class="hidden sm:inline">ดูรายละเอียด</span>
+                  <span class="sm:hidden">ดู</span>
+                </a>
+                <a href="{{ route('maintenance.requests.edit', $row) }}"
+                   class="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 px-2.5 md:px-3 py-1.5 text-[11px] md:text-xs font-medium text-emerald-700 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 whitespace-nowrap min-w-[74px] justify-center"
+                   onclick="showLoader()" aria-label="แก้ไข">
+                  <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                  </svg>
+                  <span class="hidden sm:inline">แก้ไข</span>
+                  <span class="sm:hidden">แก้ไข</span>
+                </a>
+              </div>
             </td>
           </tr>
         @empty

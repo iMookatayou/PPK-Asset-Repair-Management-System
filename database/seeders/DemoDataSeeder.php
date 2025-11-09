@@ -136,7 +136,7 @@ class DemoDataSeeder extends Seeder
         }
 
         // ===== Assets =====
-        $types      = ['เครื่องใช้ไฟฟ้า','อุปกรณ์สำนักงาน','คอมพิวเตอร์','เครื่องมือแพทย์'];
+    $types      = ['เครื่องใช้ไฟฟ้า','อุปกรณ์สำนักงาน','คอมพิวเตอร์','เครื่องมือแพทย์']; // mapped to assets.type
         $brands     = ['HP','Dell','Acer','Lenovo','Brother','Mitsubishi','Daikin'];
         $locations  = ['ER','OPD','Ward','Admin','IT Room','Lab'];
 
@@ -146,7 +146,8 @@ class DemoDataSeeder extends Seeder
         $hasSerial        = Schema::hasColumn('assets','serial_number');
         $hasLocation      = Schema::hasColumn('assets','location');
         $hasDeptId        = Schema::hasColumn('assets','department_id');
-        $hasCategoryId    = Schema::hasColumn('assets','category_id');
+    $hasCategoryId    = Schema::hasColumn('assets','category_id');
+    // legacy string column 'category' removed; ignore if still exists
         $hasPurchaseDate  = Schema::hasColumn('assets','purchase_date');
         $hasWarranty      = Schema::hasColumn('assets','warranty_expire');
         $hasStatus        = Schema::hasColumn('assets','status');

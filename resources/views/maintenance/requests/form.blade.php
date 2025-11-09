@@ -1,6 +1,8 @@
 @php
   /** @var \App\Models\MaintenanceRequest|null $req */
-  $priorities = ['low' => 'Low', 'normal' => 'Normal', 'high' => 'High', 'urgent' => 'Urgent'];
+  // priority ต้องใช้ medium (ไม่ใช่ normal)
+  $priorities = ['low' => 'Low', 'medium' => 'Medium', 'high' => 'High', 'urgent' => 'Urgent'];
+
   $defaultReporter = old('reporter_id', (string)($req->reporter_id ?? auth()->id()));
   $assetList = is_iterable($assets ?? null) ? $assets : [];
   $userList  = is_iterable($users ?? null)  ? $users  : [];
@@ -20,10 +22,13 @@
       aria-invalid="@error('asset_id') true @else false @enderror"
       aria-describedby="@error('asset_id') asset_id_error @enderror"
     >
-      <option value="" {{ old('asset_id', $req->asset_id ?? '') === '' ? 'selected' : '' }}>-- Choose Asset --</option>
+      <option value="" {{ old('asset_id', (string)($req->asset_id ?? '')) === '' ? 'selected' : '' }}>-- Choose Asset --</option>
       @foreach ($assetList as $a)
-        <option value="{{ $a->id }}" @selected((string)old('asset_id', (string)($req->asset_id ?? '')) === (string)$a->id)>
-          {{ $a->code ? '#'.$a->code : '#'.$a->id }} — {{ $a->name ?? $a->model ?? 'Asset' }}
+        <option
+          value="{{ $a->id }}"
+          @selected((string)old('asset_id', (string)($req->asset_id ?? '')) === (string)$a->id)
+        >
+          {{ $a->asset_code ? '#'.$a->asset_code : '#'.$a->id }} — {{ $a->name ?? $a->model ?? 'Asset' }}
         </option>
       @endforeach
     </select>
@@ -32,7 +37,7 @@
     @enderror
   </div>
 
-  {{-- Reporter (optional; จะ fallback เป็นผู้ใช้ปัจจุบันถ้าไม่เลือก) --}}
+  {{-- Reporter (optional; will fallback to current user if empty) --}}
   <div>
     <label for="reporter_id" class="block text-sm font-medium text-slate-700">
       Reporter (optional)
@@ -52,6 +57,27 @@
     </select>
     @error('reporter_id')
       <p id="reporter_id_error" class="mt-1 text-sm text-rose-600">{{ $message }}</p>
+    @enderror
+  </div>
+
+  {{-- Reporter Email (optional; ใช้กรณีไม่ได้เลือกผู้ใช้ในระบบ) --}}
+  <div>
+    <label for="reporter_email" class="block text-sm font-medium text-slate-700">
+      Reporter Email (optional)
+    </label>
+    <input
+      id="reporter_email"
+      name="reporter_email"
+      type="email"
+      maxlength="255"
+      value="{{ old('reporter_email', $req->reporter_email ?? '') }}"
+      class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm placeholder-slate-400 focus:border-emerald-600 focus:ring-emerald-600 @error('reporter_email') border-rose-400 ring-rose-200 @enderror"
+      aria-invalid="@error('reporter_email') true @else false @enderror"
+      aria-describedby="@error('reporter_email') reporter_email_error @enderror"
+      placeholder="someone@example.com" />
+    <div class="mt-1 text-xs text-slate-500">หากไม่ได้เลือก Reporter เป็นผู้ใช้ในระบบ สามารถกรอกอีเมลผู้ติดต่อที่นี่</div>
+    @error('reporter_email')
+      <p id="reporter_email_error" class="mt-1 text-sm text-rose-600">{{ $message }}</p>
     @enderror
   </div>
 
@@ -100,7 +126,7 @@
     @enderror
   </div>
 
-  {{-- Priority (use: low|normal|high|urgent) --}}
+  {{-- Priority (use: low|medium|high|urgent) --}}
   <div>
     <label for="priority" class="block text-sm font-medium text-slate-700">
       Priority <span class="text-rose-600" aria-hidden="true">*</span>
@@ -114,7 +140,7 @@
       aria-invalid="@error('priority') true @else false @enderror"
       aria-describedby="@error('priority') priority_error @enderror"
     >
-      @php $priorityValue = old('priority', $req->priority ?? 'normal'); @endphp
+      @php $priorityValue = old('priority', $req->priority ?? 'medium'); @endphp
       @foreach ($priorities as $k => $label)
         <option value="{{ $k }}" @selected($priorityValue === $k)>{{ $label }}</option>
       @endforeach

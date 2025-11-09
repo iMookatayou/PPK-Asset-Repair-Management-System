@@ -6,6 +6,10 @@ use App\Models\Asset;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Symfony\Component\HttpFoundation\Response;
+use App\Support\Toast;
 
 class AssetController extends Controller
 {
@@ -20,16 +24,15 @@ class AssetController extends Controller
     {
         $q          = trim($request->string('q')->toString());
         $status     = $request->string('status')->toString();
-        $type       = $request->string('type')->toString();
-        $category   = $request->string('category')->toString();    // legacy string
-        $categoryId = $request->integer('category_id');            // FK
+    $type       = $request->string('type')->toString();
+    // legacy 'category' string removed; use category_id (FK) instead
+    $categoryId = $request->integer('category_id');
         $deptId     = $request->integer('department_id');
         $location   = $request->string('location')->toString();
 
         $perPageInput = (int) $request->integer('per_page', 20);
         $perPage      = max(1, min($perPageInput, 100));
 
-        // map คอลัมน์ให้ชัดเจน
         $sortMap = [
             'id'              => 'id',
             'asset_code'      => 'asset_code',
@@ -54,24 +57,26 @@ class AssetController extends Controller
             )
             ->when($status !== '', fn($s) => $s->where('status', $status))
             ->when($type !== '', fn($s) => $s->where('type', $type))
-            ->when($category !== '', fn($s) => $s->where('category', $category))
-            ->when(filled($categoryId), fn($s) => $s->where('category_id', $categoryId))
-            ->when(filled($deptId), fn($s) => $s->where('department_id', $deptId))
+            // Use request->filled to avoid treating empty select ("") as 0 which filters out all rows
+            ->when($request->filled('category_id'), fn($s) => $s->where('category_id', $categoryId))
+            ->when($request->filled('department_id'), fn($s) => $s->where('department_id', $deptId))
             ->when($location !== '', fn($s) => $s->where('location', $location))
             ->orderBy($sortBy, $sortDir)
             ->paginate($perPage)
-            ->withQueryString(); // คง query เดิมในลิงก์ถัดไป
+            ->withQueryString();
 
-        return response()->json($assets, 200, [], $this->jsonOptions($request));
+        $payload = $assets->toArray();
+        // ถ้า client ขอ JSON ให้แนบ info toast สำหรับ UX (โหลดข้อมูลสำเร็จ)
+        $payload['toast'] = Toast::info('โหลดรายการทรัพย์สินแล้ว', 1200);
+        return response()->json($payload, 200, [], $this->jsonOptions($request));
     }
 
     public function store(Request $request)
     {
-        $data = $request->validate([
+        $rules = [
             'asset_code'      => ['required','string','max:100','unique:assets,asset_code'],
             'name'            => ['required','string','max:255'],
             'type'            => ['nullable','string','max:100'],
-            'category'        => ['nullable','string','max:100'], // legacy
             'category_id'     => ['nullable','integer','exists:asset_categories,id'],
             'brand'           => ['nullable','string','max:100'],
             'model'           => ['nullable','string','max:100'],
@@ -81,29 +86,53 @@ class AssetController extends Controller
             'purchase_date'   => ['nullable','date'],
             'warranty_expire' => ['nullable','date','after_or_equal:purchase_date'],
             'status'          => ['nullable', Rule::in(['active','in_repair','disposed'])],
-        ]);
+        ];
 
+        $validator = Validator::make($request->all(), $rules);
+        if ($validator->fails()) {
+            $errors = $validator->errors();
+            $fieldsHuman = [
+                'asset_code' => 'รหัสครุภัณฑ์', 'name' => 'ชื่อครุภัณฑ์', 'serial_number' => 'Serial',
+                'category_id' => 'หมวดหมู่', 'department_id' => 'หน่วยงาน', 'warranty_expire' => 'หมดประกัน'
+            ];
+            $bad = collect(array_keys($errors->toArray()))->map(fn($f) => $fieldsHuman[$f] ?? $f)->implode(', ');
+            $msg = $bad ? ('ข้อมูลไม่ถูกต้อง: '.$bad) : 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง';
+
+            if (!$request->expectsJson()) {
+                return redirect()->back()->withErrors($validator)->withInput()
+                    ->with('toast', Toast::warning($msg, 2200));
+            }
+            return response()->json([
+                'errors' => $errors,
+                'toast'  => Toast::warning($msg, 2200),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY, [], $this->jsonOptions($request));
+        }
+
+        $data = $validator->validated();
         $asset = Asset::create($data)->load(['categoryRef','department']);
 
         return response()->json([
             'message' => 'created',
+            'toast'   => Toast::success('สร้างทรัพย์สินเรียบร้อย', 1600),
             'data'    => $asset,
-        ], 201, [], $this->jsonOptions($request));
+        ], Response::HTTP_CREATED, [], $this->jsonOptions($request));
     }
 
     public function show(Asset $asset)
     {
         $asset->load(['categoryRef','department']);
-        return response()->json($asset, 200, [], $this->jsonOptions(request()));
+        return response()->json([
+            'data'  => $asset,
+            'toast' => Toast::info('โหลดข้อมูลทรัพย์สินแล้ว', 1000),
+        ], 200, [], $this->jsonOptions(request()));
     }
 
     public function update(Request $request, Asset $asset)
     {
-        $data = $request->validate([
+        $rules = [
             'asset_code'      => ['sometimes','string','max:100','unique:assets,asset_code,'.$asset->id],
             'name'            => ['sometimes','string','max:255'],
             'type'            => ['nullable','string','max:100'],
-            'category'        => ['nullable','string','max:100'], // legacy
             'category_id'     => ['nullable','integer','exists:asset_categories,id'],
             'brand'           => ['nullable','string','max:100'],
             'model'           => ['nullable','string','max:100'],
@@ -113,20 +142,45 @@ class AssetController extends Controller
             'purchase_date'   => ['nullable','date'],
             'warranty_expire' => ['nullable','date','after_or_equal:purchase_date'],
             'status'          => ['nullable', Rule::in(['active','in_repair','disposed'])],
-        ]);
+        ];
 
+        $validator = Validator::make($request->all(), $rules);
+        if ($validator->fails()) {
+            $errors = $validator->errors();
+            $fieldsHuman = [
+                'asset_code' => 'รหัสครุภัณฑ์', 'name' => 'ชื่อครุภัณฑ์', 'serial_number' => 'Serial',
+                'category_id' => 'หมวดหมู่', 'department_id' => 'หน่วยงาน', 'warranty_expire' => 'หมดประกัน'
+            ];
+            $bad = collect(array_keys($errors->toArray()))->map(fn($f) => $fieldsHuman[$f] ?? $f)->implode(', ');
+            $msg = $bad ? ('ข้อมูลไม่ถูกต้อง: '.$bad) : 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง';
+
+            if (!$request->expectsJson()) {
+                return redirect()->back()->withErrors($validator)->withInput()
+                    ->with('toast', Toast::warning($msg, 2200));
+            }
+            return response()->json([
+                'errors' => $errors,
+                'toast'  => Toast::warning($msg, 2200),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY, [], $this->jsonOptions($request));
+        }
+
+        $data = $validator->validated();
         $asset->update($data);
 
         return response()->json([
             'message' => 'updated',
+            'toast'   => Toast::success('อัปเดตทรัพย์สินเรียบร้อย', 1600),
             'data'    => $asset->load(['categoryRef','department']),
-        ], 200, [], $this->jsonOptions($request));
+        ], Response::HTTP_OK, [], $this->jsonOptions($request));
     }
 
     public function destroy(Asset $asset)
     {
         $asset->delete();
-        return response()->json(['message' => 'deleted'], 200, [], $this->jsonOptions(request()));
+        return response()->json([
+            'message' => 'deleted',
+            'toast'   => Toast::success('ลบทรัพย์สินแล้ว', 1600),
+        ], Response::HTTP_OK, [], $this->jsonOptions(request()));
     }
 
     // ====================== เพจ (Blade) ======================
@@ -134,7 +188,7 @@ class AssetController extends Controller
     {
         $q = trim($request->string('q')->toString());
         $status   = $request->string('status')->toString();
-        $category = $request->string('category')->toString();
+        $categoryId = $request->integer('category_id');
         $sortBy   = $request->string('sort_by', 'id')->toString();
         $sortDir  = strtolower($request->string('sort_dir', 'desc')->toString()) === 'asc' ? 'asc' : 'desc';
 
@@ -142,33 +196,56 @@ class AssetController extends Controller
             'id'         => 'id',
             'asset_code' => 'asset_code',
             'name'       => 'name',
-            'category'   => 'category',
             'status'     => 'status',
+            // virtual key 'category' will sort by related category name
+            'category'   => 'category',
         ];
         $sortCol = $sortMap[$sortBy] ?? 'id';
 
-        $assets = \App\Models\Asset::query()
+        $assetsQ = \App\Models\Asset::query()
             ->with(['categoryRef','department'])
             ->when($q !== '', fn($s) =>
                 $s->where(function ($w) use ($q) {
                     $w->where('asset_code', 'like', "%{$q}%")
-                    ->orWhere('name', 'like', "%{$q}%")
-                    ->orWhere('serial_number', 'like', "%{$q}%");
+                      ->orWhere('name', 'like', "%{$q}%")
+                      ->orWhere('serial_number', 'like', "%{$q}%");
                 })
             )
             ->when($status !== '', fn($s) => $s->where('status', $status))
-            ->when($category !== '', fn($s) => $s->where('category', $category))
-            ->orderBy($sortCol, $sortDir)
-            ->paginate(20)
-            ->withQueryString();
+            // Avoid category_id=0 when select is "ทั้งหมด"
+            ->when($request->filled('category_id'), fn($s) => $s->where('category_id', $categoryId));
 
-        return view('assets.index', compact('assets'));
+        if ($sortCol === 'category') {
+            $assetsQ->orderByRaw('(select name from asset_categories where asset_categories.id = assets.category_id) '.$sortDir);
+        } else {
+            $assetsQ->orderBy($sortCol, $sortDir);
+        }
+
+        $assets = $assetsQ->paginate(20)->withQueryString();
+
+        $categories = \App\Models\AssetCategory::orderBy('name')->get(['id','name']);
+
+        return view('assets.index', compact('assets','categories'));
     }
 
     public function createPage()
     {
-        $departments = \App\Models\Department::orderBy('name')->get(['id','name']);
+        // ดึงคอลัมน์จริงเพื่อให้ accessor บนโมเดลทำงานได้ถูกต้อง (หลีกเลี่ยง alias "name" ชนกับ accessor)
+        $departments = \App\Models\Department::query()
+            ->select(['id','code','name_th','name_en'])
+            ->orderByRaw('COALESCE(name_th, name_en, code) asc')
+            ->get();
+
         $categories  = \App\Models\AssetCategory::orderBy('name')->get(['id','name']);
+
+        // แจ้งเตือนหากยังไม่มีข้อมูลที่จำเป็นสำหรับการสร้างรายการ
+        if ($departments->isEmpty()) {
+            session()->flash('toast', Toast::info('ยังไม่มีข้อมูลหน่วยงาน กรุณา seed หรือเพิ่มใหม่ก่อน', 3200));
+        }
+        if ($categories->isEmpty()) {
+            session()->flash('toast', Toast::info('ยังไม่มีหมวดหมู่ทรัพย์สิน กรุณา seed หรือเพิ่มใหม่ก่อน', 3200));
+        }
+
         return view('assets.create', compact('departments','categories'));
     }
 
@@ -178,7 +255,6 @@ class AssetController extends Controller
             'asset_code'      => ['required','string','max:100','unique:assets,asset_code'],
             'name'            => ['required','string','max:255'],
             'type'            => ['nullable','string','max:100'],
-            'category'        => ['nullable','string','max:100'],
             'category_id'     => ['nullable','integer','exists:asset_categories,id'],
             'brand'           => ['nullable','string','max:100'],
             'model'           => ['nullable','string','max:100'],
@@ -191,7 +267,9 @@ class AssetController extends Controller
         ]);
 
         $asset = \App\Models\Asset::create($data);
-        return redirect()->route('assets.show', $asset)->with('status','Asset created.');
+        return redirect()
+            ->route('assets.show', $asset)
+            ->with('toast', Toast::success('สร้างทรัพย์สินเรียบร้อยแล้ว'));
     }
 
     public function showPage(\App\Models\Asset $asset)
@@ -223,8 +301,22 @@ class AssetController extends Controller
     public function editPage(\App\Models\Asset $asset)
     {
         $asset->load(['categoryRef','department']);
-        $departments = \App\Models\Department::orderBy('name')->get(['id','name']);
+
+        // ดึงคอลัมน์จริงเพื่อให้ accessor ทำงานถูกต้อง (ไม่ alias เป็น name)
+        $departments = \App\Models\Department::query()
+            ->select(['id','code','name_th','name_en'])
+            ->orderByRaw('COALESCE(name_th, name_en, code) asc')
+            ->get();
+
         $categories  = \App\Models\AssetCategory::orderBy('name')->get(['id','name']);
+
+        if ($departments->isEmpty()) {
+            session()->flash('toast', Toast::info('ยังไม่มีข้อมูลหน่วยงาน กรุณา seed หรือเพิ่มใหม่ก่อน', 3200));
+        }
+        if ($categories->isEmpty()) {
+            session()->flash('toast', Toast::info('ยังไม่มีหมวดหมู่ทรัพย์สิน กรุณา seed หรือเพิ่มใหม่ก่อน', 3200));
+        }
+
         return view('assets.edit', compact('asset','departments','categories'));
     }
 
@@ -234,7 +326,6 @@ class AssetController extends Controller
             'asset_code'      => ['sometimes','string','max:100','unique:assets,asset_code,'.$asset->id],
             'name'            => ['sometimes','string','max:255'],
             'type'            => ['nullable','string','max:100'],
-            'category'        => ['nullable','string','max:100'],
             'category_id'     => ['nullable','integer','exists:asset_categories,id'],
             'brand'           => ['nullable','string','max:100'],
             'model'           => ['nullable','string','max:100'],
@@ -247,12 +338,47 @@ class AssetController extends Controller
         ]);
 
         $asset->update($data);
-        return redirect()->route('assets.show', $asset)->with('status','Asset updated.');
+        return redirect()
+            ->route('assets.show', $asset)
+            ->with('toast', Toast::success('อัปเดตรายการทรัพย์สินแล้ว'));
     }
 
     public function destroyPage(\App\Models\Asset $asset)
     {
         $asset->delete();
-        return redirect()->route('assets.index')->with('status','Asset deleted.');
+        return redirect()
+            ->route('assets.index')
+            ->with('toast', Toast::success('ลบทรัพย์สินเรียบร้อยแล้ว'));
+    }
+
+    // ========== Utilities (align with MaintenanceRequestController) ==========
+    protected function respondWithToast(
+        Request $request,
+        array $toast,
+        $webRedirect,
+        array $jsonPayload = [],
+        int $status = Response::HTTP_OK
+    ) {
+        if (!$request->expectsJson()) {
+            return $webRedirect->with('toast', [
+                'type'     => $toast['type']    ?? 'info',
+                'message'  => $toast['message'] ?? '',
+                'position' => $toast['position'] ?? 'tc',
+                'timeout'  => $toast['timeout']  ?? 2000,
+                'size'     => $toast['size']     ?? 'sm',
+            ]);
+        }
+
+        $payload = array_merge($jsonPayload, [
+            'toast' => [
+                'type'     => $toast['type']    ?? 'info',
+                'message'  => $toast['message'] ?? '',
+                'position' => $toast['position'] ?? 'tc',
+                'timeout'  => $toast['timeout']  ?? 2000,
+                'size'     => $toast['size']     ?? 'sm',
+            ],
+        ]);
+
+        return response()->json($payload, $status, [], $this->jsonOptions($request));
     }
 }

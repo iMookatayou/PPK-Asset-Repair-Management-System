@@ -39,7 +39,6 @@ class AssetFactory extends Factory
             'asset_code'      => 'ASSET-'.fake()->unique()->numerify('#####'),
             'name'            => fake()->words(2, true),
             'type'            => $type,                 // ← เพิ่ม type
-            'category'        => $categoryName,         // string เดิม (เพื่อ compatibility)
             'category_id'     => $categoryId,           // ← FK ใหม่ (อาจเป็น null หากยังไม่มี seed)
             'brand'           => fake()->randomElement($brands),
             'model'           => strtoupper(fake()->bothify('??-###')),

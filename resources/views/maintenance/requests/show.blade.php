@@ -28,16 +28,17 @@
     };
 
     $prio = strtolower((string) $req->priority);
+    // ← เปลี่ยน normal -> medium
     $prioLabel = [
       'low'    => 'ต่ำ',
-      'normal' => 'ปกติ',
+      'medium' => 'ปานกลาง',
       'high'   => 'สูง',
       'urgent' => 'เร่งด่วน',
     ][$prio] ?? ($req->priority ?? '—');
 
     $prioTone = match ($prio) {
       'low'    => 'bg-white text-zinc-700 border-zinc-300',
-      'normal' => 'bg-white text-sky-800 border-sky-300',
+      'medium' => 'bg-white text-sky-800 border-sky-300',
       'high'   => 'bg-white text-amber-800 border-amber-300',
       'urgent' => 'bg-white text-rose-800 border-rose-300',
       default  => 'bg-white text-zinc-700 border-zinc-300',
@@ -52,7 +53,7 @@
             <svg class="h-5 w-5 text-emerald-600" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M21 2l-4.2 4.2a4 4 0 01-5.6 5.6L7 16l-3 1 1-3 4.2-4.2a4 4 0 015.6-5.6L21 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            รายละเอียดงานซ่อม <span id="rid">#{{ $req->id }}</span>
+            Repair work details <span id="rid">#{{ $req->id }}</span>
           </h1>
 
           <div class="flex flex-wrap items-center gap-2">
@@ -71,18 +72,18 @@
         <div class="ml-auto flex flex-wrap items-center gap-2">
           <button id="copyIdBtn" type="button"
                   class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50">
-            คัดลอกเลขที่
+            Copy Number
           </button>
           <button type="button" onclick="window.print()"
                   class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50">
-            พิมพ์
+            Print
           </button>
           <a href="{{ route('maintenance.requests.index') }}"
              class="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-700 hover:bg-slate-50 transition">
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            กลับ
+            Back
           </a>
         </div>
       </div>
@@ -109,6 +110,10 @@
           <div>
             <div class="text-slate-500">ผู้แจ้ง</div>
             <div class="font-semibold text-slate-900">{{ $req->reporter->name ?? $req->reporter_name ?? '-' }}</div>
+            @php $contactEmail = $req->reporter->email ?? $req->reporter_email; @endphp
+            @if($contactEmail)
+              <div class="text-slate-600 text-sm mt-0.5">{{ $contactEmail }}</div>
+            @endif
           </div>
           <div>
             <div class="text-slate-500">ทรัพย์สิน</div>
@@ -116,7 +121,7 @@
           </div>
           <div>
             <div class="text-slate-500">สถานที่</div>
-            <div class="font-semibold text-slate-900">{{ $req->location ?? '—' }}</div>
+            <div class="font-semibold text-slate-900">{{ $req->location_text ?? '—' }}</div> {{-- ← ใช้ location_text --}}
           </div>
         </div>
 
@@ -204,11 +209,7 @@
             <button type="submit"
                     class="inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
               บันทึกการดำเนินการ
-            </button>
-            <a href="{{ route('maintenance.requests.index') }}"
-               class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">
-              กลับรายการ
-            </a>
+            </button>          
           </div>
         </form>
       </div>
@@ -254,37 +255,43 @@
           </div>
         </form>
 
-        @if(($req->attachments ?? collect())->count())
+        @php $atts = ($req->attachments ?? collect()); @endphp
+        @if($atts->count())
           <div class="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-            @foreach($req->attachments as $att)
+            @foreach($atts as $att)
               @php
-                $name = $att->original_name ?? basename($att->path ?? '');
-                $isPrivate = (bool) ($att->is_private ?? false);
-                $canOpen = !$isPrivate && ($att->disk ?? 'public') === 'public' && !empty($att->path);
-                $url = $canOpen ? asset('storage/'.$att->path) : '#';
-                $isImg = str_starts_with((string) $att->mime, 'image/');
+                // ใช้ข้อมูลจาก relation file
+                $file = $att->file;       // อาจถูก eager load มาจาก Controller
+                $mime = (string) ($file->mime ?? '');
+                $name = $att->filename;   // original_name หรือ basename(path)
+                $isPrivate = (bool) $att->is_private;
+
+                // URL: public จะได้ URL โดยตรง, private = ใช้ route เพื่อ authorize/ดาวน์โหลด
+                $openUrl = $att->url ?? route('attachments.show', $att);
+                $isImg = $att->is_image;  // อิง mime ในตาราง files
               @endphp
+
               <figure class="overflow-hidden rounded-lg border border-slate-200">
-                @if($isImg && $canOpen)
-                  <a href="{{ $url }}" target="_blank" rel="noopener">
-                    <img src="{{ $url }}" alt="{{ $att->alt_text ?? $name }}" class="h-36 w-full object-cover">
+                @if($isImg && !$isPrivate && $att->url)
+                  {{-- แสดง thumbnail ได้ก็ต่อเมื่อ public --}}
+                  <a href="{{ $openUrl }}" target="_blank" rel="noopener">
+                    <img src="{{ $att->url }}" alt="{{ $att->alt_text ?? $name }}" class="h-36 w-full object-cover">
                   </a>
                 @else
                   <div class="grid h-36 w-full place-items-center text-slate-500">
                     {{ strtoupper(pathinfo($name, PATHINFO_EXTENSION) ?: 'FILE') }}
                   </div>
                 @endif
+
                 <figcaption class="flex items-center justify-between gap-2 px-3 py-2 text-xs">
                   <span class="inline-flex items-center rounded-full border {{ $isPrivate ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-slate-200 bg-slate-50 text-slate-700' }} px-2 py-0.5 font-medium">
                     {{ $isPrivate ? 'private' : 'public' }}
                   </span>
                   <span class="truncate text-slate-600" title="{{ $name }}">{{ $name }}</span>
-                  @if($canOpen)
-                    <a href="{{ $url }}" target="_blank" rel="noopener"
-                       class="inline-flex items-center rounded-md border border-sky-300 bg-sky-50 px-2 py-1 font-medium text-sky-800 hover:bg-sky-100">
-                      เปิด
-                    </a>
-                  @endif
+                  <a href="{{ $openUrl }}" {{ $isPrivate ? '' : 'target=_blank rel=noopener' }}
+                     class="inline-flex items-center rounded-md border border-sky-300 bg-sky-50 px-2 py-1 font-medium text-sky-800 hover:bg-sky-100">
+                    เปิด
+                  </a>
                 </figcaption>
               </figure>
             @endforeach
@@ -295,7 +302,7 @@
       </div>
     </section>
 
-    {{-- ===== ไทม์ไลน์ ===== --}}
+    {{-- ===== ไทม์ไทม์ ===== --}}
     <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div class="p-6">
         <h3 class="text-base font-semibold text-slate-900">ประวัติการดำเนินการ</h3>
@@ -306,7 +313,7 @@
               $tone = 'bg-slate-400';
               if (($log->to ?? null) === 'resolved' || ($log->to ?? null) === 'closed') $tone = 'bg-emerald-600';
               if (($log->to ?? null) === 'cancelled') $tone = 'bg-rose-600';
-              if (($log->to ?? null) === 'in_progress' || ($log->to ?? null) === 'accepted' || ($log->to ?? null) === 'on_hold') $tone = 'bg-amber-600';
+              if (in_array(($log->to ?? null), ['in_progress','accepted','on_hold'], true)) $tone = 'bg-amber-600';
             @endphp
             <article class="relative border-l-2 border-slate-200 pl-6">
               <span class="absolute -left-1.5 top-2 inline-block h-3 w-3 rounded-full {{ $tone }}"></span>
@@ -315,9 +322,11 @@
                 <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700">
                   {{ ($log->from ?? '—') }} → {{ ($log->to ?? '—') }}
                 </span>
-                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700">
-                  <time datetime="{{ $log->created_at->toIso8601String() }}">{{ $log->created_at->format('Y-m-d H:i') }}</time>
-                </span>
+                @if($log->created_at)
+                  <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700">
+                    <time datetime="{{ $log->created_at->toIso8601String() }}">{{ $log->created_at->format('Y-m-d H:i') }}</time>
+                  </span>
+                @endif
                 @if($log->user?->name ?? $log->user_id)
                   <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700">
                     โดย {{ $log->user->name ?? ('#'.$log->user_id) }}

@@ -85,17 +85,20 @@
           </select>
         </div>
 
-        {{-- หมวดหมู่ --}}
+        {{-- หมวดหมู่ (FK) --}}
         <div class="md:col-span-3">
-          <label for="category" class="mb-1 block text-[12px] text-zinc-600">หมวดหมู่</label>
-          <input id="category" type="text" name="category" value="{{ request('category') }}"
-                 placeholder="เช่น คอมพิวเตอร์ / เครื่องพิมพ์"
-                 class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-600">
+          <label for="category_id" class="mb-1 block text-[12px] text-zinc-600">หมวดหมู่</label>
+          <select id="category_id" name="category_id" class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
+            <option value="">ทั้งหมด</option>
+            @foreach(($categories ?? []) as $c)
+              <option value="{{ $c->id }}" @selected((string)request('category_id') === (string)$c->id)>{{ $c->name }}</option>
+            @endforeach
+          </select>
         </div>
 
         {{-- ปุ่ม --}}
         <div class="md:col-span-1 flex items-end justify-end gap-2">
-          @if(request()->hasAny(['q','status','category','sort_by','sort_dir']))
+          @if(request()->hasAny(['q','status','category_id','sort_by','sort_dir']))
             <a href="{{ route('assets.index') }}"
                class="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50">
               ล้างค่า
@@ -133,7 +136,7 @@
                 <a class="text-emerald-700 hover:underline" href="{{ route('assets.show',$a) }}">{{ $a->name }}</a>
                 <div class="text-xs text-zinc-500">S/N: {{ $a->serial_number ?? '—' }}</div>
               </td>
-              <td class="p-3 hidden xl:table-cell text-zinc-700">{{ $a->category ?? '—' }}</td>
+              <td class="p-3 hidden xl:table-cell text-zinc-700">{{ optional($a->categoryRef)->name ?? '—' }}</td>
               <td class="p-3 hidden lg:table-cell text-zinc-700">{{ $a->location ?? '—' }}</td>
               <td class="p-3">
                 <span class="rounded-full px-2 py-1 text-[11px] ring-1 {{ $statusBadge($a->status) }}">
@@ -141,7 +144,18 @@
                 </span>
               </td>
               <td class="p-3 text-right whitespace-nowrap">
-                <a href="{{ route('assets.edit',$a) }}" class="text-emerald-700 hover:underline">แก้ไข</a>
+                <div class="flex items-center justify-end gap-2">
+                  <a href="{{ route('assets.show',$a) }}"
+              class="inline-flex items-center gap-1.5 rounded-md border border-indigo-300 px-2.5 md:px-3 py-1.5 text-[11px] md:text-xs font-medium text-indigo-700 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 whitespace-nowrap min-w-[84px] justify-center" aria-label="ดูรายละเอียดทรัพย์สิน">
+                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg>
+                    <span class="hidden sm:inline">ดูรายละเอียด</span><span class="sm:hidden">ดู</span>
+                  </a>
+                  <a href="{{ route('assets.edit',$a) }}"
+              class="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 px-2.5 md:px-3 py-1.5 text-[11px] md:text-xs font-medium text-emerald-700 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 whitespace-nowrap min-w-[74px] justify-center" aria-label="แก้ไขทรัพย์สิน">
+                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                    <span class="hidden sm:inline">แก้ไข</span><span class="sm:hidden">แก้</span>
+                  </a>
+                </div>
               </td>
             </tr>
           @empty
@@ -171,14 +185,20 @@
 
         <div class="mt-3 grid grid-cols-2 gap-2 text-sm">
           <div class="text-zinc-500">Category</div>
-          <div>{{ $a->category ?? '—' }}</div>
+          <div>{{ optional($a->categoryRef)->name ?? '—' }}</div>
           <div class="text-zinc-500">Location</div>
           <div>{{ $a->location ?? '—' }}</div>
         </div>
 
-        <div class="mt-3 text-right">
+        <div class="mt-3 flex justify-end gap-2">
+          <a href="{{ route('assets.show',$a) }}"
+         class="inline-flex items-center gap-1.5 rounded-md border border-indigo-300 px-3 py-2 text-xs font-medium text-indigo-700 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-600" aria-label="ดูรายละเอียดทรัพย์สิน">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg>
+            ดู
+          </a>
           <a href="{{ route('assets.edit',$a) }}"
-             class="inline-flex items-center rounded-md px-3 py-2 border border-zinc-300 hover:bg-zinc-50">
+         class="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600" aria-label="แก้ไขทรัพย์สิน">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
             แก้ไข
           </a>
         </div>

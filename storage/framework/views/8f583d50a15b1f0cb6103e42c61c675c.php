@@ -28,6 +28,34 @@
   </div>
 <?php $__env->stopSection(); ?>
 
+<?php $__env->startPush('scripts'); ?>
+<script>
+  // Client-side assist: warn user immediately if required fields are missing
+  (function(){
+    const form = document.querySelector('form[aria-label="แบบฟอร์มสร้างคำขอซ่อม"]');
+    if (!form) return;
+    form.addEventListener('submit', function(e){
+      const reqs = [
+        { id: 'title', label: 'หัวข้อ' },
+        { id: 'priority', label: 'ระดับความสำคัญ' }
+      ];
+      const missing = [];
+      for (const r of reqs){
+        const el = document.getElementById(r.id);
+        const val = (el && (el.value ?? '').toString().trim());
+        if (!val) missing.push(r.label);
+      }
+      if (missing.length){
+        e.preventDefault(); // ป้องกัน POST และแจ้งเตือนแบบไม่ trigger global loader
+        const msg = 'กรุณากรอกให้ครบ: ' + missing.join(', ') + ' • ช่องอื่นๆ เช่น รายละเอียด/ไฟล์แนบ ไม่บังคับ';
+        if (window.showToast) window.showToast({ type:'warning', message: msg, position:'uc', timeout: 2600, size:'lg' });
+        try{ reqs.find(r => missing.includes(r.label)) && document.getElementById(reqs.find(r => missing.includes(r.label)).id)?.focus(); }catch(_){ }
+      }
+    });
+  })();
+</script>
+<?php $__env->stopPush(); ?>
+
 <?php $__env->startSection('content'); ?>
   <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
 
@@ -61,7 +89,7 @@
             <?php $field='asset_id'; ?>
             <div>
               <label for="<?php echo e($field); ?>" class="block text-sm font-medium text-slate-700">
-                ทรัพย์สิน
+                ทรัพย์สิน <span class="ml-1 text-xs text-slate-500">(ไม่บังคับ)</span>
               </label>
               <select id="<?php echo e($field); ?>" name="<?php echo e($field); ?>"
                       class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-emerald-600 focus:ring-emerald-600 <?php $__errorArgs = [$field];
@@ -83,8 +111,8 @@ unset($__errorArgs, $__bag); ?>>
                 <option value="">— เลือกทรัพย์สิน —</option>
                 <?php $assetList = is_iterable($assets ?? null) ? $assets : []; ?>
                 <?php $__currentLoopData = $assetList; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $a): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                  <option value="<?php echo e($a->id); ?>" <?php if(old($field) == $a->id): echo 'selected'; endif; ?>>
-                    <?php echo e($a->code ?? '—'); ?> — <?php echo e($a->name); ?>
+                  <option value="<?php echo e($a->id); ?>" <?php if(old($field) == $a->id): echo 'selected'; endif; ?>">
+                    <?php echo e($a->asset_code ?? '—'); ?> — <?php echo e($a->name); ?>
 
                   </option>
                 <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
@@ -103,7 +131,7 @@ unset($__errorArgs, $__bag); ?>
             <?php $field='reporter_id'; ?>
             <div>
               <label for="<?php echo e($field); ?>" class="block text-sm font-medium text-slate-700">
-                ผู้แจ้ง (ถ้าทำเรื่องแทน)
+                ผู้แจ้ง (ถ้าทำเรื่องแทน) <span class="ml-1 text-xs text-slate-500">(ไม่บังคับ)</span>
               </label>
               <select id="<?php echo e($field); ?>" name="<?php echo e($field); ?>"
                       class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-emerald-600 focus:ring-emerald-600 <?php $__errorArgs = [$field];
@@ -125,7 +153,7 @@ unset($__errorArgs, $__bag); ?>>
                 <option value="">— ใช้ผู้ใช้งานปัจจุบัน —</option>
                 <?php $userList = is_iterable($users ?? null) ? $users : []; ?>
                 <?php $__currentLoopData = $userList; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $u): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                  <option value="<?php echo e($u->id); ?>" <?php if(old($field, auth()->id()) == $u->id): echo 'selected'; endif; ?>>
+                  <option value="<?php echo e($u->id); ?>" <?php if(old($field, auth()->id()) == $u->id): echo 'selected'; endif; ?>">
                     <?php echo e($u->name); ?>
 
                   </option>
@@ -153,10 +181,11 @@ unset($__errorArgs, $__bag); ?>
             <?php $field='title'; ?>
             <div class="md:col-span-2">
               <label for="<?php echo e($field); ?>" class="block text-sm font-medium text-slate-700">
-                หัวข้อ <span class="text-rose-600">*</span>
+                หัวข้อ <span class="text-rose-600">*</span> <span class="ml-1 text-xs text-slate-500">(จำเป็น)</span>
               </label>
-              <input id="<?php echo e($field); ?>" name="<?php echo e($field); ?>" type="text" required autocomplete="off"
+              <input id="<?php echo e($field); ?>" name="<?php echo e($field); ?>" type="text" required aria-required="true" autocomplete="off"
                      placeholder="สรุปสั้น ๆ ชัดเจน (เช่น แอร์รั่วน้ำ ห้อง 302)"
+                     maxlength="150"
                      class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-emerald-600 focus:ring-emerald-600 <?php $__errorArgs = [$field];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
@@ -180,7 +209,7 @@ unset($__errorArgs, $__bag); ?>
             
             <?php $field='description'; ?>
             <div class="md:col-span-2">
-              <label for="<?php echo e($field); ?>" class="block text-sm font-medium text-slate-700">รายละเอียด</label>
+              <label for="<?php echo e($field); ?>" class="block text-sm font-medium text-slate-700">รายละเอียด <span class="ml-1 text-xs text-slate-500">(ไม่บังคับ)</span></label>
               <textarea id="<?php echo e($field); ?>" name="<?php echo e($field); ?>" rows="5"
                         placeholder="อาการ เกิดเมื่อไร มีรูป/ลิงก์ประกอบ ฯลฯ"
                         class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-emerald-600 focus:ring-emerald-600 <?php $__errorArgs = [$field];
@@ -209,13 +238,14 @@ unset($__errorArgs, $__bag); ?>
           <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
             <?php
               $field='priority';
-              $priorities=['low'=>'ต่ำ','normal'=>'ปกติ','high'=>'สูง','urgent'=>'ด่วน'];
+              // ปรับให้ตรงกับ validation/migration: low|medium|high|urgent
+              $priorities=['low'=>'ต่ำ','medium'=>'ปานกลาง','high'=>'สูง','urgent'=>'ด่วน'];
             ?>
             <div>
               <label for="<?php echo e($field); ?>" class="block text-sm font-medium text-slate-700">
-                ระดับความสำคัญ <span class="text-rose-600">*</span>
+                ระดับความสำคัญ <span class="text-rose-600">*</span> <span class="ml-1 text-xs text-slate-500">(จำเป็น)</span>
               </label>
-              <select id="<?php echo e($field); ?>" name="<?php echo e($field); ?>" required
+              <select id="<?php echo e($field); ?>" name="<?php echo e($field); ?>" required aria-required="true"
                       class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-emerald-600 focus:ring-emerald-600 <?php $__errorArgs = [$field];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
@@ -225,7 +255,7 @@ if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>">
                 <?php $__currentLoopData = $priorities; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $k=>$label): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                  <option value="<?php echo e($k); ?>" <?php if(old($field, 'normal') === $k): echo 'selected'; endif; ?>><?php echo e($label); ?></option>
+                  <option value="<?php echo e($k); ?>" <?php if(old($field, 'medium') === $k): echo 'selected'; endif; ?>><?php echo e($label); ?></option>
                 <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
               </select>
               <?php $__errorArgs = [$field];
@@ -242,7 +272,7 @@ unset($__errorArgs, $__bag); ?>
             <?php $field='request_date'; ?>
             <div>
               <label for="<?php echo e($field); ?>" class="block text-sm font-medium text-slate-700">
-                วันที่แจ้ง
+                วันที่แจ้ง <span class="ml-1 text-xs text-slate-500">(ไม่บังคับ)</span>
               </label>
               <input id="<?php echo e($field); ?>" name="<?php echo e($field); ?>" type="date"
                      class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-emerald-600 focus:ring-emerald-600 <?php $__errorArgs = [$field];
@@ -274,7 +304,7 @@ unset($__errorArgs, $__bag); ?>
           <div class="mt-3">
             <?php $field='files'; ?>
             <label for="<?php echo e($field); ?>" class="block text-sm font-medium text-slate-700">
-              เลือกไฟล์ (Images / PDF)
+              เลือกไฟล์ (Images / PDF) <span class="ml-1 text-xs text-slate-500">(ไม่บังคับ)</span>
             </label>
             <input id="<?php echo e($field); ?>" name="<?php echo e($field); ?>[]"
                    type="file" multiple

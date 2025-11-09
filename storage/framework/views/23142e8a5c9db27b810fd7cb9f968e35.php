@@ -184,8 +184,8 @@
                     <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/>
                     </svg>
-                    <span class="hidden sm:inline">Edit</span>
-                    <span class="sm:hidden">Edit</span>
+                    <span class="hidden sm:inline">แก้ไข</span>
+                    <span class="sm:hidden">แก้ไข</span>
                   </a>
                   <?php if($u->id !== auth()->id()): ?>
                     <form method="POST" action="<?php echo e(route('admin.users.destroy', $u)); ?>" onsubmit="return confirm('Delete this user?');">
@@ -196,8 +196,8 @@
                         <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                           <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/>
                         </svg>
-                        <span class="hidden sm:inline">Delete</span>
-                        <span class="sm:hidden">Del</span>
+                        <span class="hidden sm:inline">ลบ</span>
+                        <span class="sm:hidden">ลบ</span>
                       </button>
                     </form>
                   <?php endif; ?>

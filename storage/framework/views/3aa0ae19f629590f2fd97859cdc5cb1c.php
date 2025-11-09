@@ -9,15 +9,16 @@
   // Base fields
   $type     = $toast['type']     ?? null;      // success|info|warning|error
   $message  = $toast['message']  ?? null;
-  $position = $toast['position'] ?? 'center';      // tr|tl|br|bl|center|tc|bc
+  $position = $toast['position'] ?? 'uc';      // tr|tl|br|bl|center|tc|bc|uc
   $timeout  = (int)($toast['timeout'] ?? 3200);
   $size     = $toast['size']     ?? 'lg';      // sm|md|lg
 
   // ===== map error/status → toast อัตโนมัติ =====
-  $firstError = ($errors ?? null)?->first();
+  $firstError = (isset($errors) && method_exists($errors,'first') && $errors->any()) ? $errors->first() : null;
   if (!$message && $firstError) {
-      $message = $firstError;
-      $type    = $type ?: 'error';
+    $message = $firstError;
+    // ใช้ warning สำหรับฟอร์มไม่ผ่าน เพื่อสอดคล้องกับ UX ของระบบ (Alert)
+    $type    = $type ?: 'warning';
   }
   if (!$message && session('error')) {
       $message = session('error');
@@ -28,12 +29,17 @@
       $type    = $type ?: 'success';
   }
 
-  // ===== Lottie map (แก้ให้ถูกต้อง) =====
+  // ===== Lottie map (บังคับ scheme ให้ตรงกับหน้า ป้องกัน Mixed Content) =====
+  $isHttps = request()->isSecure();
+  $link = function(string $path) use ($isHttps) {
+      return $isHttps ? secure_asset($path) : asset($path);
+  };
+  // เส้นทาง asset() ต้องไม่ใส่ /public นำหน้า (Laravel จะชี้ไป public/ ให้อัตโนมัติ)
   $lottieMap = [
-    'success' => asset('lottie/lock_with_green_tick.json'),
-    'info'    => asset('lottie/lock_with_blue_info.json'),
-    'warning' => asset('lottie/lock_with_yellow_alert.json'),
-    'error'   => asset('lottie/lock_with_red_tick.json'),
+    'success' => $link('lottie/lock_with_green_tick.json'),
+    'info'    => $link('lottie/lock_with_blue_info.json'),
+    'warning' => $link('lottie/lock_with_yello_alert.json'), // yello ตามชื่อไฟล์จริง
+    'error'   => $link('lottie/lock_with_red_tick.json'),
   ];
 ?>
 
@@ -46,6 +52,8 @@
   .toast-pos.bl{align-items:flex-end;justify-content:flex-start}
   .toast-pos.center{align-items:center;justify-content:center}
   .toast-pos.tc{align-items:flex-start;justify-content:center;padding-top:calc(var(--topbar-h,0px) + .75rem)}
+  /* upper-center (ระหว่าง top กับ center เลื่อนลงมาเล็กน้อย) */
+  .toast-pos.uc{align-items:flex-start;justify-content:center;padding-top:15vh}
   .toast-pos.bc{align-items:flex-end;justify-content:center;padding-bottom:.75rem}
 
   /* ============ Design tokens ============ */
@@ -134,16 +142,16 @@
 <div class="toast-overlay" aria-live="polite" aria-atomic="true"></div>
 
 
-<script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js" defer></script>
+<script id="lottie-player-loader" src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js" async></script>
 
 <script>
 (function(){
   // ===== แผนที่ไฟล์ Lottie จาก PHP =====
   const LOTTIE = {
-    success: <?php echo json_encode($lottieMap['success'], 15, 512) ?>,
-    info:    <?php echo json_encode($lottieMap['info'], 15, 512) ?>,
-    warning: <?php echo json_encode($lottieMap['warning'], 15, 512) ?>,
-    error:   <?php echo json_encode($lottieMap['error'], 15, 512) ?>,
+    success: <?php echo json_encode($lottieMap['success'] ?? null, 15, 512) ?>,
+    info:    <?php echo json_encode($lottieMap['info'] ?? null, 15, 512) ?>,
+    warning: <?php echo json_encode($lottieMap['warning'] ?? null, 15, 512) ?>,
+    error:   <?php echo json_encode($lottieMap['error'] ?? null, 15, 512) ?>,
   };
 
   // ตั้งค่าเป็นค่า truthy ('tc' ฯลฯ) หากอยาก "บังคับ" ตำแหน่งทั้งหมดให้ตรงกัน
@@ -168,7 +176,7 @@
   */
   function showToast({type='info', message='', position='tc', timeout=3200, size='lg'} = {}){
     position = FORCE_POSITION || position || 'tc';
-    const allowed = ['tr','tl','br','bl','center','tc','bc'];
+  const allowed = ['tr','tl','br','bl','center','tc','bc','uc'];
     if (!allowed.includes(position)) position = 'tc';
     timeout = Number(timeout) || 3200;
 
@@ -183,7 +191,25 @@
     const icon = document.createElement('div');
     icon.className = 'toast-icon';
     const src = LOTTIE[type] || LOTTIE.success;
-    icon.innerHTML = `<lottie-player src="${src}" style="width:var(--toast-icon);height:var(--toast-icon)" background="transparent" speed="1" autoplay></lottie-player>`;
+    function renderPlaceholder(){
+      icon.innerHTML = `<span style=\"display:inline-block;width:var(--toast-icon);height:var(--toast-icon);border-radius:50%;background:#e2e8f0\"></span>`;
+    }
+    function renderLottie(){
+      if (!src) return renderPlaceholder();
+      icon.innerHTML = `<lottie-player src="${src}" renderer="svg" style="width:var(--toast-icon);height:var(--toast-icon)" background="transparent" speed="1" autoplay></lottie-player>`;
+    }
+    try{
+      if (window.customElements && (customElements.get('lottie-player') || customElements.whenDefined)){
+        if (customElements.get('lottie-player')) {
+          renderLottie();
+        } else {
+          renderPlaceholder();
+          customElements.whenDefined('lottie-player').then(renderLottie).catch(()=>{});
+        }
+      } else {
+        renderLottie();
+      }
+    } catch (e){ renderPlaceholder(); }
 
     // message (ใช้ textContent เพื่อความปลอดภัย)
     const msg = document.createElement('div');
@@ -251,15 +277,20 @@
 
   // ===== ยิงอัตโนมัติถ้ามีค่าใน session =====
   <?php if($type && $message): ?>
-  document.addEventListener('DOMContentLoaded', function(){
-    window.showToast({
+  (function fireToastNowOrReady(){
+    const payload = {
       type: <?php echo json_encode($type, 15, 512) ?>,
       message: <?php echo json_encode($message, 15, 512) ?>,
       position: <?php echo json_encode($position, 15, 512) ?>,
       timeout: <?php echo json_encode($timeout, 15, 512) ?>,
       size: <?php echo json_encode($size ?? 'lg', 15, 512) ?>
-    });
-  });
+    };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => window.showToast(payload), { once: true });
+    } else {
+      window.showToast(payload);
+    }
+  })();
   <?php endif; ?>
 })();
 </script>

@@ -49,6 +49,7 @@
     <?php endif; ?>
 
     <form method="POST" action="<?php echo e(route('assets.update', $asset)); ?>"
+      onsubmit="window.dispatchEvent(new CustomEvent('app:toast',{detail:{type:'info',message:'กำลังบันทึก...'}}))"
           class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
       <?php echo csrf_field(); ?>
       <?php echo method_field('PUT'); ?>

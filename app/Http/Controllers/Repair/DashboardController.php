@@ -17,12 +17,15 @@ class DashboardController extends Controller
         $hasCreatedAt     = Schema::hasColumn('maintenance_requests','created_at');
         $hasCompletedDate = Schema::hasColumn('maintenance_requests','completed_date');
         $hasCompletedAt   = Schema::hasColumn('maintenance_requests','completed_at');
+        $hasMrDeptId      = Schema::hasColumn('maintenance_requests','department_id');
 
-        $hasAssets  = Schema::hasTable('assets');
-        $hasType    = $hasAssets && Schema::hasColumn('assets','type');
-        $hasDeptTbl = Schema::hasTable('departments');
-        $hasDeptCol = $hasDeptTbl && Schema::hasColumn('departments', 'name');
-        $hasDeptId  = $hasAssets && Schema::hasColumn('assets', 'department_id');
+        $hasAssets        = Schema::hasTable('assets');
+        $hasType          = $hasAssets && Schema::hasColumn('assets','type');
+        $hasAssetDeptId   = $hasAssets && Schema::hasColumn('assets','department_id');
+
+        $hasDeptTbl       = Schema::hasTable('departments');
+        $hasDeptNameTh    = $hasDeptTbl && Schema::hasColumn('departments','name_th');
+        $hasDeptNameEn    = $hasDeptTbl && Schema::hasColumn('departments','name_en');
 
         // ===== Base query (ALIAS) =====
         $base = DB::table('maintenance_requests as mr');
@@ -102,17 +105,43 @@ class DashboardController extends Controller
             ->take(9)->values();
 
         // ===== By Department (Top 8) =====
-        if ($hasAssets && $hasDeptTbl && $hasDeptCol && $hasDeptId) {
-            $byDept = (clone $base)
-                ->leftJoin('assets as a','a.id','=','mr.asset_id')
-                ->leftJoin('departments as d','d.id','=','a.department_id')
-                ->selectRaw('COALESCE(d.name,"ไม่ระบุ") as dept, COUNT(*) as cnt')
-                ->groupBy('dept')->orderByDesc('cnt')->limit(8)->get()
-                ->map(fn($r)=> ['dept'=>(string)$r->dept, 'cnt'=>(int)$r->cnt]);
+        if ($hasDeptTbl && ($hasDeptNameTh || $hasDeptNameEn)) {
+            $qDept = (clone $base);
+
+            // Join asset (เผื่อ fallback)
+            if ($hasAssets) {
+                $qDept->leftJoin('assets as a','a.id','=','mr.asset_id');
+            }
+
+            // Join dept จาก MR โดยตรง (หลัก)
+            if ($hasMrDeptId) {
+                $qDept->leftJoin('departments as d_mr','d_mr.id','=','mr.department_id');
+            }
+
+            // Join dept จาก Asset เป็นสำรอง
+            if ($hasAssetDeptId) {
+                $qDept->leftJoin('departments as d_a','d_a.id','=','a.department_id');
+            }
+
+            // label: d_mr ก่อน, แล้วค่อย d_a, จากนั้น 'ไม่ระบุ'
+            $labelSqlParts = [];
+            if ($hasDeptNameTh) $labelSqlParts[] = "NULLIF(TRIM(d_mr.name_th),'')";
+            if ($hasDeptNameEn) $labelSqlParts[] = "NULLIF(TRIM(d_mr.name_en),'')";
+            if ($hasDeptNameTh) $labelSqlParts[] = "NULLIF(TRIM(d_a.name_th),'')";
+            if ($hasDeptNameEn) $labelSqlParts[] = "NULLIF(TRIM(d_a.name_en),'')";
+
+            $coalesce = 'COALESCE(' . implode(',', $labelSqlParts) . ", 'ไม่ระบุ')";
+            $byDept = $qDept
+                ->selectRaw("$coalesce as dept, COUNT(*) as cnt")
+                ->groupBy('dept')
+                ->orderByDesc('cnt')
+                ->limit(8)
+                ->get()
+                ->map(fn($r)=> ['dept'=>(string)$r->dept, 'cnt'=>(int)$r->cnt])
+                ->values();
         } else {
             $byDept = $totalReq > 0 ? collect([['dept'=>'ไม่ระบุ','cnt'=>$totalReq]]) : collect();
         }
-        $byDept = collect($byDept)->take(8)->values();
 
         // ===== Recent 12 =====
         $recentQ = (clone $base);
@@ -159,11 +188,10 @@ class DashboardController extends Controller
         });
 
         // ===== Toast: แจ้งผลการค้นหา/กรอง =====
-        // ยิง toast เฉพาะเมื่อมีการใส่ filter อย่างน้อย 1 อย่าง
         if ($hasFilter) {
             if ($stats['total'] > 0) {
                 $req->session()->flash('toast', [
-                    'type'     => 'success', 
+                    'type'     => 'success',
                     'message'  => "ค้นหาแล้ว: พบ {$stats['total']} รายการ",
                     'position' => 'tc',
                     'timeout'  => 2800,

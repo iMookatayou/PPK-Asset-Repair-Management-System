@@ -12,6 +12,11 @@ class DatabaseSeeder extends Seeder
             DepartmentSeeder::class,
             DevAdminSeeder::class,
             DemoDataSeeder::class,
+            MaintenanceRequestSeeder::class,
+            MaintenanceLogSeeder::class,
+            AssetCategorySeeder::class,
+            AssetSeeder::class,
+            ChatSeeder::class,
         ]);
     }
 }

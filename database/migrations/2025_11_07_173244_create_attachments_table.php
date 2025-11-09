@@ -10,33 +10,30 @@ return new class extends Migration {
         Schema::create('attachments', function (Blueprint $table) {
             $table->id();
 
-            // เป้าหมายแบบ polymorphic: ใช้ซ้ำได้ทุกโมดูล
-            $table->morphs('attachable'); // attachable_type, attachable_id (indexed)
+            // ชี้ไปยังไฟล์จริง (ต้องมีตาราง files ก่อน)
+            $table->foreignId('file_id')
+                  ->constrained('files')
+                  ->cascadeOnDelete();
 
-            // ข้อมูลไฟล์หลัก
+            // เป้าหมายแบบ polymorphic: แนบได้ทุกโมดูล
+            $table->morphs('attachable'); // attachable_type + attachable_id + index
+
+            // ชื่อไฟล์ตอนอัปโหลด (เพื่อแสดงผลเท่านั้น)
             $table->string('original_name', 255);
             $table->string('extension', 16)->nullable();
-            $table->string('path', 2048);                  // storage key / path
-            $table->string('disk', 50)->default('public'); // local|public|s3
-            $table->string('mime', 100)->nullable();
-            $table->unsignedBigInteger('size')->nullable();
-            $table->string('checksum_sha256', 64)->nullable()->unique(); // กันไฟล์ซ้ำ / ตรวจครบถ้วน
 
             // การแสดงผล / ลำดับ
             $table->string('caption', 512)->nullable();
             $table->string('alt_text', 512)->nullable();
             $table->unsignedInteger('order_column')->default(0);
 
-            // ความเป็นส่วนตัว & ความสัมพันธ์เวอร์ชัน (เช่น thumbnail ของไฟล์แม่)
+            // ความเป็นส่วนตัว
             $table->boolean('is_private')->default(false);
-            $table->foreignId('variant_of_id')->nullable()
-                  ->constrained('attachments')->nullOnDelete();
 
-            // audit & meta
+            // ผู้ใช้ที่อัปโหลด + ช่องทาง
             $table->foreignId('uploaded_by')->nullable()
                   ->constrained('users')->nullOnDelete();
-            $table->string('source', 32)->default('web'); // web|api|import...
-            $table->json('meta')->nullable();             // exif,width,height,duration,...
+            $table->string('source', 32)->default('web'); // web|api|import|job|seed ...
 
             // นโยบายเก็บรักษา
             $table->timestamp('expires_at')->nullable();
@@ -45,9 +42,12 @@ return new class extends Migration {
             $table->softDeletes();
 
             // Indexes ที่ใช้จริง
-            $table->index(['attachable_type', 'attachable_id', 'created_at']);
-            $table->index(['mime']);
-            $table->index(['is_private']);
+            $table->index(['attachable_type', 'attachable_id', 'created_at'], 'attachments_target_created_idx');
+            $table->index(['is_private'], 'attachments_is_private_idx');
+            $table->index(['uploaded_by'], 'attachments_uploaded_by_idx');
+
+            // กันแนบไฟล์เดียวกันซ้ำกับ target เดิม (ถ้าไม่ต้องการ uniqueness ให้คอมเมนต์ออก)
+            $table->unique(['attachable_type', 'attachable_id', 'file_id'], 'attachments_unique_per_target');
         });
     }
 

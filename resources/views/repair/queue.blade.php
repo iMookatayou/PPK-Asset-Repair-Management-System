@@ -34,7 +34,7 @@
 <div class="w-full px-4 md:px-6 lg:px-8 flex flex-col gap-5">
 
   {{-- ===== ส่วนหัวแบบราชการ ===== --}}
-  <div class="rounded-lg border border-zinc-300 bg-white">
+  <div class="rounded-lg border border-zinc-300 bg-white" id="queueTableWrapper">
     <div class="px-5 py-4">
       <div class="flex flex-wrap items-start justify-between gap-4">
         {{-- ชื่อหน้า --}}
@@ -127,7 +127,7 @@
   </div>
 
   {{-- ===== ตารางรายการ (โทนเรียบ ขอบชัด) ===== --}}
-  <div class="rounded-lg border border-zinc-300 bg-white overflow-hidden">
+  <div class="rounded-lg border border-zinc-300 bg-white">
     <div class="relative overflow-x-auto">
       <table class="min-w-full text-sm">
         <thead class="bg-zinc-50">
@@ -142,7 +142,8 @@
 
         <tbody>
         @forelse($list as $r)
-          <tr class="align-top hover:bg-zinc-50 border-b last:border-0">
+          @php $isJust = isset($just) && (int)$just === (int)$r->id; @endphp
+          <tr class="queue-row align-top border-b last:border-0 transition-colors duration-700 {{ $isJust ? 'is-just' : 'hover:bg-zinc-50' }}" data-row-id="{{ $r->id }}">
             {{-- Subject --}}
             <td class="p-3">
               <a href="{{ route('maintenance.requests.show', $r) }}"
@@ -201,51 +202,29 @@
             </td>
 
             {{-- Actions --}}
-            <td class="p-3">
+            <td class="p-3 text-right">
               @can('tech-only')
-                <div class="hidden justify-end gap-2 sm:flex">
-                  <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}">
-                    @csrf <input type="hidden" name="action" value="accept">
-                    <button class="inline-flex items-center rounded-md border border-indigo-700 bg-indigo-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-800">
-                      รับงาน
-                    </button>
-                  </form>
-                  <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}">
-                    @csrf
-                    <input type="hidden" name="action" value="assign">
-                    <input type="hidden" name="technician_id" value="{{ auth()->id() }}">
-                    <button class="inline-flex items-center rounded-md border border-sky-700 bg-sky-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-800">
-                      มอบหมาย
-                    </button>
-                  </form>
-                  <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}">
-                    @csrf <input type="hidden" name="action" value="start">
-                    <button class="inline-flex items-center rounded-md border border-emerald-700 bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-800">
-                      เริ่มงาน
-                    </button>
-                  </form>
-                </div>
-
-                {{-- Mobile dropdown --}}
-                <div class="relative sm:hidden text-right">
-                  <details class="group inline-block">
-                    <summary class="flex cursor-pointer list-none justify-end">
-                      <span class="inline-flex items-center rounded-md border border-zinc-300 px-2.5 py-1.5 text-xs">การดำเนินการ ▾</span>
+                <div class="relative inline-block text-left">
+                  <details class="group inline-block queue-actions">
+                    <summary class="flex cursor-pointer list-none">
+                      <span class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-50">
+                        ดำเนินการ ▾
+                      </span>
                     </summary>
-                    <div class="absolute right-0 mt-1 w-44 rounded-md border border-zinc-300 bg-white p-2 shadow-sm">
+                    <div class="dropdown-like absolute right-0 z-10 mt-1 w-44 rounded-md border border-zinc-300 bg-white p-2 text-left shadow-sm">
                       <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}" class="block">
                         @csrf <input type="hidden" name="action" value="accept">
-                        <button class="w-full rounded-md bg-indigo-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-800">รับงาน</button>
+                        <button class="w-full rounded-md px-3 py-1.5 text-left text-xs text-zinc-800 hover:bg-zinc-100">รับงาน</button>
                       </form>
                       <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}" class="mt-1 block">
                         @csrf
                         <input type="hidden" name="action" value="assign">
                         <input type="hidden" name="technician_id" value="{{ auth()->id() }}">
-                        <button class="w-full rounded-md bg-sky-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-800">มอบหมาย</button>
+                        <button class="w-full rounded-md px-3 py-1.5 text-left text-xs text-zinc-800 hover:bg-zinc-100">มอบหมายให้ฉัน</button>
                       </form>
                       <form method="POST" action="{{ route('maintenance.requests.transition', $r) }}" class="mt-1 block">
                         @csrf <input type="hidden" name="action" value="start">
-                        <button class="w-full rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-800">เริ่มงาน</button>
+                        <button class="w-full rounded-md px-3 py-1.5 text-left text-xs text-zinc-800 hover:bg-zinc-100">เริ่มงาน</button>
                       </form>
                     </div>
                   </details>
@@ -270,3 +249,74 @@
 
 </div>
 @endsection
+
+@push('scripts')
+<script>
+  // Enhance <details> dropdown so it never gets clipped by parent containers
+  (function(){
+    function place(menu, anchorRect){
+      const vw = window.innerWidth, vh = window.innerHeight;
+      menu.style.position = 'fixed';
+      menu.style.left = 'auto';
+      menu.style.right = (vw - anchorRect.right) + 'px';
+      // default show below
+      let top = anchorRect.bottom + 4;  
+      menu.style.top = top + 'px';
+      // If overflow bottom, flip to top
+      requestAnimationFrame(()=>{
+        const mh = menu.getBoundingClientRect().height;
+        if (top + mh > vh - 8){
+          top = Math.max(8, anchorRect.top - mh - 4);
+          menu.style.top = top + 'px';
+        }
+      });
+      menu.style.zIndex = 10050;
+    }
+
+    function bindOne(details){
+      const summary = details.querySelector('summary');
+      const menu = details.querySelector('.dropdown-like');
+      if (!summary || !menu) return;
+
+      function close(){ details.removeAttribute('open'); }
+
+      details.addEventListener('toggle', () => {
+        if (details.hasAttribute('open')){
+          const rect = summary.getBoundingClientRect();
+          place(menu, rect);
+          setTimeout(()=>{
+            // click outside to close
+            function onDoc(e){ if (!details.contains(e.target)) { close(); document.removeEventListener('click', onDoc); } }
+            document.addEventListener('click', onDoc);
+            function onEsc(ev){ if (ev.key === 'Escape'){ close(); document.removeEventListener('keydown', onEsc); } }
+            document.addEventListener('keydown', onEsc);
+          }, 0);
+        }
+      });
+    }
+
+    document.querySelectorAll('details.queue-actions').forEach(bindOne);
+
+    // Highlight effect fade-out (animate-pulse-once defined inline here)
+    // Highlight style (static so it always loads before repaint)
+    if (!document.getElementById('queue-highlight-style')) {
+      const style = document.createElement('style');
+      style.id = 'queue-highlight-style';
+      style.textContent = `
+        @keyframes queueGlow { 0%{box-shadow:0 0 0 0 rgba(16,185,129,.55);} 60%{box-shadow:0 0 0 14px rgba(16,185,129,0);} 100%{box-shadow:0 0 0 0 rgba(16,185,129,0);} }
+        tr.queue-row.is-just { position:relative; background:#ecfdf5; }
+        tr.queue-row.is-just::after { content:""; position:absolute; inset:0; border:2px solid #10b981; border-radius:4px; pointer-events:none; animation:queueGlow 2.2s cubic-bezier(.4,0,.2,1); }
+      `;
+      document.head.appendChild(style);
+    }
+    // Auto-scroll the highlighted row into view if it's below fold
+    const justRow = document.querySelector('tr.queue-row.is-just');
+    if (justRow) {
+      const rect = justRow.getBoundingClientRect();
+      if (rect.bottom > window.innerHeight || rect.top < 0) {
+        justRow.scrollIntoView({behavior:'smooth', block:'center'});
+      }
+    }
+  })();
+</script>
+@endpush

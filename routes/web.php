@@ -60,8 +60,11 @@ Route::middleware(['auth'])->group(function () {
         Route::prefix('requests')->name('requests.')->group(function () {
             Route::get('/',       [MaintenanceRequestController::class, 'indexPage'])->name('index');
             Route::get('/create', [MaintenanceRequestController::class, 'createPage'])->name('create');
+            // แก้ไขคำขอซ่อม
+            Route::get('/{req}/edit', [MaintenanceRequestController::class, 'edit'])->name('edit');
             Route::get('/{req}',  [MaintenanceRequestController::class, 'showPage'])->name('show');
             Route::post('/',      [MaintenanceRequestController::class, 'store'])->name('store');
+            Route::put('/{req}',  [MaintenanceRequestController::class, 'update'])->name('update');
 
             Route::post('/{req}/transition',  [MaintenanceRequestController::class, 'transitionFromBlade'])->name('transition');
             Route::post('/{req}/attachments', [MaintenanceRequestController::class, 'uploadAttachmentFromBlade'])->name('attachments');

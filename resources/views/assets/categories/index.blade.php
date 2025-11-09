@@ -10,10 +10,9 @@
     </a>
   </div>
 
-  @if (session('status'))
-    <div class="mb-4 p-3 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded">
-      {{ session('status') }}
-    </div>
+  {{-- เก็บ status เก่าไว้แปลงเป็น toast (ใช้ component ส่วนกลาง) --}}
+  @if (session('status') && !session()->has('toast'))
+    @php session()->flash('toast', \App\Support\Toast::success(session('status'))); @endphp
   @endif
 
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -31,11 +30,12 @@
             {{ $c->is_active ? 'Active' : 'Inactive' }}
           </span>
           <div class="space-x-2">
-            <a href="{{ route('asset-categories.edit', $c) }}" class="text-blue-600 hover:underline">แก้ไข</a>
+            <a href="{{ route('asset-categories.edit', $c) }}" class="text-blue-600 hover:underline" data-no-loader>แก้ไข</a>
             <form method="POST" action="{{ route('asset-categories.destroy', $c) }}" class="inline"
                   onsubmit="return confirm('ลบหมวดหมู่นี้หรือไม่?')">
               @csrf @method('DELETE')
-              <button type="submit" class="text-rose-600 hover:underline">ลบ</button>
+              <button type="submit" class="text-rose-600 hover:underline"
+                      onclick="setTimeout(()=>window.dispatchEvent(new CustomEvent('app:toast',{detail:{type:'info',message:'กำลังลบ...'}})),10)">ลบ</button>
             </form>
           </div>
         </div>

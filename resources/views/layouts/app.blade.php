@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  {{-- CSRF token สำหรับ JS ที่อาจต้องดึงค่าไปใช้กับ fetch / AJAX --}}
+  <meta name="csrf-token" content="{{ csrf_token() }}" />
   <meta name="theme-color" content="#0E2B51">
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -279,6 +281,9 @@
 
     document.addEventListener('DOMContentLoaded', () => Loader.hide());
     document.addEventListener('click', (e) => {
+      // อย่าโชว์ Loader หากคลิกอยู่ใน Chat Widget (ลด side-effects ระหว่าง polling)
+      if (e.target.closest('#chatWidgetRoot')) return;
+      if (e.defaultPrevented) return;
       const a = e.target.closest('a'); if (!a) return;
       const href = a.getAttribute('href') || '';
       const noLoader = a.hasAttribute('data-no-loader') || a.getAttribute('target');
@@ -287,6 +292,8 @@
     });
     document.addEventListener('submit', (e) => {
       const form = e.target;
+      // อย่าโชว์ Loader หากมีการ preventDefault ใน handler อื่น (เช่น client-side validate)
+      if (e.defaultPrevented) return;
       if (form instanceof HTMLFormElement && !form.hasAttribute('data-no-loader')) Loader.show();
     });
     window.addEventListener('beforeunload', () => Loader.show());
@@ -312,23 +319,11 @@
 
   <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js" defer></script>
   <x-toast />
-  @if (session('toast'))
-    <script>
-      const t = @json(session('toast'));
-      t.position = 'center';
-      if (window.showToast) { window.showToast(t); }
-      else { window.dispatchEvent(new CustomEvent('app:toast', { detail: t })); }
-    </script>
-  @endif
 
   @includeWhen(Auth::check(), 'partials.chat-fab')
 
-  @push('styles')
-  <link href="https://unpkg.com/cropperjs@1.6.2/dist/cropper.min.css" rel="stylesheet">
-  @endpush
-
-  @push('scripts')
-  <script src="https://unpkg.com/cropperjs@1.6.2/dist/cropper.min.js"></script>
-  @endpush
+  {{-- NOTE: เดิมมีการ @push styles/scripts สำหรับ CropperJS หลังจาก @stack ถูก render แล้วใน layout เดียวกัน
+    ทำให้ไฟล์ไม่ถูกโหลดจริง หากต้องใช้ Cropper ให้ include ภายในหน้าเฉพาะที่ต้องใช้แทน
+    (ตัวอย่างเช่น resources/views/profile/edit.blade.php มีการ include ไว้อย่างถูกที่แล้ว) --}}
 </body>
 </html>

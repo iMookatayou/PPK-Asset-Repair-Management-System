@@ -124,9 +124,11 @@
                          focus:border-emerald-600 focus:ring-emerald-600 
                          @error('department') border-rose-400 ring-rose-200 @enderror">
             <option value="">— เลือกแผนก —</option>
-            @foreach(\App\Models\Department::orderBy('name')->get() as $dept)
+            @foreach(\App\Models\Department::query()
+                ->orderByRaw('COALESCE(name_th, name_en, code) asc')
+                ->get() as $dept)
               <option value="{{ $dept->code }}" @selected(old('department', $user->department) == $dept->code)>
-                {{ $dept->name }}
+                {{ $dept->display_name ?? $dept->name ?? ($dept->name_th ?: ($dept->name_en ?: $dept->code)) }}
               </option>
             @endforeach
           </select>

@@ -4,93 +4,73 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Filesystem\FilesystemAdapter;
 
 /**
  * Class Attachment
  *
- * Polymorphic attachments (ใช้ได้หลายโมดูล)
+ * Polymorphic attachments (แนบได้หลายโมดูล) อ้างอิงไฟล์จริงผ่าน files.id
  *
  * @property int $id
+ * @property int $file_id
  * @property string $original_name
  * @property string|null $extension
- * @property string $path
- * @property string $disk
- * @property string|null $mime
- * @property int|null $size
- * @property string|null $checksum_sha256
  * @property bool $is_private
- * @property array|null $meta
  * @property string|null $caption
  * @property string|null $alt_text
  * @property int $order_column
- * @property string|null $expires_at
+ * @property \Illuminate\Support\Carbon|null $expires_at
  *
+ * @property-read \App\Models\File|null $file
  * @property-read string|null $url
  * @property-read string $filename
+ * @property-read bool $is_image
  */
 class Attachment extends Model
 {
     use SoftDeletes;
 
     protected $fillable = [
-        // polymorphic
+        // polymorphic target
         'attachable_type',
         'attachable_id',
 
-        // file identity
-        'original_name',
-        'extension',
-        'path',
-        'disk',
-        'mime',
-        'size',
-        'checksum_sha256',
+        // file link
+        'file_id',
 
         // presentation
+        'original_name',
+        'extension',
         'caption',
         'alt_text',
         'order_column',
 
-        // privacy & lineage
+        // privacy & audit
         'is_private',
-        'variant_of_id',
-
-        // audit/meta
         'uploaded_by',
         'source',
-        'meta',
 
         // retention
         'expires_at',
     ];
 
     protected $casts = [
-        'size'        => 'integer',
-        'is_private'  => 'boolean',
-        'meta'        => 'array',
-        'expires_at'  => 'datetime',
-        'deleted_at'  => 'datetime',
+        'is_private' => 'boolean',
+        'expires_at' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
 
-    protected $appends = ['url','filename'];
+    protected $appends = ['url', 'filename', 'is_image'];
 
     /* ===================== Relationships ===================== */
+
+    public function file()
+    {
+        return $this->belongsTo(File::class);
+    }
 
     public function attachable()
     {
         return $this->morphTo();
-    }
-
-    public function parentVariant()
-    {
-        return $this->belongsTo(self::class, 'variant_of_id');
-    }
-
-    public function variants()
-    {
-        return $this->hasMany(self::class, 'variant_of_id');
     }
 
     public function uploader()
@@ -102,88 +82,99 @@ class Attachment extends Model
 
     public function scopeForAttachable($q, Model $model)
     {
-        return $q->where('attachable_type', get_class($model))
+        return $q->where('attachable_type', $model->getMorphClass())
                  ->where('attachable_id', $model->getKey());
     }
 
-    public function scopeImages($q)
+    public function scopeOrdered($q)
     {
-        return $q->where('mime', 'like', 'image/%');
+        return $q->orderBy('order_column')->orderBy('id');
     }
 
+    public function scopePublic($q)
+    {
+        return $q->where('is_private', false);
+    }
+
+    public function scopePrivate($q)
+    {
+        return $q->where('is_private', true);
+    }
+
+    /** คัดเฉพาะไฟล์รูปภาพ โดยดูจาก mime ของตาราง files */
+    public function scopeImages($q)
+    {
+        return $q->whereHas('file', fn($qq) => $qq->where('mime', 'like', 'image/%'));
+    }
+
+    /** กรองตาม mime pattern ในตาราง files (เช่น 'application/%') */
     public function scopeOfMime($q, string $pattern)
     {
-        return $q->where('mime', 'like', $pattern);
+        return $q->whereHas('file', fn($qq) => $qq->where('mime', 'like', $pattern));
     }
 
     /* ======================= Accessors ======================= */
 
-    /** ชื่อไฟล์สั้น (ไม่รวม path) */
+    /** ชื่อไฟล์สั้นเพื่อแสดงผล */
     public function getFilenameAttribute(): string
     {
-        return $this->original_name ?: basename((string)$this->path);
+        if ($this->original_name) {
+            return $this->original_name;
+        }
+        // ตกทอดจากไฟล์จริง
+        $path = optional($this->file)->path;
+        return $path ? basename($path) : 'file';
     }
 
     /**
      * URL สำหรับเปิดดูไฟล์
-     * - public: ใช้ FilesystemAdapter::url() ถ้ามี, fallback เป็น Storage::url()
-     * - private: คืนผ่าน route ตรวจสิทธิ์ของระบบ (attachments.show)
+     * - public: ใช้ url จากไฟล์จริง
+     * - private: คืน null (ให้ไปขอผ่าน route ที่ตรวจสิทธิ์ เช่น attachments.download)
      */
     public function getUrlAttribute(): ?string
     {
-        if (!$this->path || !$this->disk) {
+        if ($this->is_private) {
             return null;
         }
-
-        if (!$this->is_private) {
-            /** @var FilesystemAdapter $fs */
-            $fs = Storage::disk($this->disk);
-
-            // บาง disk อาจไม่มีเมธอด url()
-            if (method_exists($fs, 'url')) {
-                return $fs->url($this->path);
-            }
-
-            // fallback ใช้ default disk จาก config/filesystems
-            return Storage::url($this->path);
-        }
-
-        // Private: ส่งผ่าน controller เพื่อ authorize
-        return route('attachments.show', ['attachment' => $this->getKey()]);
+        return optional($this->file)->url;
     }
 
-    /** true ถ้าเป็นไฟล์รูปภาพ */
+    /** true ถ้าเป็นไฟล์รูปภาพ (จากไฟล์จริง) */
     public function getIsImageAttribute(): bool
     {
-        return is_string($this->mime) && str_starts_with($this->mime, 'image/');
+        return (bool) (optional($this->file)->isImage());
     }
 
     /* ======================== Helpers ======================== */
 
-    /** path เต็มใน storage (internal) */
-    public function absolutePath(): ?string
+    /**
+     * ลบเฉพาะเรคอร์ด attachment
+     * ถ้าต้องการลบไฟล์จริงเมื่อไม่มีใครอ้างอิงต่อ ให้ใช้ deleteAndCleanup(true)
+     */
+    public function deleteSafely(): bool
     {
-        if (!$this->path || !$this->disk) return null;
-
-        try {
-            return Storage::disk($this->disk)->path($this->path);
-        } catch (\Throwable $e) {
-            return null;
-        }
+        return (bool) $this->delete();
     }
 
-    /** ลบ record + ไฟล์จริงใน storage (Single Source of Truth) */
-    public function deleteWithFile(): bool
+    /**
+     * ลบ attachment และออปชัน cleanup ไฟล์จริงถ้าไม่มีใครอ้างแล้ว
+     * @param bool $deleteOrphanFile เมื่อ true และไม่มี attachment อื่นชี้ไฟล์นี้ จะลบไฟล์ (เรคอร์ดใน files) ทิ้งด้วย
+     */
+    public function deleteAndCleanup(bool $deleteOrphanFile = false): bool
     {
-        try {
-            if ($this->path && $this->disk && Storage::disk($this->disk)->exists($this->path)) {
-                Storage::disk($this->disk)->delete($this->path);
-            }
-        } catch (\Throwable $e) {
-            // swallow error: อย่าให้การลบเรคอร์ด fail เพราะลบไฟล์จริงไม่สำเร็จ
-        }
+        $fileId = $this->file_id;
+        $ok = (bool) $this->delete();
 
-        return (bool) $this->delete();
+        if ($ok && $deleteOrphanFile && $fileId) {
+            $stillUsed = static::query()->where('file_id', $fileId)->exists();
+            if (!$stillUsed) {
+                // ไม่มีใครอ้างอิงไฟล์แล้ว → ลบไฟล์จริงบน disk ด้วย
+                if ($file = File::find($fileId)) {
+                    $file->deleteWithPhysical();
+                }
+            }
+        }
+        return $ok;
     }
 
     /* ===================== Model Events ====================== */
@@ -191,14 +182,12 @@ class Attachment extends Model
     protected static function booted(): void
     {
         static::creating(function (self $m) {
-            $m->disk         = $m->disk ?: 'public';
             $m->source       = $m->source ?: 'web';
             $m->order_column = $m->order_column ?? 0;
             $m->is_private   = $m->is_private ?? false;
 
-            if (empty($m->extension)) {
-                $name = $m->original_name ?: $m->path;
-                $m->extension = pathinfo((string)$name, PATHINFO_EXTENSION) ?: null;
+            if (empty($m->extension) && $m->original_name) {
+                $m->extension = pathinfo($m->original_name, PATHINFO_EXTENSION) ?: null;
             }
         });
     }
