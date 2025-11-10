@@ -11,9 +11,6 @@ class MaintenanceRequest extends Model
     use HasFactory;
     use SoftDeletes;
 
-    /**
-     * Fillable fields
-     */
     protected $fillable = [
         // อ้างอิง/พื้นฐาน
         'request_no',
@@ -52,13 +49,10 @@ class MaintenanceRequest extends Model
         'extra',
     ];
 
-    /**
-     * Attribute casts
-     */
     protected $casts = [
         'request_date'   => 'datetime',
         'assigned_date'  => 'datetime',
-        'completed_date' => 'datetime', // legacy/back-compat
+        'completed_date' => 'datetime',
         'accepted_at'    => 'datetime',
         'started_at'     => 'datetime',
         'on_hold_at'     => 'datetime',
@@ -69,41 +63,26 @@ class MaintenanceRequest extends Model
         'deleted_at'     => 'datetime',
     ];
 
-    /**
-     * Base statuses
-     */
     public const STATUS_PENDING     = 'pending';
     public const STATUS_IN_PROGRESS = 'in_progress';
-    public const STATUS_COMPLETED   = 'completed'; // legacy → ใช้ resolved แทน
+    public const STATUS_COMPLETED   = 'completed';
     public const STATUS_CANCELLED   = 'cancelled';
 
-    /**
-     * Extended statuses
-     */
+
     public const STATUS_ACCEPTED = 'accepted';
     public const STATUS_ON_HOLD  = 'on_hold';
     public const STATUS_RESOLVED = 'resolved';
     public const STATUS_CLOSED   = 'closed';
 
-    /**
-     * Priorities
-     */
     public const PRIORITY_LOW    = 'low';
     public const PRIORITY_MEDIUM = 'medium';
     public const PRIORITY_HIGH   = 'high';
     public const PRIORITY_URGENT = 'urgent';
 
-    /**
-     * UI groups mapping (สำคัญสำหรับแท็บ)
-     */
     public const GROUP_PENDING    = ['pending', 'accepted', null];
-    // ตัด 'started' ออก (ไม่มีสถานะนี้ในระบบปัจจุบัน)
     public const GROUP_INPROGRESS = ['in_progress', 'on_hold'];
     public const GROUP_COMPLETED  = ['resolved', 'completed', 'closed'];
 
-    /**
-     * Relationships
-     */
     public function asset()      { return $this->belongsTo(Asset::class); }
     public function department() { return $this->belongsTo(Department::class); }
     public function reporter()   { return $this->belongsTo(User::class, 'reporter_id'); }
@@ -114,27 +93,21 @@ class MaintenanceRequest extends Model
         return $this->hasMany(MaintenanceLog::class, 'request_id');
     }
 
-    // Attachments (polymorphic)
     public function attachments()
     {
         return $this->morphMany(\App\Models\Attachment::class, 'attachable')->ordered();
     }
 
-    /** ไฟล์แนบที่เป็นรูปภาพเท่านั้น */
     public function imageAttachments()
     {
         return $this->attachments()->whereHas('file', fn($q) => $q->where('mime', 'like', 'image/%'));
     }
 
-    /** ไฟล์แนบล่าสุด 1 รายการ (ถ้ามี) */
     public function latestAttachment()
     {
         return $this->morphOne(\App\Models\Attachment::class, 'attachable')->latestOfMany('id');
     }
 
-    /**
-     * Helpers
-     */
     public function getNormalizedStatusAttribute(): string
     {
         if ($this->status === self::STATUS_COMPLETED && $this->resolved_at) {
@@ -143,14 +116,10 @@ class MaintenanceRequest extends Model
         return (string) $this->status;
     }
 
-    /**
-     * Auto-generate request_no ถ้ายังไม่มี
-     */
     protected static function booted(): void
     {
         static::creating(function (self $model) {
             if (empty($model->request_no)) {
-                // รูปแบบ MR-YYYY-XXXXXX (ใช้ random ชั่วคราว)
                 $year = now()->format('Y');
                 $rand = strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
                 $model->request_no = "MR-{$year}-{$rand}";
@@ -161,9 +130,6 @@ class MaintenanceRequest extends Model
         });
     }
 
-    /**
-     * Basic scopes
-     */
     public function scopeStatus($q, ?string $s)
     {
         return $s ? $q->where('status', $s) : $q;
@@ -181,7 +147,6 @@ class MaintenanceRequest extends Model
         return $q;
     }
 
-    /** ค้นหาแบบง่ายใน title/description */
     public function scopeSearch($q, ?string $term)
     {
         if (!$term) return $q;
@@ -191,9 +156,6 @@ class MaintenanceRequest extends Model
         });
     }
 
-    /**
-     * Grouped scopes (ใช้กับแท็บ UI)
-     */
     public function scopePendingGroup($q)
     {
         return $q->where(function ($w) {

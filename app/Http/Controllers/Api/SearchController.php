@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\DB;
 
 class SearchController extends Controller
 {
-    // GET /api/search/assets?q=&limit=10
     public function assets(Request $r)
     {
         $q = trim((string) $r->query('q', ''));
@@ -38,7 +37,6 @@ class SearchController extends Controller
         return response()->json(['data' => $rows]);
     }
 
-    // GET /api/search/maintenance-requests?q=&limit=10
     public function requests(Request $r)
     {
         $q = trim((string) $r->query('q', ''));

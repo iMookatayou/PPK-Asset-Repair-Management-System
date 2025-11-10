@@ -1,4 +1,3 @@
-{{-- resources/views/assets/index.blade.php --}}
 @extends('layouts.app')
 @section('title','Assets')
 
@@ -13,7 +12,6 @@
     return "<a href=\"{$q}\" class=\"inline-flex items-center gap-1 hover:text-zinc-900\">{$label} <span class=\"text-xs text-zinc-400\">{$arrow}</span></a>";
   };
 
-  // สไตล์ป้ายสถานะ (ราชการ: ring-1 + bg-white)
   $statusBadge = fn(?string $s) => match(strtolower((string)$s)) {
     'active'     => 'ring-emerald-300 text-emerald-800 bg-white',
     'in_repair'  => 'ring-amber-300 text-amber-800 bg-white',
@@ -22,12 +20,10 @@
   };
 @endphp
 
-{{-- Spacer กันชน Topbar --}}
 <div class="pt-3 md:pt-4"></div>
 
 <div class="w-full px-4 md:px-6 lg:px-8 flex flex-col gap-5">
 
-  {{-- ===== Header (โทนเดียวกับ queue/maintenance) ===== --}}
   <div class="rounded-lg border border-zinc-300 bg-white">
     <div class="px-5 py-4">
       <div class="flex flex-wrap items-start justify-between gap-4">
@@ -53,12 +49,9 @@
         </a>
       </div>
 
-      {{-- เส้นขั้น --}}
       <div class="mt-4 h-px bg-zinc-200"></div>
 
-      {{-- ===== Filters (grid-12 + ไอคอนค้นหาไม่ทับ) ===== --}}
   <form method="GET" class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-12" role="search" aria-label="Filter assets">
-        {{-- คำค้นหา --}}
         <div class="md:col-span-5 min-w-0">
           <label for="q" class="mb-1 block text-[12px] text-zinc-600">คำค้นหา</label>
           <div class="relative">
@@ -73,7 +66,6 @@
           </div>
         </div>
 
-        {{-- สถานะ --}}
         <div class="md:col-span-2">
           <label for="status" class="mb-1 block text-[12px] text-zinc-600">สถานะ</label>
           @php $statuses = ['' => 'ทั้งหมด','active'=>'พร้อมใช้งาน','in_repair'=>'อยู่ระหว่างซ่อม','disposed'=>'จำหน่าย']; @endphp
@@ -85,7 +77,6 @@
           </select>
         </div>
 
-        {{-- หมวดหมู่ (FK) --}}
         <div class="md:col-span-2">
           <label for="category_id" class="mb-1 block text-[12px] text-zinc-600">หมวดหมู่</label>
           <select id="category_id" name="category_id" class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
@@ -96,7 +87,6 @@
           </select>
         </div>
 
-        {{-- หน่วยงาน --}}
         <div class="md:col-span-2">
           <label for="department_id" class="mb-1 block text-[12px] text-zinc-600">หน่วยงาน</label>
           <select id="department_id" name="department_id" class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
@@ -107,7 +97,6 @@
           </select>
         </div>
 
-        {{-- ประเภท & ที่ตั้ง (เสริม) --}}
         <div class="md:col-span-2">
           <label for="type" class="mb-1 block text-[12px] text-zinc-600">ประเภท</label>
           <input id="type" name="type" value="{{ request('type') }}" class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-600" placeholder="เช่น Computer, Printer" />
@@ -117,7 +106,6 @@
           <input id="location" name="location" value="{{ request('location') }}" class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-600" placeholder="เช่น ER, IT Room" />
         </div>
 
-        {{-- ปุ่ม --}}
         <div class="md:col-span-1 flex items-end justify-end gap-2">
           @if(request()->hasAny(['q','status','category_id','sort_by','sort_dir']))
             <a href="{{ route('assets.index') }}"
@@ -133,7 +121,6 @@
     </div>
   </div>
 
-  {{-- ===== ตาราง Desktop ===== --}}
   <div class="hidden md:block rounded-lg border border-zinc-300 bg-white overflow-hidden">
     <div class="relative overflow-x-auto">
       <table class="min-w-full text-sm">
@@ -189,7 +176,6 @@
     </div>
   </div>
 
-  {{-- ===== การ์ด Mobile ===== --}}
   <div class="md:hidden grid grid-cols-1 gap-3">
     @forelse($assets as $a)
       <div class="rounded-lg border border-zinc-300 bg-white p-4">
@@ -231,7 +217,6 @@
     @endforelse
   </div>
 
-  {{-- Pagination --}}
   <div class="mt-4">
     {{ $assets->links() }}
   </div>

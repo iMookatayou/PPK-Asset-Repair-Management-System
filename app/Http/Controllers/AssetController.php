@@ -25,7 +25,6 @@ class AssetController extends Controller
         $q          = trim($request->string('q')->toString());
         $status     = $request->string('status')->toString();
     $type       = $request->string('type')->toString();
-    // legacy 'category' string removed; use category_id (FK) instead
     $categoryId = $request->integer('category_id');
         $deptId     = $request->integer('department_id');
         $location   = $request->string('location')->toString();
@@ -46,7 +45,6 @@ class AssetController extends Controller
         $sortBy    = $sortMap[$sortByReq] ?? 'id';
         $sortDir   = strtolower($request->string('sort_dir', 'desc')->toString()) === 'asc' ? 'asc' : 'desc';
 
-        // Build base filtered query once so we can compute an accurate total count
         $baseQuery = Asset::query()
             ->with(['categoryRef','department'])
             ->search($q)
@@ -56,20 +54,17 @@ class AssetController extends Controller
             ->departmentId($deptId)
             ->when($location !== '', fn($s) => $s->where('location', $location));
 
-        // Compute filtered total explicitly (works reliably across drivers / transactions)
         $filteredTotal = (clone $baseQuery)->toBase()->count();
 
         $assets = (clone $baseQuery)
             ->orderBy($sortBy, $sortDir)
             ->paginate($perPage)
             ->withQueryString();
-        // Unified list response shape { data: [...], meta: {...}, toast }
         $payload = [
             'data' => $assets->items(),
             'meta' => [
                 'current_page' => $assets->currentPage(),
                 'per_page'     => $assets->perPage(),
-                // Fallback to explicit filtered count if paginator total is zero (e.g., during MySQL TX tests)
                 'total'        => $assets->total() ?: $filteredTotal,
                 'last_page'    => $assets->lastPage(),
             ],
@@ -190,7 +185,6 @@ class AssetController extends Controller
         ], Response::HTTP_OK, [], $this->jsonOptions(request()));
     }
 
-    // ====================== เพจ (Blade) ======================
     public function indexPage(Request $request)
     {
         $q          = trim($request->string('q')->toString());
@@ -207,7 +201,6 @@ class AssetController extends Controller
             'asset_code' => 'asset_code',
             'name'       => 'name',
             'status'     => 'status',
-            // virtual key 'category' will sort by related category name
             'category'   => 'category',
         ];
         $sortCol = $sortMap[$sortBy] ?? 'id';
@@ -244,7 +237,6 @@ class AssetController extends Controller
 
     public function createPage()
     {
-        // ดึงคอลัมน์จริงเพื่อให้ accessor บนโมเดลทำงานได้ถูกต้อง (หลีกเลี่ยง alias "name" ชนกับ accessor)
         $departments = \App\Models\Department::query()
             ->select(['id','code','name_th','name_en'])
             ->orderByRaw('COALESCE(name_th, name_en, code) asc')
@@ -252,7 +244,6 @@ class AssetController extends Controller
 
         $categories  = \App\Models\AssetCategory::orderBy('name')->get(['id','name']);
 
-        // แจ้งเตือนหากยังไม่มีข้อมูลที่จำเป็นสำหรับการสร้างรายการ
         if ($departments->isEmpty()) {
             session()->flash('toast', Toast::info('ยังไม่มีข้อมูลหน่วยงาน กรุณา seed หรือเพิ่มใหม่ก่อน', 3200));
         }
@@ -265,7 +256,6 @@ class AssetController extends Controller
 
     public function storePage(Request $request)
     {
-        // Manual validate to control toast on failure (instead of automatic redirect block)
         $validator = Validator::make($request->all(), [
             'asset_code'      => ['required','string','max:100','unique:assets,asset_code'],
             'name'            => ['required','string','max:255'],
@@ -321,7 +311,6 @@ class AssetController extends Controller
 
         $attachments = $attQuery->get();
 
-        // หากมี status เดิมที่หน้าอื่นส่งมา (เช่นบางหน้าใช้ session('status')), แปลงเป็น toast
         if (session('status') && !session()->has('toast')) {
             session()->flash('toast', Toast::success(session('status')));
         }
@@ -332,7 +321,6 @@ class AssetController extends Controller
     {
         $asset->load(['categoryRef','department']);
 
-        // ดึงคอลัมน์จริงเพื่อให้ accessor ทำงานถูกต้อง (ไม่ alias เป็น name)
         $departments = \App\Models\Department::query()
             ->select(['id','code','name_th','name_en'])
             ->orderByRaw('COALESCE(name_th, name_en, code) asc')
@@ -391,7 +379,6 @@ class AssetController extends Controller
             ->with('toast', Toast::success('ลบทรัพย์สินเรียบร้อยแล้ว'));
     }
 
-    // ========== Utilities (align with MaintenanceRequestController) ==========
     protected function respondWithToast(
         Request $request,
         array $toast,

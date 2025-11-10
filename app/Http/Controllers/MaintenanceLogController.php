@@ -8,10 +8,6 @@ use Illuminate\Http\Request;
 
 class MaintenanceLogController extends Controller
 {
-    /**
-     * GET /repair-requests/{req}/logs
-     * คืน logs ของคำขอซ่อม (ไม่ใช่ทุกอัน)
-     */
     public function index(MaintenanceRequest $req)
     {
         return response()->json(
@@ -22,10 +18,6 @@ class MaintenanceLogController extends Controller
         );
     }
 
-    /**
-     * (มีไว้เผื่อใช้งาน) POST /logs หรือ /repair-requests/{req}/logs
-     * ถ้าจะใช้แบบอ้างอิง {req} ให้เพิ่ม route เองภายหลังได้
-     */
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -42,7 +34,6 @@ class MaintenanceLogController extends Controller
         return response()->json(['message' => 'created', 'data' => $log], 201);
     }
 
-    /** GET /logs/{maintenanceLog} (ถ้ามี route แยก) */
     public function show(MaintenanceLog $maintenanceLog)
     {
         return response()->json($maintenanceLog->load('user'));

@@ -13,7 +13,6 @@
     <div class="alert alert-success mb-4">{{ session('status') }}</div>
   @endif
 
-  {{-- Filters --}}
   <form method="GET" class="mb-4 grid grid-cols-1 md:grid-cols-4 gap-3">
     <input type="text" name="s" value="{{ $filters['s'] ?? '' }}" placeholder="Search name/email/department"
            class="input input-bordered w-full" />

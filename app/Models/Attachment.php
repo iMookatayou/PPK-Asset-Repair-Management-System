@@ -60,9 +60,6 @@ class Attachment extends Model
     ];
 
     protected $appends = ['url', 'filename', 'is_image'];
-
-    /* ===================== Relationships ===================== */
-
     public function file()
     {
         return $this->belongsTo(File::class);
@@ -77,8 +74,6 @@ class Attachment extends Model
     {
         return $this->belongsTo(User::class, 'uploaded_by');
     }
-
-    /* ======================== Scopes ========================= */
 
     public function scopeForAttachable($q, Model $model)
     {
@@ -101,36 +96,25 @@ class Attachment extends Model
         return $q->where('is_private', true);
     }
 
-    /** คัดเฉพาะไฟล์รูปภาพ โดยดูจาก mime ของตาราง files */
     public function scopeImages($q)
     {
         return $q->whereHas('file', fn($qq) => $qq->where('mime', 'like', 'image/%'));
     }
 
-    /** กรองตาม mime pattern ในตาราง files (เช่น 'application/%') */
     public function scopeOfMime($q, string $pattern)
     {
         return $q->whereHas('file', fn($qq) => $qq->where('mime', 'like', $pattern));
     }
 
-    /* ======================= Accessors ======================= */
-
-    /** ชื่อไฟล์สั้นเพื่อแสดงผล */
     public function getFilenameAttribute(): string
     {
         if ($this->original_name) {
             return $this->original_name;
         }
-        // ตกทอดจากไฟล์จริง
         $path = optional($this->file)->path;
         return $path ? basename($path) : 'file';
     }
 
-    /**
-     * URL สำหรับเปิดดูไฟล์
-     * - public: ใช้ url จากไฟล์จริง
-     * - private: คืน null (ให้ไปขอผ่าน route ที่ตรวจสิทธิ์ เช่น attachments.download)
-     */
     public function getUrlAttribute(): ?string
     {
         if ($this->is_private) {
@@ -139,18 +123,11 @@ class Attachment extends Model
         return optional($this->file)->url;
     }
 
-    /** true ถ้าเป็นไฟล์รูปภาพ (จากไฟล์จริง) */
     public function getIsImageAttribute(): bool
     {
         return (bool) (optional($this->file)->isImage());
     }
 
-    /* ======================== Helpers ======================== */
-
-    /**
-     * ลบเฉพาะเรคอร์ด attachment
-     * ถ้าต้องการลบไฟล์จริงเมื่อไม่มีใครอ้างอิงต่อ ให้ใช้ deleteAndCleanup(true)
-     */
     public function deleteSafely(): bool
     {
         return (bool) $this->delete();
@@ -168,7 +145,6 @@ class Attachment extends Model
         if ($ok && $deleteOrphanFile && $fileId) {
             $stillUsed = static::query()->where('file_id', $fileId)->exists();
             if (!$stillUsed) {
-                // ไม่มีใครอ้างอิงไฟล์แล้ว → ลบไฟล์จริงบน disk ด้วย
                 if ($file = File::find($fileId)) {
                     $file->deleteWithPhysical();
                 }
@@ -176,8 +152,6 @@ class Attachment extends Model
         }
         return $ok;
     }
-
-    /* ===================== Model Events ====================== */
 
     protected static function booted(): void
     {

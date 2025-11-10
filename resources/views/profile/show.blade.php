@@ -1,19 +1,15 @@
-{{-- resources/views/profile/show.blade.php --}}
 @extends('layouts.app')
 @section('title', 'Profile')
 
-{{-- ===== Page Header (ราชการสไตล์: แถบหัวข้อชัดเจน) ===== --}}
 @section('page-header')
   <div class="border-b border-slate-200 bg-slate-50/80 backdrop-blur-sm">
     <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-4">
-      {{-- Breadcrumb --}}
       <nav class="flex items-center gap-2 text-sm text-slate-500">
         <a href="{{ route('dashboard') }}" class="hover:text-emerald-700 hover:underline">Dashboard</a>
         <span class="text-slate-400">/</span>
         <span class="text-slate-700">Profile</span>
       </nav>
 
-      {{-- Title Section --}}
       <div class="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="min-w-0">
           <h1 class="text-xl font-semibold text-slate-900 tracking-tight">
@@ -21,7 +17,6 @@
           </h1>
           <p class="mt-0.5 text-sm text-slate-500">ข้อมูลส่วนตัวและความปลอดภัยของบัญชี (Account & Security)</p>
 
-          {{-- Info Chips --}}
           <div class="mt-3 flex flex-wrap items-center gap-2">
             <span class="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs capitalize text-slate-700">
               <x-app-icon name="briefcase" class="w-3.5 h-3.5 text-slate-600" />
@@ -48,7 +43,6 @@
           </div>
         </div>
 
-        {{-- Action Buttons --}}
         <div class="flex flex-wrap items-center gap-2">
           <a href="{{ route('dashboard') }}"
              class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">
@@ -77,19 +71,15 @@
   </div>
 @endsection
 
-
-{{-- ===== Page Content ===== --}}
 @section('content')
 <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
-  {{-- Flash status --}}
   @if (session('status'))
     <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
       {{ session('status') }}
     </div>
   @endif
 
-  {{-- ===== Profile Summary ===== --}}
   <section class="rounded-xl border border-slate-200 bg-white p-5">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div class="flex items-center gap-3">
@@ -135,9 +125,7 @@
     </dl>
   </section>
 
-  {{-- ===== Two Columns: Account / Security ===== --}}
   <section class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-    {{-- Account --}}
     <div class="rounded-xl border border-slate-200 bg-white p-5">
       <div>
         <h2 class="flex items-center gap-2 text-base font-semibold text-slate-900">
@@ -175,7 +163,6 @@
       </div>
     </div>
 
-    {{-- Security --}}
     <div class="rounded-xl border border-slate-200 bg-white p-5">
       <div class="flex items-center justify-between">
         <div>

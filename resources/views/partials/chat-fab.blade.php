@@ -1,4 +1,3 @@
-{{-- resources/views/partials/chat-fab.blade.php --}}
 @auth
 <div id="chatWidgetRoot" class="fixed z-50 right-4 bottom-4 sm:right-6 sm:bottom-6">
 

@@ -1,4 +1,3 @@
-{{-- resources/views/profile/edit.blade.php --}}
 @extends('layouts.app')
 @section('title', 'Edit Profile')
 
@@ -53,17 +52,14 @@
         @csrf
         @method('PATCH')
 
-        {{-- รูปโปรไฟล์ & อัปโหลด --}}
         <div>
           <label class="block text-sm font-medium text-slate-700 mb-2">รูปโปรไฟล์</label>
 
           <div class="flex items-center gap-4">
-            {{-- ถ้ามีรูปให้โชว์ img, ถ้าไม่มีให้โชว์ตัวอักษรย่อ --}}
             <img id="avatar-preview"
                  @if(!$avatarThumb && !$avatarMain) class="hidden h-16 w-16 rounded-full object-cover ring-1 ring-slate-200"
                  @else class="h-16 w-16 rounded-full object-cover ring-1 ring-slate-200" @endif
                  src="{{ $avatarThumb ?: $avatarMain }}"
-                 {{-- srcset สลับกันได้ ถ้าอย่างใดอย่างหนึ่งว่างจะกลายเป็นค่าว่าง ซึ่งไม่กระทบเพราะซ่อน img เมื่อไม่มี --}}
                  srcset="{{ $avatarThumb ?: $avatarMain }} 128w, {{ $avatarMain ?: $avatarThumb }} 512w"
                  sizes="64px"
                  alt="Profile photo" width="64" height="64"
@@ -95,33 +91,30 @@
           </div>
         </div>
 
-        {{-- ชื่อ --}}
         <div>
           <label for="name" class="block text-sm font-medium text-slate-700">ชื่อ-นามสกุล</label>
           <input id="name" name="name" type="text" value="{{ old('name', $user->name) }}" required
-                 class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 
-                        focus:border-emerald-600 focus:ring-emerald-600 
+                 class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2
+                        focus:border-emerald-600 focus:ring-emerald-600
                         @error('name') border-rose-400 ring-rose-200 @enderror">
           @error('name') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
         </div>
 
-        {{-- อีเมล --}}
         <div>
           <label for="email" class="block text-sm font-medium text-slate-700">อีเมล</label>
           <input id="email" name="email" type="email" value="{{ old('email', $user->email) }}" required
-                 class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 
-                        focus:border-emerald-600 focus:ring-emerald-600 
+                 class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2
+                        focus:border-emerald-600 focus:ring-emerald-600
                         @error('email') border-rose-400 ring-rose-200 @enderror">
           @error('email') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
           <p class="mt-1 text-xs text-slate-500">เปลี่ยนอีเมลจะทำให้สถานะยืนยันอีเมลถูกรีเซ็ต</p>
         </div>
 
-        {{-- แผนก --}}
         <div>
           <label for="department" class="block text-sm font-medium text-slate-700">แผนก</label>
           <select id="department" name="department"
-                  class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 
-                         focus:border-emerald-600 focus:ring-emerald-600 
+                  class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2
+                         focus:border-emerald-600 focus:ring-emerald-600
                          @error('department') border-rose-400 ring-rose-200 @enderror">
             <option value="">— เลือกแผนก —</option>
             @foreach(\App\Models\Department::query()
@@ -135,7 +128,6 @@
           @error('department') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
         </div>
 
-        {{-- ปุ่มบันทึก --}}
         <div class="pt-2">
           <button type="submit" class="inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700">
             บันทึกการเปลี่ยนแปลง
@@ -145,7 +137,6 @@
     </div>
   </div>
 
-  {{-- ===== Modal ครอปรูป ===== --}}
   <div id="cropper-modal" class="fixed inset-0 z-50 hidden">
     <div class="absolute inset-0 bg-black/50"></div>
     <div class="relative mx-auto mt-10 w-[92vw] max-w-2xl rounded-xl bg-white shadow-xl">
@@ -195,7 +186,6 @@
     imgEl.src = '';
   }
 
-  // เมื่อเลือกไฟล์ -> เปิด cropper modal
   fileInput.addEventListener('change', (e) => {
     const [file] = e.target.files || [];
     if (!file) return;

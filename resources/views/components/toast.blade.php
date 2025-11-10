@@ -1,8 +1,6 @@
 @php
-  // ===== อ่าน toast จาก session =====
   $toast = session('toast');
   if ($toast) {
-      // ใช้ครั้งเดียวจบ
       session()->forget('toast');
   }
 
@@ -13,11 +11,9 @@
   $timeout  = (int)($toast['timeout'] ?? 3200);
   $size     = $toast['size']     ?? 'lg';      // sm|md|lg
 
-  // ===== map error/status → toast อัตโนมัติ =====
   $firstError = (isset($errors) && method_exists($errors,'first') && $errors->any()) ? $errors->first() : null;
   if (!$message && $firstError) {
     $message = $firstError;
-    // ใช้ warning สำหรับฟอร์มไม่ผ่าน เพื่อสอดคล้องกับ UX ของระบบ (Alert)
     $type    = $type ?: 'warning';
   }
   if (!$message && session('error')) {
@@ -29,16 +25,14 @@
       $type    = $type ?: 'success';
   }
 
-  // ===== Lottie map (บังคับ scheme ให้ตรงกับหน้า ป้องกัน Mixed Content) =====
   $isHttps = request()->isSecure();
   $link = function(string $path) use ($isHttps) {
       return $isHttps ? secure_asset($path) : asset($path);
   };
-  // เส้นทาง asset() ต้องไม่ใส่ /public นำหน้า (Laravel จะชี้ไป public/ ให้อัตโนมัติ)
   $lottieMap = [
     'success' => $link('lottie/lock_with_green_tick.json'),
     'info'    => $link('lottie/lock_with_blue_info.json'),
-    'warning' => $link('lottie/lock_with_yello_alert.json'), // yello ตามชื่อไฟล์จริง
+    'warning' => $link('lottie/lock_with_yello_alert.json'),
     'error'   => $link('lottie/lock_with_red_tick.json'),
   ];
 @endphp
@@ -52,11 +46,9 @@
   .toast-pos.bl{align-items:flex-end;justify-content:flex-start}
   .toast-pos.center{align-items:center;justify-content:center}
   .toast-pos.tc{align-items:flex-start;justify-content:center;padding-top:calc(var(--topbar-h,0px) + .75rem)}
-  /* upper-center (ระหว่าง top กับ center เลื่อนลงมาเล็กน้อย) */
   .toast-pos.uc{align-items:flex-start;justify-content:center;padding-top:15vh}
   .toast-pos.bc{align-items:flex-end;justify-content:center;padding-bottom:.75rem}
 
-  /* ============ Design tokens ============ */
   .toast-card{
     --toast-max-w: min(92vw, 640px);
     --toast-min-w: 420px;
@@ -135,18 +127,15 @@
   .fill-warning{background:#f59e0b}
   .fill-error{background:#ef4444}
 
-  /* Mobile safety */
   @media (max-width:480px){ .toast-card{ min-width: calc(100vw - 2rem); } }
 </style>
 
 <div class="toast-overlay" aria-live="polite" aria-atomic="true"></div>
 
-{{-- lottie web component (โหลดครั้งเดียวพอ ถ้า layout ไม่มี ใส่ที่นี่แบบ defer) --}}
 <script id="lottie-player-loader" src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js" async></script>
 
 <script>
 (function(){
-  // ===== แผนที่ไฟล์ Lottie จาก PHP =====
   const LOTTIE = {
     success: @json($lottieMap['success'] ?? null),
     info:    @json($lottieMap['info'] ?? null),
@@ -154,8 +143,7 @@
     error:   @json($lottieMap['error'] ?? null),
   };
 
-  // ตั้งค่าเป็นค่า truthy ('tc' ฯลฯ) หากอยาก "บังคับ" ตำแหน่งทั้งหมดให้ตรงกัน
-  const FORCE_POSITION = 'tc'; // บังคับ Toast ทุกตัวให้อยู่ top-center
+  const FORCE_POSITION = 'tc';
 
   function ensurePos(position){
     const overlay = document.querySelector('.toast-overlay');
@@ -166,14 +154,6 @@
     return { overlay, posEl };
   }
 
-  /*
-    showToast options:
-    - type: 'success'|'info'|'warning'|'error'
-    - message: string
-    - position: 'tr'|'tl'|'br'|'bl'|'center'|'tc'|'bc'
-    - timeout: milliseconds
-    - size: 'sm'|'md'|'lg'
-  */
   function showToast({type='info', message='', position='tc', timeout=3200, size='lg'} = {}){
     position = FORCE_POSITION || position || 'tc';
   const allowed = ['tr','tl','br','bl','center','tc','bc','uc'];
@@ -187,7 +167,6 @@
     card.className = `toast-card ${sizeClass} toast-${type}`;
     card.setAttribute('role','status');
 
-    // icon
     const icon = document.createElement('div');
     icon.className = 'toast-icon';
     const src = LOTTIE[type] || LOTTIE.success;
@@ -211,18 +190,15 @@
       }
     } catch (e){ renderPlaceholder(); }
 
-    // message (ใช้ textContent เพื่อความปลอดภัย)
     const msg = document.createElement('div');
     msg.className = 'toast-msg';
     msg.textContent = message ?? '';
 
-    // close button
     const btn = document.createElement('button');
     btn.className = 'toast-close';
     btn.setAttribute('aria-label','Close');
     btn.innerHTML = '&times;';
 
-    // progress
     const bar = document.createElement('div');
     bar.className = 'toast-bar';
     const fill = document.createElement('div');
@@ -232,7 +208,6 @@
     card.append(icon, msg, btn, bar);
     posEl.appendChild(card);
 
-    // Animate in + progress
     requestAnimationFrame(() => {
       card.classList.add('show');
       requestAnimationFrame(() => {
@@ -267,7 +242,6 @@
       timer = setTimeout(close, remainMs + 50);
     });
 
-    // ESC to close
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); }, { once:true });
   }
 
@@ -275,7 +249,6 @@
   window.showToast = showToast;
   window.addEventListener('app:toast', e => showToast(e.detail || {}));
 
-  // ===== ยิงอัตโนมัติถ้ามีค่าใน session =====
   @if ($type && $message)
   (function fireToastNowOrReady(){
     const payload = {

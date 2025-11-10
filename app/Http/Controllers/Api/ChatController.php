@@ -12,10 +12,6 @@ use Illuminate\Validation\Rule;
 
 class ChatController extends Controller
 {
-    /**
-     * GET /api/chat/threads?q=&page=
-     * รายการกระทู้ + ค้นหาชื่อ + นับข้อความ + แนบข้อความล่าสุดของแต่ละกระทู้
-     */
     public function index(Request $r)
     {
         $q = (string) $r->query('q', '');
@@ -24,14 +20,11 @@ class ChatController extends Controller
         $threads = ChatThread::query()
             ->with('author:id,name')
             ->withCount('messages')
-            // อย่ากำหนด select เองใน latestMessage เพื่อเลี่ยง ambiguous
             ->with(['latestMessage' => fn($qq) => $qq->with('user:id,name')])
             ->when($q !== '', fn($qq) => $qq->where('title', 'like', "%{$q}%"))
             ->orderByDesc('created_at')
             ->paginate(perPage: 15);
 
-        // แปลงเป็น JSON ที่อ่านง่าย
-        // Pre-fetch last read map for current user
         $readsMap = [];
         if ($userId) {
             $readsMap = DB::table('chat_thread_reads')
@@ -52,7 +45,7 @@ class ChatController extends Controller
                         ->where('id', '>', $lastReadMessageId)
                         ->count();
                 } else {
-                    $unread = $total; // ไม่มี record ถือว่ายังไม่เคยอ่าน
+                    $unread = $total;
                 }
                 return [
                     'id'              => $th->id,
@@ -87,10 +80,6 @@ class ChatController extends Controller
         return response()->json($payload);
     }
 
-    /**
-     * POST /api/chat/threads
-     * body: { title: string(max:180) }
-     */
     public function store(Request $r)
     {
         $data = $r->validate([
@@ -111,10 +100,6 @@ class ChatController extends Controller
         ], 201);
     }
 
-    /**
-     * GET /api/chat/threads/{thread}
-     * รายละเอียดกระทู้ + preview ข้อความล่าสุด 10 รายการ (เก่า->ใหม่)
-     */
     public function show(ChatThread $thread)
     {
         $thread->load('author:id,name');
@@ -150,12 +135,6 @@ class ChatController extends Controller
         ]);
     }
 
-    /**
-     * GET /api/chat/threads/{thread}/messages?after_id=&limit=
-     * ดึงข้อความในเธรด:
-     * - ถ้าไม่มี after_id -> เรียงเก่า->ใหม่ จำกัด 50 (หรือ limit ที่ส่งมาไม่เกิน 100)
-     * - ถ้ามี after_id -> คืนเฉพาะ id > after_id (ใหม่กว่า) เรียงเก่า->ใหม่ จำกัด 100
-     */
     public function messages(Request $r, ChatThread $thread)
     {
         $afterId = $r->integer('after_id');
@@ -169,7 +148,6 @@ class ChatController extends Controller
             $q->where('id', '>', $afterId)
               ->orderBy('id', 'asc');
         } else {
-            // แรกเข้า: เอาแบตช์แรกแบบเก่า->ใหม่
             $q->orderBy('created_at', 'asc');
         }
 
@@ -190,10 +168,6 @@ class ChatController extends Controller
         ]);
     }
 
-    /**
-     * POST /api/chat/threads/{thread}/messages
-     * body: { body: string(max:3000) }
-     */
     public function storeMessage(Request $r, ChatThread $thread)
     {
         abort_if($thread->is_locked, 403, 'Thread locked');
@@ -202,16 +176,13 @@ class ChatController extends Controller
             'body' => ['required', 'string', 'max:3000'],
         ]);
 
-        // ใช้ relation เพื่อลดโอกาสพิมพ์ชื่อคอลัมน์ผิด (chat_thread_id จะถูกตั้งอัตโนมัติ)
         $msg = $thread->messages()->create([
             'user_id' => Auth::id(),
             'body'    => $data['body'],
         ]);
 
-        // แนบ user กลับไปด้วย
         $msg->load('user:id,name');
 
-        // Update read marker for author (message owner auto-reads their own post)
         if ($msg->user_id) {
             DB::table('chat_thread_reads')->updateOrInsert(
                 ['user_id' => $msg->user_id, 'chat_thread_id' => $thread->id],

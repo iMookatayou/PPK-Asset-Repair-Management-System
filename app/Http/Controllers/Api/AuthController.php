@@ -12,9 +12,6 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AuthController extends Controller
 {
-    /**
-     * Map role -> default abilities/scopes for API tokens.
-     */
     protected function abilitiesFor(User $user): array
     {
         return match ($user->role) {
@@ -24,13 +21,12 @@ class AuthController extends Controller
             User::ROLE_TECHNICIAN => [
                 'assets.read','maintenance.work','stats.view'
             ],
-            default => [ // staff
+            default => [
                 'assets.read','maintenance.request','stats.view'
             ],
         };
     }
 
-    // POST /api/auth/login
     public function login(Request $request)
     {
         $data = $request->validate([
@@ -43,7 +39,7 @@ class AuthController extends Controller
         if (RateLimiter::tooManyAttempts($key, 5)) {
             $seconds = RateLimiter::availableIn($key);
             return response()->json([
-                'message' => 'Too many attempts. Try again in '.$seconds.' seconds.',
+                'message' => 'พยายามเข้าสู่ระบบมากเกินไป กรุณาลองใหม่ใน '.$seconds.' วินาที',
                 'code'    => 'too_many_attempts',
             ], Response::HTTP_TOO_MANY_REQUESTS);
         }
@@ -52,7 +48,7 @@ class AuthController extends Controller
         if (! $user || ! Hash::check($data['password'], (string) $user->password)) {
             RateLimiter::hit($key, 60);
             return response()->json([
-                'message' => 'Invalid credentials',
+                'message' => 'อีเมลหรือรหัสผ่านไม่ถูกต้อง',
                 'code'    => 'invalid_credentials',
             ], Response::HTTP_UNAUTHORIZED);
         }
@@ -76,7 +72,6 @@ class AuthController extends Controller
         ], Response::HTTP_CREATED);
     }
 
-    // GET /api/auth/tokens (list own tokens) (auth:sanctum)
     public function tokens(Request $request)
     {
         $user = $request->user();
@@ -90,42 +85,38 @@ class AuthController extends Controller
         return response()->json(['data' => $list]);
     }
 
-    // DELETE /api/auth/tokens/{token} (revoke one) (auth:sanctum)
     public function revokeToken(Request $request, string $tokenId)
     {
         $user = $request->user();
         $token = $user->tokens()->where('id', $tokenId)->first();
         if (! $token) {
             return response()->json([
-                'message' => 'Token not found',
+                'message' => 'ไม่พบโทเค็น',
                 'code'    => 'token_not_found',
             ], Response::HTTP_NOT_FOUND);
         }
         $token->delete();
-        return response()->json(['message' => 'Token revoked']);
+        return response()->json(['message' => 'ยกเลิกโทเค็นเรียบร้อยแล้ว']);
     }
 
-    // POST /api/auth/logout (auth:sanctum)
     public function logout(Request $request)
     {
         $token = $request->user()?->currentAccessToken();
         if ($token) {
             $token->delete();
         }
-        return response()->json(['message' => 'Logged out']);
+        return response()->json(['message' => 'ออกจากระบบเรียบร้อยแล้ว']);
     }
 
-    // POST /api/auth/logout-all (auth:sanctum)
     public function logoutAll(Request $request)
     {
         $user = $request->user();
         if ($user) {
             $user->tokens()->delete();
         }
-        return response()->json(['message' => 'All tokens revoked']);
+        return response()->json(['message' => 'ยกเลิกโทเค็นทั้งหมดเรียบร้อยแล้ว']);
     }
 
-    // GET /api/auth/me (auth:sanctum)
     public function me(Request $request)
     {
         $u = $request->user();

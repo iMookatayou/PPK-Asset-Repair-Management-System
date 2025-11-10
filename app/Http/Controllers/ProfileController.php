@@ -33,10 +33,8 @@ class ProfileController extends Controller
     {
         $user = $request->user();
 
-        // 1) ฟิลด์หลักจาก FormRequest
         $data = $request->validated();
 
-        // 2) รูปภาพ
         $request->validate([
             'avatar'        => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'remove_avatar' => ['nullable', 'boolean'],
@@ -52,7 +50,6 @@ class ProfileController extends Controller
             ]);
         }
 
-        // 3) อัปเดตรายละเอียดทั่วไป
         $user->fill($data);
         if ($user->isDirty('email')) {
             $user->email_verified_at = null;
@@ -65,7 +62,6 @@ class ProfileController extends Controller
         $disk->makeDirectory('avatars');
         $hasThumbCol = Schema::hasColumn('users', 'profile_photo_thumb');
 
-        // ===== เลือกไดรเวอร์ประมวลผลภาพแบบอัตโนมัติ =====
         $driver = null;
         if (extension_loaded('imagick')) {
             $driver = new ImagickDriver();
@@ -75,15 +71,13 @@ class ProfileController extends Controller
 
         $manager = $driver ? new ImageManager($driver) : null;
 
-        // เช็ค WebP support (ถ้าใช้ GD)
         $supportsWebp = true;
         if ($driver instanceof GdDriver) {
             $supportsWebp = function_exists('imagewebp');
         }
         $targetExt = $supportsWebp ? 'webp' : 'jpg';
-        $encodeFn  = $supportsWebp ? 'toWebp' : 'toJpeg'; // method on Intervention v3
+        $encodeFn  = $supportsWebp ? 'toWebp' : 'toJpeg';
 
-        // 4) ลบรูป (ติ๊ก remove)
         if ($request->boolean('remove_avatar') === true) {
             $toDelete = array_values(array_filter([
                 $user->profile_photo_path ?: null,
@@ -96,9 +90,7 @@ class ProfileController extends Controller
             $avatarRemoved = true;
         }
 
-        // 5) อัปโหลดใหม่
         if ($request->hasFile('avatar')) {
-            // ลบของเก่า
             $toDelete = array_values(array_filter([
                 $user->profile_photo_path ?: null,
                 $hasThumbCol ? ($user->profile_photo_thumb ?: null) : null,
@@ -108,17 +100,14 @@ class ProfileController extends Controller
             $file = $request->file('avatar');
 
             try {
-                // กรณีไม่มี driver ใด ๆ เลย → เก็บไฟล์ต้นฉบับ (ไม่ย่อ/ไม่แปลง)
                 if (!$manager) {
                     $basename = $user->id . '-' . time();
                     $ext      = strtolower($file->getClientOriginalExtension() ?: 'jpg');
                     $mainPath = "avatars/{$basename}.{$ext}";
                     $disk->putFileAs('avatars', $file, "{$basename}.{$ext}");
-
-                    // ไม่มีการทำ thumb ก็ให้ใช้ไฟล์เดียวกันไปก่อน หรือปล่อยว่าง
                     $user->profile_photo_path = $mainPath;
                     if ($hasThumbCol) {
-                        $user->profile_photo_thumb = $mainPath; // ใช้ไฟล์เดียวกัน
+                        $user->profile_photo_thumb = $mainPath;
                     }
 
                     Log::warning('Avatar stored without processing (no image driver).', [
@@ -129,7 +118,6 @@ class ProfileController extends Controller
 
                     $avatarChanged = true;
                 } else {
-                    // มี driver → ประมวลผลปกติ
                     $img = $manager->read($file->getRealPath());
 
                     $basename = $user->id . '-' . time();
@@ -165,14 +153,12 @@ class ProfileController extends Controller
             }
         }
 
-        // 6) Save
         $user->save();
 
         $message = 'อัปเดตโปรไฟล์เรียบร้อย';
         if ($avatarChanged)     $message .= ' — อัปเดตรูปโปรไฟล์ใหม่แล้ว';
         elseif ($avatarRemoved) $message .= ' — ลบรูปโปรไฟล์เรียบร้อย';
 
-        // Breeze tests expect redirect to /profile (show page)
         return Redirect::route('profile.show')->with('toast', [
             'type'     => 'success',
             'message'  => $message,

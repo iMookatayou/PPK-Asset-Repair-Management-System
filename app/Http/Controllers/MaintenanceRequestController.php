@@ -15,9 +15,9 @@ use Symfony\Component\HttpFoundation\Response;
 
 class MaintenanceRequestController extends Controller
 {
-    /** ========== PAGES (Blade) ========== */
     public function indexPage(Request $request)
     {
+        $user     = Auth::user();
         $status   = $request->string('status')->toString();
         $priority = $request->string('priority')->toString();
         $q        = $request->string('q')->toString();
@@ -25,20 +25,19 @@ class MaintenanceRequestController extends Controller
         $list = MR::query()
             ->with([
                 'asset',
-                // include email เพื่อให้คอลัมน์ "อีเมล" แสดงผลได้
                 'reporter:id,name,email',
                 'technician:id,name',
                 'attachments' => fn($qq) => $qq
                     ->select('id','attachable_id','attachable_type','file_id','original_name','is_private','order_column')
                     ->with(['file:id,path,disk,mime,size']),
             ])
+            ->when(($user && !$user->isAdmin() && !$user->isTechnician()), fn($qb) => $qb->where('reporter_id', $user->id))
             ->when($status, fn ($qb) => $qb->where('status', $status))
             ->when($priority, fn ($qb) => $qb->where('priority', $priority))
             ->when($q, function ($w) use ($q) {
                 $w->where(function ($ww) use ($q) {
                     $ww->where('title','like',"%{$q}%")
                        ->orWhere('description','like',"%{$q}%")
-                       // ค้นหาอีเมลทั้งจาก Users.email และ reporter_email (กรณีผู้แจ้งไม่ใช่ผู้ใช้ในระบบ)
                        ->orWhereHas('reporter', fn($qr) => $qr->where('email','like',"%{$q}%"))
                        ->orWhere('reporter_email','like',"%{$q}%");
                 });
@@ -52,6 +51,7 @@ class MaintenanceRequestController extends Controller
 
     public function queuePage(Request $request)
     {
+        \Gate::authorize('view-repair-dashboard');
         $status = (string) $request->string('status');
         $q      = (string) $request->string('q');
         $just   = (int) $request->query('just');
@@ -75,7 +75,6 @@ class MaintenanceRequestController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        // quick stats for header
         $stats = [
             'total'       => (clone $base)->count(),
             'pending'     => (clone $base)->where('status','pending')->count(),
@@ -88,6 +87,7 @@ class MaintenanceRequestController extends Controller
 
     public function myJobsPage(Request $request)
     {
+        \Gate::authorize('view-my-jobs');
         $userId = Auth::id();
 
         $list = MR::query()
@@ -101,6 +101,7 @@ class MaintenanceRequestController extends Controller
 
     public function showPage(MR $req)
     {
+    \Gate::authorize('view', $req);
         $req->loadMissing([
             'asset',
             'reporter:id,name,email',
@@ -114,14 +115,12 @@ class MaintenanceRequestController extends Controller
 
     public function createPage()
     {
-        // เตรียมรายการทรัพย์สินและผู้ใช้สำหรับ dropdown
         $assets = \App\Models\Asset::orderBy('asset_code')->get(['id','asset_code','name']);
         $users  = \App\Models\User::orderBy('name')->get(['id','name']);
 
         return view('maintenance.requests.create', compact('assets','users'));
     }
 
-    /** ========== API & Form handlers ========== */
     public function index(Request $request)
     {
         $status   = $request->string('status')->toString();
@@ -165,7 +164,6 @@ class MaintenanceRequestController extends Controller
 
     public function store(Request $request)
     {
-        // Custom validator so we can craft a toast listing missing required fields
         $maxKb = config('uploads.max_kb', 10240);
         $mimetypes = implode(',', config('uploads.mimetypes', ['image/*','application/pdf']));
         $fileRules = ['file', 'max:'.$maxKb, 'mimetypes:'.$mimetypes];
@@ -183,7 +181,6 @@ class MaintenanceRequestController extends Controller
 
     $validator = Validator::make($request->all(), $rules);
         if ($validator->fails()) {
-            // Determine which required fields are missing
             $required = ['title','priority'];
             $missing = [];
             foreach ($required as $field) {
@@ -198,11 +195,9 @@ class MaintenanceRequestController extends Controller
                 ? 'กรุณากรอกให้ครบ: '.$missingHuman.' • ช่องอื่นๆ '.$optionalList
                 : 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง';
 
-            // Web: redirect back with toast + errors preserved
             if (!$request->expectsJson()) {
                 return redirect()->back()->withErrors($validator)->withInput()->with('toast', \App\Support\Toast::warning($msg, 2600));
             }
-            // JSON response
             return response()->json([
                 'errors' => $validator->errors(),
                 'toast'  => \App\Support\Toast::warning($msg, 2600),
@@ -225,7 +220,6 @@ class MaintenanceRequestController extends Controller
                 'reporter_email'=> $data['reporter_email'] ?? null,
             ]);
 
-            // Log: create request
             if (class_exists(\App\Models\MaintenanceLog::class)) {
                 \App\Models\MaintenanceLog::create([
                     'request_id' => $req->id,
@@ -235,13 +229,11 @@ class MaintenanceRequestController extends Controller
                 ]);
             }
 
-            // อัปโหลดไฟล์ → ไปที่ files ก่อน แล้วค่อย create attachments
             if ($request->hasFile('files')) {
                 foreach ($request->file('files') as $up) {
                     $disk = 'public';
                     $storedPath = $up->store("maintenance/{$req->id}", $disk);
 
-                    // checksum + path_hash
                     $stream = fopen($up->getRealPath(), 'r');
                     $ctx = hash_init('sha256');
                     while (!feof($stream)) {
@@ -264,13 +256,11 @@ class MaintenanceRequestController extends Controller
                         ]
                     );
 
-                    // ป้องกันแนบซ้ำ + เคสเคยลบ (soft-deleted) → restore
                     $existing = $req->attachments()->withTrashed()->where('file_id', $file->id)->first();
                     if ($existing) {
                         if ($existing->trashed()) {
                             $existing->restore();
                         }
-                        // ถ้ามีอยู่แล้วแบบ active ไม่ต้องสร้างซ้ำ
                     } else {
                         $req->attachments()->create([
                             'file_id'       => $file->id,
@@ -299,7 +289,7 @@ class MaintenanceRequestController extends Controller
 
     public function update(Request $request, MR $req)
     {
-        // ใช้ Validator manual เพื่อออก warning toast แบบรวมสาเหตุ (คล้าย store())
+        \Gate::authorize('update', $req);
         $maxKb = config('uploads.max_kb', 10240);
         $mimetypes = implode(',', config('uploads.mimetypes', ['image/*','application/pdf']));
         $fileRules = ['file', 'max:'.$maxKb, 'mimetypes:'.$mimetypes];
@@ -308,7 +298,7 @@ class MaintenanceRequestController extends Controller
             'title'        => ['sometimes','required','string','max:255'],
             'description'  => ['nullable','string','max:5000'],
             'asset_id'     => ['nullable','integer','exists:assets,id'],
-            'priority'     => ['nullable', Rule::in(['low','medium','high','urgent'])], // ← medium
+            'priority'     => ['nullable', Rule::in(['low','medium','high','urgent'])],
             'status'       => ['nullable', Rule::in(['pending','accepted','in_progress','on_hold','resolved','closed','cancelled'])],
             'request_date' => ['nullable','date'],
             'reporter_email'=> ['nullable','email','max:255'],
@@ -318,7 +308,6 @@ class MaintenanceRequestController extends Controller
         $validator = Validator::make($request->all(), $rules);
         if ($validator->fails()) {
             $errors = $validator->errors();
-            // รวมรายการ field สำคัญที่มี error เพื่อให้ user เห็นภาพรวม
             $fieldsHuman = [
                 'title' => 'หัวข้อ', 'priority' => 'ระดับความสำคัญ','status' => 'สถานะ',
                 'reporter_email' => 'อีเมลผู้แจ้ง','request_date' => 'วันที่แจ้ง','files.*' => 'ไฟล์แนบ'
@@ -339,19 +328,40 @@ class MaintenanceRequestController extends Controller
         $data = $validator->validated();
 
         DB::transaction(function () use ($data, $request, $req) {
-            $req->fill($data)->save();
+            $originalStatus = $req->status;
+            $req->fill($data);
 
-            // Log: update request
-            if (class_exists(\App\Models\MaintenanceLog::class)) {
-                \App\Models\MaintenanceLog::create([
-                    'request_id' => $req->id,
-                    'action'     => \App\Models\MaintenanceLog::ACTION_UPDATE,
-                    'note'       => null,
-                    'user_id'    => optional($request->user())->id,
-                ]);
+            // หากเปลี่ยนเป็น accepted และยังไม่มีช่าง -> ตั้งเป็นผู้ใช้งานปัจจุบัน
+            $actorId = optional($request->user())->id;
+            if (($data['status'] ?? null) === 'accepted' && empty($req->technician_id) && $actorId) {
+                $req->technician_id = $actorId;
             }
 
-            // ลบไฟล์แนบที่ติ๊กเลือกไว้ในแบบฟอร์ม
+            $req->save();
+
+
+            // ถ้าสถานะมีการเปลี่ยน ให้บันทึก transition log พร้อม from/to
+            if (class_exists(\App\Models\MaintenanceLog::class)) {
+                if (array_key_exists('status', $data) && $originalStatus !== $req->status) {
+                    $defaultNote = $this->defaultNoteForStatus($req->status, $actorId, $req);
+                    \App\Models\MaintenanceLog::create([
+                        'request_id'  => $req->id,
+                        'action'      => \App\Models\MaintenanceLog::ACTION_TRANSITION,
+                        'note'        => $defaultNote,
+                        'user_id'     => $actorId,
+                        'from_status' => $originalStatus,
+                        'to_status'   => $req->status,
+                    ]);
+                } else {
+                    \App\Models\MaintenanceLog::create([
+                        'request_id' => $req->id,
+                        'action'     => \App\Models\MaintenanceLog::ACTION_UPDATE,
+                        'note'       => null,
+                        'user_id'    => $actorId,
+                    ]);
+                }
+            }
+
             $toRemove = array_filter((array) $request->input('remove_attachments', []), fn($v) => is_numeric($v));
             if (!empty($toRemove)) {
                 $attachments = $req->attachments()->whereIn('id', $toRemove)->get();
@@ -366,7 +376,6 @@ class MaintenanceRequestController extends Controller
                     $disk = 'public';
                     $storedPath = $up->store("maintenance/{$req->id}", $disk);
 
-                    // checksum + path_hash
                     $stream = fopen($up->getRealPath(), 'r');
                     $ctx = hash_init('sha256');
                     while (!feof($stream)) {
@@ -389,13 +398,11 @@ class MaintenanceRequestController extends Controller
                         ]
                     );
 
-                    // ป้องกันแนบซ้ำ + เคสเคยลบ (soft-deleted) → restore
                     $existing = $req->attachments()->withTrashed()->where('file_id', $file->id)->first();
                     if ($existing) {
                         if ($existing->trashed()) {
                             $existing->restore();
                         }
-                        // ถ้ามีอยู่แล้วแบบ active ไม่ต้องสร้างซ้ำ
                     } else {
                         $req->attachments()->create([
                             'file_id'       => $file->id,
@@ -423,6 +430,7 @@ class MaintenanceRequestController extends Controller
 
     public function transition(Request $request, MR $req)
     {
+        \Gate::authorize('transition', $req);
         $rules = [
             'status'        => ['required', Rule::in(['pending','accepted','in_progress','on_hold','resolved','closed','cancelled'])],
             'note'          => ['nullable','string','max:2000'],
@@ -457,7 +465,7 @@ class MaintenanceRequestController extends Controller
 
     public function transitionFromBlade(Request $request, MR $req)
     {
-        // รองรับ action แบบย่อจากหน้า Queue: accept|assign|start
+        \Gate::authorize('transition', $req);
         $action = (string) $request->string('action');
         if ($action) {
             $map = [
@@ -471,12 +479,10 @@ class MaintenanceRequestController extends Controller
                     'status' => $status,
                     'note'   => $request->string('note')->toString(),
                 ];
-                // ถ้า assign หรือ accept ให้ผูก technician เป็นผู้ใช้ปัจจุบันหากไม่ส่งมา
                 if (in_array($action, ['accept','assign'], true)) {
                     $payload['technician_id'] = $request->integer('technician_id') ?: optional(Auth::user())->id;
                 }
 
-                // ดำเนินการอัปเดตสถานะ แล้วส่ง Toast ที่ชัดเจนตาม action
                 $updated = $this->applyTransition($req, $payload, optional(Auth::user())->id);
 
                 $toastMessage = match ($action) {
@@ -486,7 +492,6 @@ class MaintenanceRequestController extends Controller
                     default  => 'บันทึกสถานะเรียบร้อย',
                 };
 
-                // ส่งกลับไปยังหน้า Queue โดยตรงให้ชัวร์ว่าเห็น Toast (หลีกเลี่ยง Referer ที่บางทีหาย)
                 return $this->respondWithToast(
                     $request,
                     \App\Support\Toast::success($toastMessage, 1800),
@@ -498,24 +503,35 @@ class MaintenanceRequestController extends Controller
         return $this->transition($request, $req);
     }
 
-    /**
-     * ทำ Transition ให้คำขอ พร้อมเขียน Log และคืนค่ารายการที่อัปเดตแล้ว (พร้อม technician)
-     */
     protected function applyTransition(MR $req, array $data, ?int $actorId = null): MR
     {
         DB::transaction(function () use ($req, $data, $actorId) {
+            $originalStatus = $req->status;
             $req->status = $data['status'];
-            if (!empty($data['technician_id'])) {
+            $technicianChanged = false;
+            if (!empty($data['technician_id']) && $req->technician_id !== $data['technician_id']) {
                 $req->technician_id = $data['technician_id'];
+                $technicianChanged = true;
+            }
+            // รับงาน แต่ยังไม่มีช่าง -> ตั้งค่าเป็นผู้ที่กดรับงาน
+            if ($req->status === 'accepted' && empty($req->technician_id) && $actorId) {
+                $req->technician_id = $actorId;
+                $technicianChanged = true;
             }
             $req->save();
 
             if (class_exists(\App\Models\MaintenanceLog::class)) {
+                $defaultNote = $data['note'] ?? $this->defaultNoteForStatus($req->status, $actorId, $req);
+                if ($technicianChanged && $req->technician) {
+                    $defaultNote = trim(($defaultNote ? $defaultNote.' • ' : '').'ช่าง: '.$req->technician->name);
+                }
                 \App\Models\MaintenanceLog::create([
-                    'request_id' => $req->id,
-                    'action'     => \App\Models\MaintenanceLog::ACTION_TRANSITION,
-                    'note'       => $data['note'] ?? null,
-                    'user_id'    => $actorId,
+                    'request_id'  => $req->id,
+                    'action'      => \App\Models\MaintenanceLog::ACTION_TRANSITION,
+                    'note'        => $defaultNote ?: null,
+                    'user_id'     => $actorId,
+                    'from_status' => $originalStatus,
+                    'to_status'   => $req->status,
                 ]);
             }
         });
@@ -525,6 +541,7 @@ class MaintenanceRequestController extends Controller
 
     public function uploadAttachmentFromBlade(Request $request, MR $req)
     {
+        \Gate::authorize('attach', $req);
         $maxKb = config('uploads.max_kb', 10240);
         $mimetypes = implode(',', config('uploads.mimetypes', ['image/*','application/pdf']));
         $fileRules = ['required','file','max:'.$maxKb,'mimetypes:'.$mimetypes];
@@ -541,7 +558,6 @@ class MaintenanceRequestController extends Controller
         $disk = $isPrivate ? 'local' : 'public';
         $storedPath = $up->store("maintenance/{$req->id}", $disk);
 
-        // checksum + path_hash
         $stream = fopen($up->getRealPath(), 'r');
         $ctx = hash_init('sha256');
         while (!feof($stream)) {
@@ -563,13 +579,11 @@ class MaintenanceRequestController extends Controller
                 'meta'       => null,
             ]
         );
-        // ตรวจว่ามีอยู่แล้ว (รวมถึง soft-deleted) -> restore แทนที่จะสร้างซ้ำ
         $existing = $req->attachments()->withTrashed()->where('file_id', $file->id)->first();
         if ($existing) {
             if ($existing->trashed()) {
                 $existing->restore();
             }
-            // อัปเดต meta ใหม่ (caption/alt/private) เผื่อเปลี่ยนค่า
             $existing->fill([
                 'original_name' => $up->getClientOriginalName(),
                 'extension'     => $up->getClientOriginalExtension() ?: $existing->extension,
@@ -609,13 +623,13 @@ class MaintenanceRequestController extends Controller
 
     public function destroyAttachment(MR $req, Attachment $attachment)
     {
+        \Gate::authorize('deleteAttachment', $req);
         abort_unless(
             $attachment->attachable_type === MR::class &&
             (int) $attachment->attachable_id === (int) $req->id,
             404
         );
 
-        // ลบแนบไฟล์ และถ้าไม่มีใครใช้ไฟล์ก้อนนี้แล้ว ให้ลบ record + physical file
         $attachment->deleteAndCleanup(true);
 
         return $this->respondWithToast(
@@ -626,7 +640,6 @@ class MaintenanceRequestController extends Controller
         );
     }
 
-    /** ========== Utilities ========== */
     protected function respondWithToast(
         Request $request,
         array $toast,
@@ -660,16 +673,34 @@ class MaintenanceRequestController extends Controller
     public function edit($id)
     {
         $mr = \App\Models\MaintenanceRequest::with(['asset','reporter','attachments.file'])->findOrFail($id);
+        \Gate::authorize('update', $mr);
 
         $assets = \App\Models\Asset::orderBy('asset_code')->get(['id','asset_code','name']);
         $users  = \App\Models\User::orderBy('name')->get(['id','name']);
 
-        // ดึงคอลัมน์ของ attachments ที่มีจริง + eager load file
         $attachments = $mr->attachments()
             ->select(['id','file_id','original_name','is_private','order_column','attachable_id','attachable_type'])
             ->with(['file:id,path,disk,mime,size'])
             ->get();
 
         return view('maintenance.requests.edit', compact('mr','assets','users','attachments'));
+    }
+
+    /**
+     * สร้าง note เริ่มต้นเมื่อเปลี่ยนสถานะ หากผู้ใช้ไม่ได้ใส่ note เอง
+     */
+    protected function defaultNoteForStatus(string $status, ?int $actorId, MR $req): string
+    {
+        $actorName = optional(\App\Models\User::find($actorId))->name;
+        return match ($status) {
+            'pending'     => 'ตั้งคิวงานใหม่',
+            'accepted'    => $actorName ? ('รับงานโดย '.$actorName) : 'รับงานแล้ว',
+            'in_progress' => 'เริ่มดำเนินการซ่อม',
+            'on_hold'     => 'พักงานชั่วคราว',
+            'resolved'    => 'แก้ไขเสร็จ รอตรวจรับ',
+            'closed'      => 'ปิดงานเรียบร้อย',
+            'cancelled'   => 'ยกเลิกคำขอ',
+            default       => 'อัปเดตสถานะ',
+        };
     }
 }

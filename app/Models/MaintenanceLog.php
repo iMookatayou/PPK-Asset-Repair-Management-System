@@ -8,13 +8,14 @@ class MaintenanceLog extends Model
 {
     public $timestamps = false;
 
-    protected $fillable = ['request_id','user_id','action','note','created_at'];
+    protected $fillable = [
+        'request_id','user_id','action','note','created_at','from_status','to_status'
+    ];
 
     protected $casts = [
         'created_at' => 'datetime',
     ];
 
-    // === คอนสแตนต์ action ===
     public const ACTION_CREATE   = 'create_request';
     public const ACTION_UPDATE   = 'update_request';
     public const ACTION_ASSIGN   = 'assign_technician';
@@ -23,7 +24,32 @@ class MaintenanceLog extends Model
     public const ACTION_CANCEL   = 'cancel_request';
     public const ACTION_TRANSITION = 'transition';
 
-    // เติม created_at อัตโนมัติถ้าไม่ส่งมา
+    /**
+     * แปลง status code -> Thai label สำหรับแสดงผลเร็ว ๆ ใน view (ไม่ persisted)
+     */
+    public static function statusLabel(string $status): string
+    {
+        return [
+            'pending'     => 'รอคิว',
+            'accepted'    => 'รับงานแล้ว',
+            'in_progress' => 'ระหว่างดำเนินการ',
+            'on_hold'     => 'พักไว้',
+            'resolved'    => 'แก้ไขแล้ว',
+            'closed'      => 'ปิดงาน',
+            'cancelled'   => 'ยกเลิก',
+        ][$status] ?? $status;
+    }
+
+    public function getFromStatusLabelAttribute(): ?string
+    {
+        return $this->from_status ? self::statusLabel($this->from_status) : null;
+    }
+
+    public function getToStatusLabelAttribute(): ?string
+    {
+        return $this->to_status ? self::statusLabel($this->to_status) : null;
+    }
+
     protected static function booted()
     {
         static::creating(function (self $log) {
@@ -33,7 +59,6 @@ class MaintenanceLog extends Model
         });
     }
 
-    // === ความสัมพันธ์ ===
     public function request()
     {
         return $this->belongsTo(MaintenanceRequest::class, 'request_id');
@@ -44,7 +69,6 @@ class MaintenanceLog extends Model
         return $this->belongsTo(User::class);
     }
 
-    // === Scopes ===
     public function scopeForRequest($query, int $requestId)
     {
         return $query->where('request_id', $requestId);

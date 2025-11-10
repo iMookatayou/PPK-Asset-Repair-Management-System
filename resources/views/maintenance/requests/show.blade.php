@@ -1,4 +1,3 @@
-{{-- resources/views/maintenance/show.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'รายละเอียดงานซ่อม #'.$req->id)
@@ -60,9 +59,14 @@
             <span class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium bg-slate-50 text-slate-700 border-slate-200">
               {{ $req->asset->name ?? $req->asset_id ?? '—' }}
             </span>
-            <span class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium {{ $statusTone }}">
+            <span class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium {{ $statusTone }}" id="currentStatusBadge">
               {{ $statusLabel }}
             </span>
+            @if($req->technician?->name)
+              <span class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium bg-indigo-50 text-indigo-700 border-indigo-200" id="currentTechnicianBadge">
+                ช่าง: {{ $req->technician->name }}
+              </span>
+            @endif
             <span class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium {{ $prioTone }}">
               {{ $prioLabel }}
             </span>
@@ -209,7 +213,7 @@
             <button type="submit"
                     class="inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
               บันทึกการดำเนินการ
-            </button>          
+            </button>
           </div>
         </form>
       </div>
@@ -310,18 +314,27 @@
         <div class="mt-4 space-y-3">
           @forelse(($req->logs ?? collect()) as $log)
             @php
+              $to = $log->to_status;
               $tone = 'bg-slate-400';
-              if (($log->to ?? null) === 'resolved' || ($log->to ?? null) === 'closed') $tone = 'bg-emerald-600';
-              if (($log->to ?? null) === 'cancelled') $tone = 'bg-rose-600';
-              if (in_array(($log->to ?? null), ['in_progress','accepted','on_hold'], true)) $tone = 'bg-amber-600';
+              if (in_array($to, ['resolved','closed'], true)) $tone = 'bg-emerald-600';
+              if ($to === 'cancelled') $tone = 'bg-rose-600';
+              if (in_array($to, ['in_progress','accepted','on_hold'], true)) $tone = 'bg-amber-600';
+              $fromLabel = $log->from_status_label ?? ($log->from_status ?? '—');
+              $toLabel   = $log->to_status_label ?? ($to ?? '—');
             @endphp
             <article class="relative border-l-2 border-slate-200 pl-6">
               <span class="absolute -left-1.5 top-2 inline-block h-3 w-3 rounded-full {{ $tone }}"></span>
               <header class="flex flex-wrap items-center gap-2 text-sm">
                 <strong>#{{ $log->id }}</strong>
-                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700">
-                  {{ ($log->from ?? '—') }} → {{ ($log->to ?? '—') }}
-                </span>
+                @if($log->action === \App\Models\MaintenanceLog::ACTION_TRANSITION)
+                  <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700">
+                    {{ $fromLabel }} → {{ $toLabel }}
+                  </span>
+                @else
+                  <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700">
+                    {{ $log->action }}
+                  </span>
+                @endif
                 @if($log->created_at)
                   <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700">
                     <time datetime="{{ $log->created_at->toIso8601String() }}">{{ $log->created_at->format('Y-m-d H:i') }}</time>

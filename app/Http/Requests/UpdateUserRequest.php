@@ -16,7 +16,6 @@ class UpdateUserRequest extends FormRequest
 
     public function rules(): array
     {
-        // route model binding: {user}
         $routeUser = $this->route('user');
         $userId = $routeUser instanceof User ? $routeUser->getKey() : $routeUser;
 

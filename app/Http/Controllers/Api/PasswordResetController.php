@@ -13,7 +13,6 @@ use Symfony\Component\HttpFoundation\Response;
 
 class PasswordResetController extends Controller
 {
-    // POST /api/auth/password/email  { email }
     public function sendResetLinkEmail(Request $request)
     {
         $request->validate(['email' => ['required','email']]);
@@ -34,7 +33,6 @@ class PasswordResetController extends Controller
         ], Response::HTTP_BAD_REQUEST);
     }
 
-    // POST /api/auth/password/reset  { email, token, password, password_confirmation }
     public function reset(Request $request)
     {
         $request->validate([

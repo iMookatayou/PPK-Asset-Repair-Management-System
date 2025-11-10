@@ -23,7 +23,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'department',            // เก็บรหัสแผนก (code) เป็น string
+        'department',
         'role',
         'profile_photo_path',
         'profile_photo_thumb',
@@ -44,7 +44,6 @@ class User extends Authenticatable
         ];
     }
 
-    // ===== Role Helpers =====
     public function isAdmin(): bool      { return $this->role === self::ROLE_ADMIN; }
     public function isTechnician(): bool { return $this->role === self::ROLE_TECHNICIAN; }
     public function isStaff(): bool      { return $this->role === self::ROLE_STAFF; }
@@ -52,7 +51,6 @@ class User extends Authenticatable
     public function scopeRole($q, string $role)    { return $q->where('role', $role); }
     public function scopeInRoles($q, array $roles) { return $q->whereIn('role', $roles); }
 
-    // ===== Relations =====
     public function reportedRequests()
     {
         return $this->hasMany(MaintenanceRequest::class, 'reporter_id');
@@ -67,18 +65,11 @@ class User extends Authenticatable
     {
         return $this->hasMany(MaintenanceLog::class, 'user_id');
     }
-
-    /**
-     * อ้างอิงแผนกด้วยคีย์ภายนอกเป็น code
-     * เปลี่ยนชื่อรีเลชันเป็น departmentRef เพื่อไม่ชนกับคอลัมน์ users.department
-     */
     public function departmentRef()
     {
-        // users.department (local key) -> departments.code (owner key)
         return $this->belongsTo(Department::class, 'department', 'code');
     }
 
-    // ===== Accessors / Scopes =====
     public function getDepartmentNameAttribute(): ?string
     {
         return $this->departmentRef?->name;
@@ -89,7 +80,6 @@ class User extends Authenticatable
         return $code ? $q->where('department', $code) : $q;
     }
 
-    // ===== Avatar / Profile Photo =====
     public function getAvatarUrlAttribute(): string
     {
         $path = $this->profile_photo_path;
@@ -119,7 +109,6 @@ class User extends Authenticatable
         return $q->whereNotNull('profile_photo_path')->where('profile_photo_path', '!=', '');
     }
 
-    // ===== Private helpers =====
     private function uiAvatarUrl(int $size = 256): string
     {
         $name = urlencode($this->name ?: 'User');

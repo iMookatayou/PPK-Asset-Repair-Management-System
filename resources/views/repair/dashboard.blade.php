@@ -1,11 +1,9 @@
-{{-- resources/views/repair/dashboard.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Asset Repair Dashboard — Compact')
 
 @section('content')
 
-  {{-- ===== [A] อ่าน toast จาก session (วางใต้ @section('content') ทันที) ===== --}}
   @php
     $toast = session('toast');
     if ($toast) { session()->forget('toast'); } // ใช้ครั้งเดียว
@@ -25,7 +23,6 @@
   @endphp
 
   @php
-    // ===== Normalize incoming collections =====
     $monthlyTrend = is_iterable($monthlyTrend ?? null) ? collect($monthlyTrend) : collect();
     $byAssetType  = is_iterable($byAssetType  ?? null) ? collect($byAssetType)  : collect();
     $byDept       = is_iterable($byDept       ?? null) ? collect($byDept)       : collect();
@@ -70,7 +67,6 @@
   <div class="py-4">
     <div class="mx-auto max-w-7xl px-3 lg:px-6 space-y-4">
 
-      {{-- ===== Page Header (utility-only) ===== --}}
       <div class="sticky top-16 z-30 -mt-2">
         <div class="rounded-2xl border border-zinc-200 bg-white/90 backdrop-blur shadow-sm">
           <div class="flex flex-wrap items-center gap-3 px-4 py-3">
@@ -100,31 +96,52 @@
                 Filters
               </button>
 
+              {{-- Status dropdown (replaces quick pills) --}}
+              @php
+                $statusMap = [
+                  '' => 'All',
+                  'pending' => 'Pending',
+                  'in_progress' => 'In progress',
+                  'completed' => 'Completed',
+                ];
+                $currStatus = (string) request('status','');
+                $currStatusLabel = $statusMap[$currStatus] ?? 'All';
+              @endphp
+              <div class="relative">
+                <button id="statusMenuBtn" type="button"
+                        class="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
+                        aria-haspopup="menu" aria-expanded="false" aria-controls="statusMenu">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18M6 8h12M9 12h6M11 16h2"/>
+                  </svg>
+                  <span>Status: {{ $currStatusLabel }}</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9l6 6 6-6"/>
+                  </svg>
+                </button>
+                <div id="statusMenu" role="menu"
+                     class="absolute right-0 mt-2 w-44 rounded-lg border border-zinc-200 bg-white shadow-lg hidden z-40">
+                  <a href="{{ request()->fullUrlWithQuery(['status'=>'']) }}"
+                     class="block px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50" role="menuitem">All</a>
+                  <a href="{{ request()->fullUrlWithQuery(['status'=>'pending']) }}"
+                     class="block px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50" role="menuitem">Pending</a>
+                  <a href="{{ request()->fullUrlWithQuery(['status'=>'in_progress']) }}"
+                     class="block px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50" role="menuitem">In progress</a>
+                  <a href="{{ request()->fullUrlWithQuery(['status'=>'completed']) }}"
+                     class="block px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50" role="menuitem">Completed</a>
+                </div>
+              </div>
+
               <a href="{{ route('repair.dashboard') }}"
                  class="inline-flex items-center rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50">
                 Refresh
               </a>
             </div>
           </div>
-
-          {{-- Quick filters row --}}
-          <div class="border-t border-zinc-200 px-4 py-2">
-            <div class="flex flex-wrap items-center gap-2 text-xs">
-              <span class="text-zinc-500">Quick:</span>
-              <a href="{{ request()->fullUrlWithQuery(['status'=>'pending']) }}"
-                 class="rounded-md bg-white px-2.5 py-1 text-zinc-700 ring-1 ring-inset ring-zinc-300 hover:bg-zinc-50">Pending</a>
-              <a href="{{ request()->fullUrlWithQuery(['status'=>'in_progress']) }}"
-                 class="rounded-md bg-white px-2.5 py-1 text-zinc-700 ring-1 ring-inset ring-zinc-300 hover:bg-zinc-50">In progress</a>
-              <a href="{{ request()->fullUrlWithQuery(['status'=>'completed']) }}"
-                 class="rounded-md bg-white px-2.5 py-1 text-zinc-700 ring-1 ring-inset ring-zinc-300 hover:bg-zinc-50">Completed</a>
-              <a href="{{ route('repair.dashboard') }}"
-                 class="rounded-md px-2.5 py-1 text-zinc-600 hover:underline">Clear</a>
-            </div>
-          </div>
+          {{-- Quick row removed in favor of dropdown --}}
         </div>
       </div>
 
-      {{-- ===== Filters (collapsible, utility-only) ===== --}}
       <div id="filtersPanel" class="{{ $filtersActive ? '' : 'hidden' }}">
         <form method="GET" class="rounded-2xl border border-zinc-200 bg-white shadow-sm">
           <div class="px-4 py-3 sm:px-6 sm:py-4">
@@ -134,7 +151,6 @@
             </div>
 
             <div class="mt-3 grid grid-cols-2 gap-3 md:grid-cols-6">
-              {{-- Status --}}
               <div class="md:col-span-2">
                 <label for="f_status" class="block text-xs font-medium text-zinc-700">Status</label>
                 <select id="f_status" name="status"
@@ -146,21 +162,18 @@
                 </select>
               </div>
 
-              {{-- From --}}
               <div>
                 <label for="f_from" class="block text-xs font-medium text-zinc-700">From</label>
                 <input id="f_from" type="date" name="from" value="{{ e(request('from','')) }}"
                        class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
               </div>
 
-              {{-- To --}}
               <div>
                 <label for="f_to" class="block text-xs font-medium text-zinc-700">To</label>
                 <input id="f_to" type="date" name="to" value="{{ e(request('to','')) }}"
                        class="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
               </div>
 
-              {{-- Apply / Reset --}}
               <div class="md:col-span-2 flex items-end gap-2">
                 <button class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500/30">
                   Apply
@@ -175,7 +188,6 @@
         </form>
       </div>
 
-      {{-- ===== KPIs (utility-only, no .stats) ===== --}}
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div class="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
           <div class="text-sm text-zinc-500">Total</div>
@@ -204,7 +216,6 @@
         </div>
       </div>
 
-      {{-- ===== Focus Chart: Department (Bar) ===== --}}
       <div class="rounded-2xl border border-zinc-200 bg-white shadow-sm">
         <div class="px-4 py-3 sm:px-6 sm:py-4">
           <div class="flex items-center justify-between">
@@ -224,9 +235,7 @@
         </div>
       </div>
 
-      {{-- ===== Chart Pair: Trend + Type ===== --}}
       <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {{-- Monthly Trend (line) --}}
         <div class="rounded-2xl border border-zinc-200 bg-white shadow-sm">
           <div class="px-4 py-3 sm:px-6 sm:py-4">
             <div class="flex items-center justify-between">
@@ -246,7 +255,6 @@
           </div>
         </div>
 
-        {{-- Asset Types (pie) --}}
         <div class="rounded-2xl border border-zinc-200 bg-white shadow-sm">
           <div class="px-4 py-3 sm:px-6 sm:py-4">
             <div class="flex items-center justify-between">
@@ -267,7 +275,7 @@
         </div>
       </div>
 
-      {{-- ===== Recent Table ===== --}}
+
       <div class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
         <div class="px-4 py-3 sm:px-6 sm:py-4">
           <div class="flex items-center gap-2">
@@ -324,7 +332,6 @@
     </div>
   </div>
 
-  {{-- ===== [B] Toast overlay + CSS (ครั้งเดียว/ย้ายไป layout ได้) ===== --}}
   <style>
     .toast-overlay{position:fixed;inset:0;z-index:100001;pointer-events:none}
     .toast-pos{display:flex;width:100%;height:100%;padding:1rem}
@@ -367,16 +374,38 @@
     ];
   @endphp
 
-  {{-- ===== [C.1] Lottie web component (ถ้า layout มีอยู่แล้ว ตัดบรรทัดนี้ออกได้) ===== --}}
   <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js" defer></script>
 
-  {{-- ===== [C.2] Chart.js (ถ้า layout โหลดอยู่แล้ว ตัดบรรทัดนี้ออกได้) ===== --}}
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
 
-  {{-- ===== JS: Charts render + Toast ===== --}}
   <script>
   (function(){
-    // ===== Util: waitFor condition (ใช้รอ Chart โหลด) =====
+    // ===== Filters toggle + Status dropdown =====
+    document.addEventListener('DOMContentLoaded', () => {
+      // Filters panel
+      const btn = document.getElementById('filterToggle');
+      const panel = document.getElementById('filtersPanel');
+      if (btn && panel) {
+        btn.addEventListener('click', () => {
+          const hidden = panel.classList.toggle('hidden');
+          btn.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+        });
+      }
+
+      // Status dropdown
+      const menuBtn = document.getElementById('statusMenuBtn');
+      const menu    = document.getElementById('statusMenu');
+      if (menuBtn && menu) {
+        const closeMenu = () => { if (!menu.classList.contains('hidden')) menu.classList.add('hidden'); menuBtn.setAttribute('aria-expanded','false'); };
+        const toggleMenu = () => { const hidden = menu.classList.toggle('hidden'); menuBtn.setAttribute('aria-expanded', hidden ? 'false' : 'true'); };
+        menuBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleMenu(); });
+        document.addEventListener('click', (e) => {
+          if (!menu.contains(e.target) && e.target !== menuBtn) closeMenu();
+        });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
+      }
+    });
+
     function waitFor(condFn, {tries=50, interval=60} = {}) {
       return new Promise((resolve, reject) => {
         const t = setInterval(() => {
@@ -386,7 +415,6 @@
       });
     }
 
-    // ===== Chart helpers =====
     function parseData(el){
       try {
         const labels = JSON.parse(el.dataset.labels || '[]');
@@ -507,7 +535,6 @@
       if (typePie)    makePieChart(typePie);
     }
 
-    // ===== Toast =====
     const LOTTIE = {
       success: @json($lottieMap['success'] ?? null),
       info:    @json($lottieMap['info']    ?? null),
@@ -617,7 +644,6 @@
     window.showToast = showToast;
     window.addEventListener('app:toast', e => showToast(e.detail || {}));
 
-    // ===== Kickoff =====
     document.addEventListener('DOMContentLoaded', async () => {
       // Charts
       try { await renderCharts(); } catch(e) { /* noop */ }

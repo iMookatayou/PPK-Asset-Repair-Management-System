@@ -15,13 +15,11 @@ class Department extends Model
         'name_en',
     ];
 
-    // ===== Relationships =====
     public function assets()
     {
         return $this->hasMany(Asset::class);
     }
 
-    // รวมใบซ่อมทั้งหมดของแผนก (ผ่านทรัพย์สิน)
     public function maintenanceRequests()
     {
         return $this->hasManyThrough(
@@ -34,14 +32,11 @@ class Department extends Model
         );
     }
 
-    // ===== Accessors (สำหรับความเข้ากันได้กับโค้ดเดิม) =====
-    // ใช้ $dept->name จะได้ชื่อไทย ถ้าไม่มีไทยจะ fallback เป็นอังกฤษ
     public function getNameAttribute(): string
     {
         return $this->name_th ?: ($this->name_en ?: '');
     }
 
-    // สำหรับ UI: แสดง "Thai (English)" ถ้ามีทั้งสองภาษา
     public function getDisplayNameAttribute(): string
     {
         $th = trim((string) $this->name_th);
@@ -52,13 +47,11 @@ class Department extends Model
         return $th ?: $en;
     }
 
-    // ===== Scopes =====
     public function scopeCode($q, ?string $code)
     {
         return $code ? $q->where('code', $code) : $q;
     }
 
-    // ค้นหาชื่อแบบ like ทั้งไทยและอังกฤษ
     public function scopeNameLike($q, ?string $name)
     {
         if (!$name) return $q;
@@ -69,7 +62,6 @@ class Department extends Model
         });
     }
 
-    // ค้นหาแบบรวม code + ชื่อ (เหมาะกับหน้า index filter เดียว)
     public function scopeSearch($q, ?string $term)
     {
         if (!$term) return $q;

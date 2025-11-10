@@ -9,7 +9,6 @@
 @endphp
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-  {{-- Asset (search-select) --}}
   <div>
     <label for="asset_id" class="block text-sm font-medium text-slate-700">Asset</label>
     @php $assetColl = is_iterable($assetList ?? null) ? collect($assetList) : collect(); @endphp
@@ -21,7 +20,6 @@
     @error('asset_id')<p id="asset_id_error" class="mt-1 text-sm text-rose-600">{{ $message }}</p>@enderror
   </div>
 
-  {{-- Reporter (optional; search-select) --}}
   <div>
     <label for="reporter_id" class="block text-sm font-medium text-slate-700">Reporter (optional)</label>
     @php $userColl = is_iterable($userList ?? null) ? collect($userList) : collect(); @endphp
@@ -33,7 +31,6 @@
     @error('reporter_id')<p id="reporter_id_error" class="mt-1 text-sm text-rose-600">{{ $message }}</p>@enderror
   </div>
 
-  {{-- Reporter Email (optional; ใช้กรณีไม่ได้เลือกผู้ใช้ในระบบ) --}}
   <div>
     <label for="reporter_email" class="block text-sm font-medium text-slate-700">
       Reporter Email (optional)
@@ -54,7 +51,6 @@
     @enderror
   </div>
 
-  {{-- Title --}}
   <div class="md:col-span-2">
     <label for="title" class="block text-sm font-medium text-slate-700">
       Title <span class="text-rose-600" aria-hidden="true">*</span>
@@ -79,7 +75,6 @@
     @enderror
   </div>
 
-  {{-- Description --}}
   <div class="md:col-span-2">
     <label for="description" class="block text-sm font-medium text-slate-700">Description</label>
     <textarea
@@ -97,7 +92,6 @@
     @enderror
   </div>
 
-  {{-- Priority (use: low|medium|high|urgent) --}}
   <div>
     <label for="priority" class="block text-sm font-medium text-slate-700">
       Priority <span class="text-rose-600" aria-hidden="true">*</span>

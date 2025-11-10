@@ -23,7 +23,6 @@ class AuthenticatedSessionController extends Controller
             $request->authenticate();
             $request->session()->regenerate();
 
-            // เก็บเป็น session ปกติ (ไม่ใช่ flash)
             session()->put('toast', [
                 'type'     => 'success',
                 'message'  => 'Login successful',
@@ -37,7 +36,6 @@ class AuthenticatedSessionController extends Controller
             return redirect()->intended('/dashboard');
 
         } catch (ValidationException $e) {
-            // เคสผิดยังใช้ flash ได้ เพราะไม่ redirect ซ้อน
             return back()
                 ->with('toast', [
                     'type'     => 'error',

@@ -84,7 +84,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/chat/threads/{thread}/messages', [ChatController::class, 'messages'])->name('chat.messages');
     Route::post('/chat/threads/{thread}/messages', [ChatController::class, 'storeMessage'])->name('chat.messages.store');
     Route::get('/chat/my-updates', [\App\Http\Controllers\ChatController::class, 'myUpdates'])->name('chat.my_updates');
-  
+
     // Assets
     Route::get('/assets',                 [AssetController::class,'indexPage'])->name('assets.index');
     Route::get('/assets/create',          [AssetController::class,'createPage'])->name('assets.create');
@@ -94,7 +94,6 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/assets/{asset}',         [AssetController::class,'updatePage'])->name('assets.update');
     Route::delete('/assets/{asset}',      [AssetController::class,'destroyPage'])->name('assets.destroy');
 
-    // ===== Admin → Manage Users (รวมเป็นกลุ่มเดียว) =====
     Route::prefix('admin')->name('admin.')->middleware('can:manage-users')->group(function () {
         Route::prefix('users')->name('users.')->group(function () {
             Route::get('/',            [AdminUserController::class, 'index'])->name('index');
@@ -107,15 +106,11 @@ Route::middleware(['auth'])->group(function () {
         });
     });
 
-    // ===== Repairs (คืนเส้นทางที่หาย) =====
     Route::get('/repairs/my-jobs', [MaintenanceRequestController::class, 'myJobsPage'])->name('repairs.my_jobs');
     Route::get('/repairs/queue',   [MaintenanceRequestController::class, 'queuePage'])->name('repairs.queue');
 
-    // ===== Profile =====
-    // ดูโปรไฟล์ (ทุกคน)
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
 
-    // ผู้ใช้ทุกคนสามารถแก้ไข / อัปเดต / ลบบัญชีตนเองได้ (สอดคล้อง Breeze tests)
     Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile',    [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile',   [ProfileController::class, 'destroy'])->name('profile.destroy');

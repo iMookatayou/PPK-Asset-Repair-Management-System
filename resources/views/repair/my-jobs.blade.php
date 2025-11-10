@@ -1,4 +1,3 @@
-{{-- resources/views/repairs/my_jobs.blade.php --}}
 @extends('layouts.app')
 @section('title','My Jobs')
 
@@ -37,8 +36,6 @@
 @endphp
 
 <div class="mx-auto max-w-7xl py-6 space-y-6">
-
-  {{-- ===== Section header ===== --}}
   <div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
     <div class="flex items-center justify-between px-5 py-4">
       <div class="flex items-center gap-3">
@@ -54,15 +51,13 @@
       </div>
     </div>
 
-    {{-- ===== Filters row (moved all controls to TOP) ===== --}}
     <div class="border-t border-slate-200 px-5 py-4">
       <form method="GET" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6 xl:grid-cols-8">
-        {{-- keep other query params --}}
+
         @foreach(request()->except(['q','status','priority','sort','per_page','page']) as $k => $v)
           <input type="hidden" name="{{ $k }}" value="{{ $v }}">
         @endforeach
 
-        {{-- Search (wider to avoid text squeezing) --}}
         <div class="lg:col-span-2 xl:col-span-3">
           <label for="q" class="mb-1 block text-xs font-medium text-slate-600">Search</label>
           <div class="relative">
@@ -75,7 +70,6 @@
           </div>
         </div>
 
-        {{-- Status --}}
         <div class="lg:col-span-1">
           <label for="status" class="mb-1 block text-xs font-medium text-slate-600">Status</label>
           <select id="status" name="status"
@@ -87,7 +81,6 @@
           </select>
         </div>
 
-        {{-- Priority --}}
         <div class="lg:col-span-1">
           <label for="priority" class="mb-1 block text-xs font-medium text-slate-600">Priority</label>
           <select id="priority" name="priority"
@@ -99,7 +92,6 @@
           </select>
         </div>
 
-        {{-- Sort (moved from bottom) --}}
         <div class="lg:col-span-1">
           <label for="sort" class="mb-1 block text-xs font-medium text-slate-600">Sort</label>
           <select id="sort" name="sort"
@@ -111,7 +103,6 @@
           </select>
         </div>
 
-        {{-- Per page (moved from bottom) --}}
         <div class="lg:col-span-1">
           <label for="per_page" class="mb-1 block text-xs font-medium text-slate-600">Per page</label>
           <select id="per_page" name="per_page"
@@ -122,7 +113,6 @@
           </select>
         </div>
 
-        {{-- Actions --}}
         <div class="flex items-end gap-2 lg:col-span-1">
           <button type="submit" class="w-full sm:w-auto {{ $btnPrimary }}">Apply</button>
           @if($q || $status || $priority || $sort!=='updated_desc' || $perPage!==20)
@@ -132,7 +122,6 @@
       </form>
     </div>
 
-    {{-- ===== Table ===== --}}
     <div class="border-t border-slate-200">
       <div class="overflow-x-auto">
         <table class="w-full table-auto text-left">
@@ -206,7 +195,6 @@
         </table>
       </div>
 
-      {{-- Pagination only (controls moved to top already) --}}
       <div class="px-5 py-3">
         <div class="flex justify-center">
           {{ $list->withQueryString()->links() }}
@@ -215,7 +203,6 @@
     </div>
   </div>
 
-  {{-- ===== Mobile cards ===== --}}
   <div class="grid grid-cols-1 gap-3 md:hidden">
     @forelse($list as $r)
       @php

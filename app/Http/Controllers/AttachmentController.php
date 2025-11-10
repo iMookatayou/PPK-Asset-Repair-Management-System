@@ -10,11 +10,6 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AttachmentController extends Controller
 {
-    /**
-     * [DEPRECATED]
-     * เดิมเคยค้นจาก request_id/file_path (non-polymorphic)
-     * ปัจจุบันย้ายไปใช้ความสัมพันธ์ polymorphic แล้ว
-     */
     public function index(Request $request)
     {
         return response()->json([
@@ -23,22 +18,16 @@ class AttachmentController extends Controller
         ], 410);
     }
 
-    /**
-     * รายการไฟล์แนบของใบงาน (ยังใช้ได้)
-     * GET /maintenance/requests/{req}/attachments (ถ้าคุณมี route ตรงนี้)
-     */
     public function indexByRequest(MR $req)
     {
-        // ใช้ความสัมพันธ์ polymorphic: $req->attachments()
         $list = $req->attachments()
             ->orderByDesc('created_at')
             ->paginate(20);
 
-        // แปลง url ให้ FE ใช้งานได้ทั้ง public/private
         $list->getCollection()->transform(function (Attachment $a) {
             return [
                 'id'            => $a->id,
-                'url'           => $a->url,        // private => route('attachments.show', ...)
+                'url'           => $a->url,
                 'filename'      => $a->filename,
                 'mime'          => $a->mime,
                 'size'          => $a->size,
@@ -54,26 +43,14 @@ class AttachmentController extends Controller
         return response()->json($list);
     }
 
-    /**
-     * แสดง/ดาวน์โหลดไฟล์แนบ (สำหรับไฟล์ private)
-     * Route ตัวอย่าง:
-     *   Route::get('/attachments/{attachment}', [AttachmentController::class, 'show'])
-     *     ->middleware('auth')
-     *     ->name('attachments.show');
-     *
-     * Query:
-     *   ?download=1  -> force download (Content-Disposition: attachment)
-     */
     public function show(Request $request, Attachment $attachment)
     {
-        // public ไม่น่าถูกเรียกถึงจุดนี้ (เพราะ $attachment->url จะชี้ไป public URL อยู่แล้ว)
         if (!$attachment->is_private) {
             $publicUrl = $attachment->url;
             abort_unless($publicUrl, 404);
             return redirect()->away($publicUrl);
         }
 
-        // private: stream จาก disk
         $disk = $attachment->disk ?: 'local';
         $path = $attachment->path;
 
@@ -97,7 +74,6 @@ class AttachmentController extends Controller
             $headers['Content-Length'] = (string) $size;
         }
 
-        // inline หรือ download
         $disposition = $download ? 'attachment' : 'inline';
         $headers['Content-Disposition'] = $disposition.'; filename="'.addslashes($filename).'"';
 
@@ -109,9 +85,6 @@ class AttachmentController extends Controller
         }, 200, $headers);
     }
 
-    /**
-     * [DEPRECATED] non-polymorphic upload endpoint
-     */
     public function store(Request $request)
     {
         return response()->json([
@@ -120,12 +93,6 @@ class AttachmentController extends Controller
         ], 410);
     }
 
-    /**
-     * [DEPRECATED] non-polymorphic delete endpoint
-     * การลบควรทำผ่าน:
-     *   DELETE /maintenance/requests/{req}/attachments/{attachment}
-     *   -> MaintenanceRequestController@destroyAttachment
-     */
     public function destroy(Attachment $attachment)
     {
         return response()->json([
@@ -134,9 +101,6 @@ class AttachmentController extends Controller
         ], 410);
     }
 
-    /**
-     * [DEPRECATED] non-polymorphic upload-for-request endpoint
-     */
     public function storeForRequest(Request $request, MR $req)
     {
         return response()->json([

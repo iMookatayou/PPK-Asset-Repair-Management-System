@@ -12,7 +12,6 @@ class DashboardController extends Controller
 {
     public function index(Request $req)
     {
-        // ===== Column existence guards =====
         $hasReqDate       = Schema::hasColumn('maintenance_requests','request_date');
         $hasCreatedAt     = Schema::hasColumn('maintenance_requests','created_at');
         $hasCompletedDate = Schema::hasColumn('maintenance_requests','completed_date');
@@ -27,10 +26,8 @@ class DashboardController extends Controller
         $hasDeptNameTh    = $hasDeptTbl && Schema::hasColumn('departments','name_th');
         $hasDeptNameEn    = $hasDeptTbl && Schema::hasColumn('departments','name_en');
 
-        // ===== Base query (ALIAS) =====
         $base = DB::table('maintenance_requests as mr');
 
-        // ===== Filters from query string =====
         $status = (string) $req->query('status', '');
         $from   = $req->query('from');
         $to     = $req->query('to');
@@ -60,7 +57,6 @@ class DashboardController extends Controller
             } catch (\Throwable $e) {}
         }
 
-        // ===== KPI =====
         $stats = [
             'total'      => (clone $base)->count(),
             'pending'    => (clone $base)->where('mr.status','pending')->count(),
@@ -69,7 +65,6 @@ class DashboardController extends Controller
             'monthCost'  => 0.0,
         ];
 
-        // ===== Trend 6 months =====
         if ($hasReqDate || $hasCreatedAt) {
             $trendCol = $hasReqDate ? 'mr.request_date' : 'mr.created_at';
             $monthlyTrend = (clone $base)
@@ -83,7 +78,6 @@ class DashboardController extends Controller
             $monthlyTrend = collect();
         }
 
-        // ===== By Asset Type (Top 8 + others) =====
         $totalReq = $stats['total'];
         if ($hasAssets) {
             $qType = (clone $base)
@@ -104,26 +98,21 @@ class DashboardController extends Controller
             ->map(fn($r)=> ['type'=>(string)$r->type, 'cnt'=>(int)$r->cnt])
             ->take(9)->values();
 
-        // ===== By Department (Top 8) =====
         if ($hasDeptTbl && ($hasDeptNameTh || $hasDeptNameEn)) {
             $qDept = (clone $base);
 
-            // Join asset (เผื่อ fallback)
             if ($hasAssets) {
                 $qDept->leftJoin('assets as a','a.id','=','mr.asset_id');
             }
 
-            // Join dept จาก MR โดยตรง (หลัก)
             if ($hasMrDeptId) {
                 $qDept->leftJoin('departments as d_mr','d_mr.id','=','mr.department_id');
             }
 
-            // Join dept จาก Asset เป็นสำรอง
             if ($hasAssetDeptId) {
                 $qDept->leftJoin('departments as d_a','d_a.id','=','a.department_id');
             }
 
-            // label: d_mr ก่อน, แล้วค่อย d_a, จากนั้น 'ไม่ระบุ'
             $labelSqlParts = [];
             if ($hasDeptNameTh) $labelSqlParts[] = "NULLIF(TRIM(d_mr.name_th),'')";
             if ($hasDeptNameEn) $labelSqlParts[] = "NULLIF(TRIM(d_mr.name_en),'')";
@@ -143,7 +132,6 @@ class DashboardController extends Controller
             $byDept = $totalReq > 0 ? collect([['dept'=>'ไม่ระบุ','cnt'=>$totalReq]]) : collect();
         }
 
-        // ===== Recent 12 =====
         $recentQ = (clone $base);
         if     ($hasReqDate)   $recentQ->orderByDesc('mr.request_date');
         elseif ($hasCreatedAt) $recentQ->orderByDesc('mr.created_at');
@@ -187,7 +175,6 @@ class DashboardController extends Controller
             ];
         });
 
-        // ===== Toast: แจ้งผลการค้นหา/กรอง =====
         if ($hasFilter) {
             if ($stats['total'] > 0) {
                 $req->session()->flash('toast', [

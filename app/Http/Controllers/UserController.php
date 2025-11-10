@@ -13,17 +13,15 @@ class UserController extends Controller
     {
         $q       = (string) $request->string('q');
         $role    = (string) $request->string('role');
-        $dept    = (string) $request->string('department'); // กรองตาม code
+        $dept    = (string) $request->string('department');
         $perPage = max(1, min((int) $request->integer('per_page', 20), 100));
 
         $users = User::query()
-            // เลือกเฉพาะคอลัมน์ที่จำเป็น เพื่อลด payload
             ->select([
                 'id', 'name', 'email', 'department', 'role',
                 'profile_photo_thumb', 'created_at', 'updated_at'
             ])
             ->with([
-                // users.department (code) -> departments.code
                 'departmentRef:id,code,name',
             ])
             ->when($q, fn($qq) => $qq->where(function ($w) use ($q) {
@@ -50,13 +48,11 @@ class UserController extends Controller
         $data = $request->validate([
             'name'       => ['sometimes','string','max:255'],
             'email'      => ['sometimes','email','max:255', Rule::unique('users','email')->ignore($user->id)],
-            // เก็บเป็น code (string) เช่น "IT", "NUR", "FIN"
             'department' => ['nullable','string','max:100'],
             'role'       => ['sometimes', Rule::in(['admin','technician','staff'])],
             'password'   => ['nullable','string','min:8'],
         ]);
 
-        // ถ้าไม่ได้ส่ง password หรือเป็นค่าว่าง ให้ตัดออก ไม่งั้น hash ก่อน
         if (array_key_exists('password', $data)) {
             if (!$data['password']) {
                 unset($data['password']);
@@ -69,7 +65,7 @@ class UserController extends Controller
         $user->load('departmentRef:id,code,name');
 
         return response()->json([
-            'message' => 'updated',
+            'message' => 'อัปเดตเรียบร้อยแล้ว',
             'data'    => $user,
         ]);
     }
@@ -77,6 +73,6 @@ class UserController extends Controller
     public function destroy(User $user)
     {
         $user->delete();
-        return response()->json(['message' => 'deleted']);
+        return response()->json(['message' => 'ลบเรียบร้อยแล้ว']);
     }
 }

@@ -45,8 +45,6 @@ class File extends Model
 
     protected $appends = ['url'];
 
-    /* ===================== Relationships ===================== */
-
     public function attachments()
     {
         return $this->hasMany(Attachment::class);
@@ -62,9 +60,6 @@ class File extends Model
         return $this->hasMany(File::class, 'variant_of_id');
     }
 
-    /* ====================== Accessors ======================== */
-
-    /** สร้าง URL สำหรับไฟล์ public */
     public function getUrlAttribute(): ?string
     {
         try {
@@ -86,8 +81,6 @@ class File extends Model
         return is_string($this->mime) && str_starts_with($this->mime, 'video/');
     }
 
-    /* ======================= Helpers ========================= */
-
     public function deleteWithPhysical(): bool
     {
         try {
@@ -95,13 +88,10 @@ class File extends Model
                 Storage::disk($this->disk)->delete($this->path);
             }
         } catch (\Throwable $e) {
-            // ignore physical delete errors
         }
 
         return (bool) $this->delete();
     }
-
-    /* ====================== Scopes ============================ */
 
     public function scopeWithChecksum($q, ?string $sha)
     {
@@ -117,8 +107,6 @@ class File extends Model
     {
         return $q->where('mime', 'like', 'video/%');
     }
-
-    /* ====================== Boot ============================== */
 
     protected static function booted(): void
     {

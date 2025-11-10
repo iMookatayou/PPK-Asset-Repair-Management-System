@@ -1,9 +1,7 @@
-{{-- resources/views/chat/index.blade.php --}}
 @extends('layouts.app')
 @section('title','Community Chat')
 
 @section('content')
-  {{-- Local styles: ปุ่มเขียวให้คงที่ไม่พึ่ง global --}}
   <style>
     .btn-hard{
       display:inline-flex;align-items:center;justify-content:center;
@@ -28,7 +26,6 @@
 
   <div class="max-w-5xl mx-auto py-6 space-y-6">
 
-    {{-- ===== Header / Search ===== --}}
     <div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div class="px-5 py-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div class="flex items-center gap-3">
@@ -63,7 +60,6 @@
       <div class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"></div>
     </div>
 
-    {{-- ===== Create Thread ===== --}}
     <div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div class="p-5 space-y-3">
         <div class="flex items-center justify-between">
@@ -106,7 +102,6 @@
       </div>
     </div>
 
-    {{-- ===== Threads List ===== --}}
     <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
       <div class="px-5 py-3 border-b border-slate-200 text-sm font-medium text-slate-800">
         กระทูล่าสุด
@@ -116,17 +111,6 @@
       </div>
 
       @php
-        /**
-         * Controller ควรเตรียม:
-         * ChatThread::query()
-         *   ->with('author:id,name')
-         *   ->withCount('messages')
-         *   ->with(['latestMessage' => fn($q) => $q->select('id','chat_thread_id','user_id','body','created_at')
-         *                                         ->latest('created_at')->limit(1)])
-         *   ->when(request('q'), fn($q,$s) => $q->where('title','like',"%{$s}%"))
-         *   ->orderByDesc('created_at')
-         *   ->paginate(15);
-         */
       @endphp
 
       @if($threads->count())
@@ -135,7 +119,6 @@
             <li>
               <a href="{{ route('chat.show', $th) }}" class="block px-5 py-4 hover:bg-slate-50 focus:bg-slate-50">
                 <div class="flex items-start gap-3">
-                  {{-- lock badge --}}
                   @if($th->is_locked)
                     <span class="chip shrink-0" title="Thread locked">
                       <svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -163,7 +146,6 @@
                       • {{ $th->created_at?->diffForHumans() }}
                     </div>
 
-                    {{-- latest message preview (หาก controller eager-load เป็น latestMessage relation) --}}
                     @php
                       $last = $th->latestMessage ?? null;
                     @endphp
@@ -193,7 +175,6 @@
           </div>
         </div>
       @else
-        {{-- empty state --}}
         <div class="p-10 text-center">
           <div class="mx-auto mb-3 size-12 grid place-items-center rounded-full bg-slate-100">
             <svg xmlns="http://www.w3.org/2000/svg" class="size-5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">

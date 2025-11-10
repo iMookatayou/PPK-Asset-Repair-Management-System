@@ -10,10 +10,6 @@ class Asset extends Model
 {
     use HasFactory, SoftDeletes;
 
-    /**
-     * ถ้าตาราง attachments / maintenance_logs อ้างใบงานด้วยคีย์อื่น
-     * เช่น 'maintenance_request_id' ให้เปลี่ยนตรงนี้จุดเดียว
-     */
     private const REQ_FK = 'request_id';
 
     protected $fillable = [
@@ -42,10 +38,6 @@ class Asset extends Model
         'status' => 'active',
     ];
 
-    // =========================
-    // Relationships
-    // =========================
-
     public function department()
     {
         return $this->belongsTo(Department::class);
@@ -56,19 +48,11 @@ class Asset extends Model
         return $this->belongsTo(AssetCategory::class, 'category_id');
     }
 
-    /**
-     * ใบงานซ่อมของทรัพย์สินนี้ (FK: maintenance_requests.asset_id)
-     */
     public function maintenanceRequests()
     {
         return $this->hasMany(MaintenanceRequest::class, 'asset_id');
     }
 
-    /**
-     * ไฟล์แนบของทรัพย์สิน “ผ่าน” ใบงานซ่อม (polymorphic)
-     * attachments.attachable_id -> maintenance_requests.id AND attachments.attachable_type = MaintenanceRequest::class
-     * NOTE: ตาราง attachments ไม่มีคอลัมน์ request_id อีกต่อไป (ใช้ morph: attachable_type/attachable_id)
-     */
     public function requestAttachments()
     {
         return $this->hasManyThrough(
@@ -81,10 +65,6 @@ class Asset extends Model
         )->where('attachments.attachable_type', (new MaintenanceRequest())->getMorphClass());
     }
 
-    /**
-     * บันทึกเหตุการณ์/Log ของการซ่อม “ผ่าน” ใบงานซ่อม
-     * maintenance_logs.{request_id|maintenance_request_id} -> maintenance_requests.id
-     */
     public function requestLogs()
     {
         return $this->hasManyThrough(
@@ -96,14 +76,6 @@ class Asset extends Model
             'id'
         );
     }
-
-    // =========================
-    // Query Scopes (ช่วยให้ controller/view สะอาด)
-    // =========================
-
-    /**
-     * ค้นหาแบบรวมหลายฟิลด์ (code/name/serial)
-     */
     public function scopeSearch($q, ?string $term)
     {
         $term = trim((string) $term);
@@ -118,13 +90,9 @@ class Asset extends Model
 
     public function scopeDepartmentId($q, ?int $departmentId)
     {
-        // Treat 0 / null / falsy as no filter (Request::integer returns 0 when param missing)
         return ($departmentId && $departmentId > 0) ? $q->where('department_id', $departmentId) : $q;
     }
 
-    /**
-     * Filter by status if provided (supports '', null => no-op)
-     */
     public function scopeStatus($q, ?string $status)
     {
         $status = trim((string) $status);
@@ -133,9 +101,7 @@ class Asset extends Model
 
     public function scopeCategory($q, ?string $category)
     {
-        // legacy: ก่อนใช้ category_id มีคอลัมน์ category (string) ใน model
-        // ปัจจุบันตัดออกเพื่อหลีกเลี่ยงความสับสน หากต้องการ filter หมวดหมู่ให้ใช้ where('category_id', ..) หรือ join กับ asset_categories
-        return $q; // no-op
+        return $q;
     }
 
     public function scopeLocation($q, ?string $location)

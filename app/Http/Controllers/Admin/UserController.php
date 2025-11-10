@@ -8,21 +8,12 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth; // <<< ใช้ Auth::id()
+use Illuminate\Support\Facades\Auth;
 
 class UserController extends Controller
 {
-    /**
-     * Roles ที่รองรับในระบบตอนนี้
-     */
     private const ROLES = ['admin', 'technician', 'staff'];
 
-    // ลบ __construct() ที่เรียก $this->middleware(...) ออก
-    // เราใส่ can:manage-users ไว้ที่ routes แล้ว
-
-    /**
-     * GET /admin/users
-     */
     public function index(Request $request)
     {
         $q = User::query();
@@ -57,9 +48,6 @@ class UserController extends Controller
         ]);
     }
 
-    /**
-     * GET /admin/users/create
-     */
     public function create()
     {
         return view('admin.users.create', [
@@ -67,9 +55,6 @@ class UserController extends Controller
         ]);
     }
 
-    /**
-     * POST /admin/users
-     */
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -86,12 +71,9 @@ class UserController extends Controller
 
         return redirect()
             ->route('admin.users.edit', $user)
-            ->with('status', 'User created successfully.');
+            ->with('status', 'สร้างผู้ใช้เรียบร้อยแล้ว');
     }
 
-    /**
-     * GET /admin/users/{user}/edit
-     */
     public function edit(User $user)
     {
         return view('admin.users.edit', [
@@ -100,9 +82,6 @@ class UserController extends Controller
         ]);
     }
 
-    /**
-     * PUT /admin/users/{user}
-     */
     public function update(Request $request, User $user)
     {
         $data = $request->validate([
@@ -121,31 +100,22 @@ class UserController extends Controller
 
         DB::transaction(fn () => $user->update($data));
 
-        return back()->with('status', 'User updated successfully.');
+        return back()->with('status', 'อัปเดตข้อมูลผู้ใช้เรียบร้อยแล้ว');
     }
 
-    /**
-     * DELETE /admin/users/{user}
-     */
     public function destroy(User $user)
     {
-        if (Auth::id() === $user->id) { // <<< ใช้ Auth::id()
-            return back()->withErrors(['delete' => 'You cannot delete yourself.']);
+        if (Auth::id() === $user->id) {
+            return back()->withErrors(['delete' => 'คุณไม่สามารถลบผู้ใช้ตัวเองได้']);
         }
 
         $user->delete();
 
         return redirect()
             ->route('admin.users.index')
-            ->with('status', 'User deleted.');
+            ->with('status', 'ลบผู้ใช้เรียบร้อยแล้ว');
     }
 
-    /**
-     * POST /admin/users/bulk
-     * action: change_role | delete
-     * ids[]: [1,2,3]
-     * role: admin/technician/staff (เมื่อ action = change_role)
-     */
     public function bulk(Request $request)
     {
         $validated = $request->validate([
@@ -157,11 +127,10 @@ class UserController extends Controller
 
         $ids = collect($validated['ids'])->unique()->values();
 
-        // ห้ามลบ/แก้ role ของตัวเองใน bulk
-        $ids = $ids->reject(fn ($id) => (int)$id === (int) Auth::id()); // <<< ใช้ Auth::id()
+        $ids = $ids->reject(fn ($id) => (int)$id === (int) Auth::id());
 
         if ($ids->isEmpty()) {
-            return back()->withErrors(['bulk' => 'No valid targets (self-action is not allowed).']);
+            return back()->withErrors(['bulk' => 'ไม่มีเป้าหมายที่ถูกต้อง (ไม่สามารถดำเนินการกับตัวเองได้)']);
         }
 
         DB::transaction(function () use ($validated, $ids) {
@@ -171,7 +140,7 @@ class UserController extends Controller
                 case 'change_role':
                     $role = $validated['role'] ?? null;
                     if (!$role) {
-                        abort(422, 'Role is required for change_role action.');
+                        abort(422, 'ต้องระบุบทบาทสำหรับการเปลี่ยนบทบาท');
                     }
                     $query->update(['role' => $role]);
                     break;
@@ -181,10 +150,10 @@ class UserController extends Controller
                     break;
 
                 default:
-                    abort(422, 'Unknown bulk action.');
+                    abort(422, 'ไม่รู้จักคำสั่งนี้');
             }
         });
 
-        return back()->with('status', 'Bulk action completed.');
+        return back()->with('status', 'ดำเนินการเรียบร้อยแล้ว');
     }
 }

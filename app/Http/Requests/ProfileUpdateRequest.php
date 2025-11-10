@@ -11,20 +11,13 @@ use Illuminate\Auth\Access\AuthorizationException;
 
 class ProfileUpdateRequest extends FormRequest
 {
-    /**
-     * อนุญาตให้ผู้ใช้ที่ล็อกอินทุกคนอัปเดตโปรไฟล์ของตนเองได้ (สอดคล้อง Breeze tests)
-     */
     public function authorize(): bool
     {
         return (bool) $this->user();
     }
 
-    /**
-     * ถ้าไม่ผ่าน authorize → flash toast + โยน exception
-     */
     protected function failedAuthorization()
     {
-        // ยิง toast error
         session()->flash('toast', [
             'type'     => 'error',
             'message'  => 'คุณไม่มีสิทธิ์ดำเนินการนี้',
@@ -36,17 +29,11 @@ class ProfileUpdateRequest extends FormRequest
         throw new AuthorizationException('This action is unauthorized.');
     }
 
-    /**
-     * (ออปชัน) หยุดตรวจทันทีเมื่อเจอ error แรกของแต่ละฟิลด์
-     */
     public function stopOnFirstFailure(): bool
     {
         return true;
     }
 
-    /**
-     * เตรียมข้อมูลก่อนตรวจสอบ (trim/normalize)
-     */
     protected function prepareForValidation(): void
     {
         $name  = $this->input('name');
@@ -58,9 +45,6 @@ class ProfileUpdateRequest extends FormRequest
         ]);
     }
 
-    /**
-     * กติกาการตรวจสอบ
-     */
     public function rules(): array
     {
         $userId = (int) ($this->user()?->id ?? 0);
@@ -75,15 +59,10 @@ class ProfileUpdateRequest extends FormRequest
                 'max:255',
                 Rule::unique(User::class, 'email')->ignore($userId),
             ],
-            // เพิ่มเติม: ถ้าฟอร์มมีแผนก ให้ตรวจสอบให้ชัด
             'department' => ['nullable', 'string', 'exists:departments,code'],
-            // หมายเหตุ: avatar / remove_avatar ให้ validate ใน Controller ตามที่คุณออกแบบไว้แล้ว
         ];
     }
 
-    /**
-     * ใส่ toast ตอน validate ไม่ผ่าน (ดึงข้อความแรก)
-     */
     protected function failedValidation(Validator $validator)
     {
         $first = $validator->errors()->first() ?: 'ข้อมูลไม่ถูกต้อง';
@@ -95,14 +74,10 @@ class ProfileUpdateRequest extends FormRequest
             'size'     => 'md',
         ]);
 
-        // ดำเนินการตามปกติของ Laravel (redirect พร้อม errors)
         throw (new ValidationException($validator))
             ->redirectTo($this->getRedirectUrl());
     }
 
-    /**
-     * ชื่อฟิลด์ภาษาไทย (ไว้แสดงใน error message)
-     */
     public function attributes(): array
     {
         return [
@@ -112,9 +87,6 @@ class ProfileUpdateRequest extends FormRequest
         ];
     }
 
-    /**
-     * ข้อความ error กำหนดเอง (กรณีต้องการความชัดเจน)
-     */
     public function messages(): array
     {
         return [

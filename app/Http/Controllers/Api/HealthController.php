@@ -16,7 +16,6 @@ class HealthController extends Controller
         $checks = [];
         $overallOk = true;
 
-        // DB check
         $start = microtime(true);
         try {
             DB::select('select 1');
@@ -32,7 +31,6 @@ class HealthController extends Controller
             ];
         }
 
-        // Redis check (graceful when phpredis extension is not installed)
         try {
             if (class_exists('Redis')) {
                 $pong = Redis::connection()->ping();
@@ -57,10 +55,8 @@ class HealthController extends Controller
             ];
         }
 
-        // Queue check (driver + connectivity)
         try {
             $driver = config('queue.default');
-            // Attempt to resolve connection (throws if misconfigured)
             Queue::connection($driver);
             $checks['queue'] = [
                 'status' => 'ok',

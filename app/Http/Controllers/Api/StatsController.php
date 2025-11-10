@@ -9,12 +9,10 @@ use Illuminate\Support\Carbon;
 
 class StatsController extends Controller
 {
-    // GET /api/stats/summary
     public function summary()
     {
         $key = 'stats:summary:v1';
         $payload = Cache::remember($key, 60, function () {
-            // Aggregate counts in minimal queries
             $assetTotal = DB::table('assets')->count();
             $openRequests = DB::table('maintenance_requests')->whereIn('status', [
                 'pending','accepted','in_progress','on_hold'
@@ -23,7 +21,6 @@ class StatsController extends Controller
                 'resolved','closed','cancelled'
             ])->count();
 
-            // Requests per priority (map missing to 0)
             $priorityRaw = DB::table('maintenance_requests')
                 ->selectRaw('priority, COUNT(*) as c')
                 ->groupBy('priority')
@@ -34,7 +31,6 @@ class StatsController extends Controller
                 $priorities[$p] = (int) ($priorityRaw[$p] ?? 0);
             }
 
-            // Recent 7 days new requests
             $recent = DB::table('maintenance_requests')
                 ->selectRaw('DATE(created_at) as d, COUNT(*) as c')
                 ->where('created_at','>=', now()->subDays(6)->startOfDay())
@@ -60,7 +56,6 @@ class StatsController extends Controller
         return response()->json($payload);
     }
 
-    // GET /api/stats/maintenance/status-counts
     public function maintenanceStatusCounts()
     {
         $raw = Cache::remember('stats:maintenance_status_counts:v1', 60, function () {
@@ -73,12 +68,11 @@ class StatsController extends Controller
         return response()->json(['data' => $raw]);
     }
 
-    // GET /api/stats/maintenance/technicians
     public function technicianSummary()
     {
         $rows = Cache::remember('stats:technician_summary:v1', 60, function () {
             return DB::table('maintenance_requests')
-            ->selectRaw('technician_id as id, 
+            ->selectRaw('technician_id as id,
                 SUM(CASE WHEN status IN (\'pending\',\'accepted\',\'in_progress\',\'on_hold\') THEN 1 ELSE 0 END) as open_count,
                 SUM(CASE WHEN status IN (\'resolved\',\'closed\',\'cancelled\') THEN 1 ELSE 0 END) as closed_count,
                 COUNT(*) as total_count,
@@ -91,7 +85,6 @@ class StatsController extends Controller
             ->get();
         });
 
-        // attach technician names (single query)
         $ids = $rows->pluck('id')->filter()->all();
         $names = $ids ? DB::table('users')->whereIn('id',$ids)->pluck('name','id')->all() : [];
 
@@ -107,7 +100,6 @@ class StatsController extends Controller
         return response()->json(['data' => $mapped]);
     }
 
-    // GET /api/stats/assets/by-department
     public function assetsByDepartment()
     {
         $rows = Cache::remember('stats:assets_by_department:v1', 60, function () {

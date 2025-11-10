@@ -10,7 +10,6 @@ class StoreUserRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // ให้เฉพาะคนที่มีสิทธิ์ manage-users
         return Gate::allows('manage-users');
     }
 

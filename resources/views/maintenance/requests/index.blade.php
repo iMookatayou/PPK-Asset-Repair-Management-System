@@ -1,4 +1,3 @@
-{{-- resources/views/maintenance/index.blade.php --}}
 @extends('layouts.app')
 
 @section('title','Maintenance Requests')
@@ -7,7 +6,6 @@
 @php
   use Illuminate\Support\Str;
 
-  // ====== Badge styles ======
   $statusClass = fn(?string $s) => match(strtolower((string)$s)) {
     'pending'     => 'ring-1 ring-zinc-300 text-zinc-800 bg-white',
     'accepted'    => 'ring-1 ring-indigo-300 text-indigo-800 bg-white',
@@ -29,7 +27,6 @@
     'cancelled'   => 'ยกเลิก',
   ][strtolower((string)$s)] ?? '-';
 
-  // >>> เปลี่ยน normal -> medium ให้ตรงกับ validation <<<
   $priorityClass = fn(?string $p) => match(strtolower((string)$p)) {
     'low'    => 'ring-1 ring-zinc-300 text-zinc-700 bg-white',
     'medium' => 'ring-1 ring-sky-300 text-sky-800 bg-white',
@@ -46,16 +43,12 @@
   ][strtolower((string)$p)] ?? '-';
 @endphp
 
-{{-- กันชน Topbar --}}
 <div class="pt-3 md:pt-4"></div>
 
 <div class="w-full px-4 md:px-6 lg:px-8 flex flex-col gap-5">
-
-  {{-- ===== ส่วนหัว ===== --}}
   <div class="rounded-lg border border-zinc-300 bg-white">
     <div class="px-5 py-4">
       <div class="flex flex-wrap items-start justify-between gap-4">
-        {{-- ซ้าย: ไอคอน + ชื่อหน้า --}}
         <div class="flex items-start gap-3">
           <div class="grid h-9 w-9 place-items-center rounded-md bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200">
             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
@@ -68,7 +61,6 @@
           </div>
         </div>
 
-        {{-- ขวา: ปุ่มเพิ่มคำขอ --}}
         <div class="flex shrink-0 items-center">
           <a href="{{ route('maintenance.requests.create') }}"
              class="inline-flex items-center gap-2 rounded-md border border-emerald-700 bg-emerald-700 px-4 py-2 text-[13px] font-medium text-white hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-600"
@@ -81,14 +73,11 @@
         </div>
       </div>
 
-      {{-- เส้นขั้น --}}
       <div class="mt-4 h-px bg-zinc-200"></div>
 
-      {{-- ===== ฟิลเตอร์ ===== --}}
       <form method="GET" action="{{ route('maintenance.requests.index') }}"
             class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-12" onsubmit="showLoader()">
 
-        {{-- คำค้นหา --}}
         <div class="md:col-span-6 min-w-0">
           <label for="q" class="mb-1 block text-[12px] text-zinc-600">คำค้นหา</label>
           <div class="relative">
@@ -103,7 +92,6 @@
           </div>
         </div>
 
-        {{-- สถานะ --}}
         <div class="md:col-span-3">
           <label for="status" class="mb-1 block text-[12px] text-zinc-600">สถานะ</label>
           <select id="status" name="status"
@@ -123,20 +111,17 @@
           </select>
         </div>
 
-        {{-- ความสำคัญ --}}
         <div class="md:col-span-2">
           <label for="priority" class="mb-1 block text-[12px] text-zinc-600">ความสำคัญ</label>
           <select id="priority" name="priority"
                   class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
             <option value="">ทั้งหมด</option>
-            {{-- >>> เปลี่ยน normal -> medium <<< --}}
             @foreach (['low'=>'ต่ำ','medium'=>'ปานกลาง','high'=>'สูง','urgent'=>'เร่งด่วน'] as $k=>$v)
               <option value="{{ $k }}" @selected($priority===$k)>{{ $v }}</option>
             @endforeach
           </select>
         </div>
 
-        {{-- ปุ่ม --}}
         <div class="md:col-span-1 flex items-end gap-2">
           <button type="submit"
                   class="rounded-md border border-emerald-700 bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800">
@@ -153,7 +138,6 @@
     </div>
   </div>
 
-  {{-- ===== ตารางข้อมูล ===== --}}
   <div class="rounded-lg border border-zinc-300 bg-white overflow-hidden">
     <div class="relative overflow-x-auto">
       <table class="min-w-full text-sm">
@@ -174,7 +158,6 @@
           <tr class="align-top hover:bg-zinc-50 border-b last:border-0">
             <td class="p-3 text-zinc-700">{{ $row->id }}</td>
 
-            {{-- เรื่อง + รายละเอียด --}}
             <td class="p-3">
               <a href="{{ route('maintenance.requests.show', $row) }}"
                  class="block max-w-full truncate font-medium text-zinc-900 hover:underline">
@@ -186,7 +169,6 @@
                 </p>
               @endif
 
-              {{-- หมวดหมู่ (ถ้ามี) --}}
               @if(!empty($row->category))
                 <div class="mt-2 flex flex-wrap gap-2">
                   <span class="rounded-full bg-white px-2 py-1 text-[11px] ring-1 ring-zinc-300 text-zinc-700">
@@ -196,10 +178,8 @@
               @endif
             </td>
 
-            {{-- อีเมลผู้แจ้ง: ใช้จาก Users.email ถ้ามี มิฉะนั้น fallback เป็น reporter_email บนคำขอ --}}
             <td class="p-3 text-zinc-700">{{ $row->reporter?->email ?? ($row->reporter_email ?? '-') }}</td>
 
-            {{-- หน่วยงาน: ใช้จาก MaintenanceRequest->department ถ้ามี; ไม่มีก็ลองจาก Asset->department --}}
             @php
               $deptName = $row->department->name
                           ?? $row->asset?->department?->name
@@ -219,7 +199,6 @@
               </span>
             </td>
 
-            {{-- การดำเนินการ --}}
             <td class="p-3 text-right whitespace-nowrap">
               <div class="flex justify-end items-center gap-2">
                 <a href="{{ route('maintenance.requests.show', $row) }}"
@@ -253,7 +232,6 @@
     </div>
   </div>
 
-  {{-- Pagination --}}
   <div class="mt-4">
     {{ $list->withQueryString()->links() }}
   </div>

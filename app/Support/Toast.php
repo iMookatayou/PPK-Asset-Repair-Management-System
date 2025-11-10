@@ -2,9 +2,6 @@
 
 namespace App\Support;
 
-/**
- * Simple Toast builder to standardize structure across web + JSON.
- */
 class Toast
 {
     public static function make(

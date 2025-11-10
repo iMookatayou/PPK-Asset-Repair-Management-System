@@ -9,7 +9,6 @@ use App\Models\User;
 
 class MetaController extends Controller
 {
-    // GET /api/meta/departments
     public function departments()
     {
         $rows = DB::table('departments')
@@ -24,7 +23,6 @@ class MetaController extends Controller
         return response()->json(['data' => $rows]);
     }
 
-    // GET /api/meta/categories
     public function categories()
     {
         $rows = DB::table('asset_categories')
@@ -38,7 +36,6 @@ class MetaController extends Controller
         return response()->json(['data' => $rows]);
     }
 
-    // GET /api/meta/users?role=technician|staff
     public function users(Request $r)
     {
         $role = $r->query('role');

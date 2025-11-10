@@ -1,4 +1,3 @@
-{{-- resources/views/admin/users/index.blade.php --}}
 @extends('layouts.app')
 @section('title','Manage Users')
 
@@ -6,23 +5,18 @@
   $roles   = $roles   ?? ['admin','technician','staff'];
   $filters = $filters ?? ['s'=>'','role'=>'','department'=>''];
 
-  // Base controls
   $CTL = 'h-10 text-sm rounded-lg border border-zinc-300 px-3 focus:border-emerald-500 focus:ring-emerald-500';
   $SEL = $CTL . ' pr-9';
-  // ปุ่มฐาน + เพิ่ม leading/px ให้ตัวหนังสือไม่ซ้อน และบังคับ min-width บางปุ่ม
   $BTN = 'h-10 text-xs md:text-sm inline-flex items-center gap-2 rounded-lg px-3 md:px-3.5 font-medium leading-5
           focus:outline-none focus:ring-2 whitespace-nowrap';
 @endphp
 
 @section('content')
-  {{-- ===== Spacer กันชน Topbar ===== --}}
   <div class="pt-3 md:pt-4"></div>
 
-  {{-- ===== Header (เรียบหรู) ===== --}}
   <div class="mb-5 rounded-2xl border border-zinc-200 bg-white shadow-sm">
     <div class="flex items-start justify-between gap-3 px-5 py-4">
       <div class="flex items-start gap-3">
-        {{-- Icon --}}
         <div class="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 ring-1 ring-inset ring-indigo-200">
           <svg class="h-5 w-5 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
             <rect x="4" y="3" width="16" height="18" rx="2"/>
@@ -41,18 +35,15 @@
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 5v14M5 12h14"/>
           </svg>
-          <span class="hidden sm:inline">New User</span>
-          <span class="sm:hidden">New</span>
+          <span class="hidden sm:inline">สร้างผู้ใช้ใหม่</span>
+          <span class="sm:hidden">สร้าง</span>
         </a>
       </div>
     </div>
   </div>
 
-  {{-- Flash & Errors --}}
   @if (session('status'))
-    <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-emerald-700 text-sm">
-      {{ session('status') }}
-    </div>
+    @php session()->flash('toast', \App\Support\Toast::success(session('status'))); @endphp
   @endif
   @if ($errors->any())
     <div class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-rose-700 text-sm">
@@ -64,7 +55,6 @@
     </div>
   @endif
 
-  {{-- ===== Filters ===== --}}
   <form method="GET" class="mb-4 grid grid-cols-1 gap-2 md:grid-cols-5">
     <input name="s" value="{{ $filters['s'] }}" placeholder="Search name/email/department"
            class="w-full {{ $CTL }}" />
@@ -100,7 +90,6 @@
     </div>
   </form>
 
-  {{-- ===== Bulk Actions ===== --}}
   <form method="POST" action="{{ route('admin.users.bulk') }}">
     @csrf
     <div class="mb-2 flex flex-wrap items-center gap-2">
@@ -110,25 +99,18 @@
         <option value="delete">Delete</option>
       </select>
 
-      <select name="role" class="{{ $SEL }} py-2 min-w-[120px]">
-        <option value="">-- role --</option>
-        @foreach ($roles as $r)
+      <select name="role" class="{{ $SEL }} py-2 min-w-[140px]">
+        <option value="">Select role</option>
+        @foreach($roles as $r)
           <option value="{{ $r }}">{{ ucfirst($r) }}</option>
         @endforeach
       </select>
 
-      <button type="submit"
-        class="{{ $BTN }} min-w-[96px] justify-center bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-500"
-        onclick="return confirm('Confirm bulk action?');">
-        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 5v14M5 12h14"/>
-        </svg>
-        <span class="hidden md:inline">Apply</span>
-        <span class="md:hidden">Go</span>
+      <button type="submit" class="{{ $BTN }} min-w-[96px] justify-center border border-zinc-300 text-zinc-700 hover:bg-zinc-50 focus:ring-emerald-500">
+        Apply
       </button>
     </div>
 
-    {{-- ===== Table ===== --}}
     <div class="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
       <table class="min-w-full divide-y divide-zinc-200">
         <thead class="bg-zinc-50 text-left text-xs font-medium text-zinc-700">
@@ -139,7 +121,6 @@
             <th class="px-3 py-2 hidden lg:table-cell">Department</th>
             <th class="px-3 py-2 hidden md:table-cell">Role</th>
             <th class="px-3 py-2 hidden xl:table-cell">Created</th>
-            {{-- กันคอลัมน์ปุ่มไม่ให้แคบเกินไป --}}
             <th class="px-3 py-2 text-right min-w-[180px]">Actions</th>
           </tr>
         </thead>
@@ -184,18 +165,15 @@
                     <span class="sm:hidden">แก้ไข</span>
                   </a>
                   @if($u->id !== auth()->id())
-                    <form method="POST" action="{{ route('admin.users.destroy', $u) }}" onsubmit="return confirm('Delete this user?');">
-                      @csrf @method('DELETE')
-                      <button
-                        class="inline-flex items-center gap-1.5 rounded-md border border-rose-300 px-2.5 md:px-3 py-1.5 text-[11px] md:text-xs font-medium text-rose-600 hover:bg-rose-50 whitespace-nowrap min-w-[74px] justify-center"
-                        type="submit">
-                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/>
-                        </svg>
-                        <span class="hidden sm:inline">ลบ</span>
-                        <span class="sm:hidden">ลบ</span>
-                      </button>
-                    </form>
+                    <button type="button"
+                      class="inline-flex items-center gap-1.5 rounded-md border border-rose-300 px-2.5 md:px-3 py-1.5 text-[11px] md:text-xs font-medium text-rose-600 hover:bg-rose-50 whitespace-nowrap min-w-[74px] justify-center"
+                      onclick="return window.confirmDeleteUser('{{ route('admin.users.destroy', $u) }}');">
+                      <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/>
+                      </svg>
+                      <span class="hidden sm:inline">ลบ</span>
+                      <span class="sm:hidden">ลบ</span>
+                    </button>
                   @endif
                 </div>
               </td>
@@ -207,6 +185,22 @@
       </table>
     </div>
   </form>
+
+  {{-- Hidden global delete form & script (outside bulk form to avoid nested forms) --}}
+  <form id="delete-user-form" method="POST" class="hidden">
+    @csrf
+    @method('DELETE')
+  </form>
+  <script>
+    window.confirmDeleteUser = function(url){
+      if(!confirm('ยืนยันการลบผู้ใช้นี้?')) return false;
+      const f = document.getElementById('delete-user-form');
+      if(!f) return true;
+      f.action = url;
+      f.submit();
+      return false; // prevent default link/button behavior
+    };
+  </script>
 
   <div class="mt-4">{{ $users->links() }}</div>
 @endsection

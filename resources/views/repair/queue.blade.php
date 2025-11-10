@@ -1,4 +1,3 @@
-{{-- resources/views/repair/queue.blade.php --}}
 @extends('layouts.app')
 @section('title', 'Repair Queue — Pending')
 
@@ -28,16 +27,12 @@
   };
 @endphp
 
-{{-- กันชน Topbar ให้เท่ากันทุกหน้า --}}
 <div class="pt-3 md:pt-4"></div>
 
 <div class="w-full px-4 md:px-6 lg:px-8 flex flex-col gap-5">
-
-  {{-- ===== ส่วนหัวแบบราชการ ===== --}}
   <div class="rounded-lg border border-zinc-300 bg-white" id="queueTableWrapper">
     <div class="px-5 py-4">
       <div class="flex flex-wrap items-start justify-between gap-4">
-        {{-- ชื่อหน้า --}}
         <div class="flex items-start gap-3">
           <div class="grid h-9 w-9 place-items-center rounded-md bg-zinc-100 text-zinc-700 ring-1 ring-inset ring-zinc-300">
             <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
@@ -50,7 +45,6 @@
           </div>
         </div>
 
-        {{-- ตัวเลขสรุป (ชิปเส้นกรอบ สุภาพ) + My Jobs (เด่นขึ้น) --}}
         <div class="flex flex-wrap items-center gap-2 text-[13px]">
           <span class="inline-flex items-center gap-2 rounded-md border border-zinc-400 bg-white px-3 py-1 text-zinc-900">
             <span class="text-zinc-700">ทั้งหมด</span>
@@ -69,7 +63,6 @@
             <strong class="tabular-nums">{{ $done }}</strong>
           </span>
 
-          {{-- ปุ่ม My Jobs แบบเด่น ชัด กว้าง --}}
           <a href="{{ route('repairs.my_jobs') }}"
              class="ml-2 inline-flex items-center gap-2 rounded-lg border border-indigo-700 bg-indigo-700 px-4 py-2 text-[13px] font-medium text-white hover:bg-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-600">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -80,12 +73,9 @@
         </div>
       </div>
 
-      {{-- เส้นขั้น --}}
       <div class="mt-4 h-px bg-zinc-200"></div>
 
-      {{-- ฟิลเตอร์แบบ Dropdown + ค้นหา --}}
       <form method="GET" class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-12">
-        {{-- Dropdown สถานะ (แทนปุ่มหลายอัน) --}}
         <div class="md:col-span-4">
           <label for="status" class="mb-1 block text-[12px] text-zinc-600">สถานะ</label>
           <select id="status" name="status"
@@ -98,7 +88,6 @@
           </select>
         </div>
 
-        {{-- Search --}}
         <div class="md:col-span-8">
           <label for="q" class="mb-1 block text-[12px] text-zinc-600">คำค้นหา</label>
           <div class="flex gap-2">
@@ -126,7 +115,6 @@
     </div>
   </div>
 
-  {{-- ===== ตารางรายการ (โทนเรียบ ขอบชัด) ===== --}}
   <div class="rounded-lg border border-zinc-300 bg-white">
     <div class="relative overflow-x-auto">
       <table class="min-w-full text-sm">
@@ -144,7 +132,6 @@
         @forelse($list as $r)
           @php $isJust = isset($just) && (int)$just === (int)$r->id; @endphp
           <tr class="queue-row align-top border-b last:border-0 transition-colors duration-700 {{ $isJust ? 'is-just' : 'hover:bg-zinc-50' }}" data-row-id="{{ $r->id }}">
-            {{-- Subject --}}
             <td class="p-3">
               <a href="{{ route('maintenance.requests.show', $r) }}"
                  class="block max-w-full truncate font-medium text-zinc-900 hover:underline">
@@ -169,7 +156,6 @@
               </div>
             </td>
 
-            {{-- Asset --}}
             <td class="p-3">
               <div class="font-medium text-zinc-900">#{{ $r->asset_id }}</div>
               <div class="max-w-full truncate text-xs text-zinc-600">{{ $r->asset->name ?? '—' }}</div>
@@ -178,7 +164,6 @@
               @endif
             </td>
 
-            {{-- Reporter --}}
             <td class="p-3">
               <div class="max-w-full truncate text-zinc-900">{{ $r->reporter->name ?? '—' }}</div>
               @php
@@ -191,7 +176,6 @@
               @endif
             </td>
 
-            {{-- Reported --}}
             <td class="p-3">
               <div class="font-medium text-zinc-800">
                 {{ optional($r->request_date)->format('Y-m-d H:i') ?? '—' }}
@@ -201,7 +185,6 @@
               @endif
             </td>
 
-            {{-- Actions --}}
             <td class="p-3 text-right">
               @can('tech-only')
                 <div class="relative inline-block text-left">
@@ -242,7 +225,6 @@
     </div>
   </div>
 
-  {{-- ===== Pagination (ล่างสุดหน้าเดียว แบบมาตรฐาน) ===== --}}
   <div class="mt-4">
     {{ $list->withQueryString()->links() }}
   </div>
@@ -260,7 +242,7 @@
       menu.style.left = 'auto';
       menu.style.right = (vw - anchorRect.right) + 'px';
       // default show below
-      let top = anchorRect.bottom + 4;  
+      let top = anchorRect.bottom + 4;
       menu.style.top = top + 'px';
       // If overflow bottom, flip to top
       requestAnimationFrame(()=>{

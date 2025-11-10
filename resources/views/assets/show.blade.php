@@ -13,10 +13,6 @@
   <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
     <div class="flex flex-col gap-2">
       <div class="flex items-center gap-2">
-        <a href="{{ route('assets.index') }}" class="inline-flex items-center gap-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50">
-          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
-          Back
-        </a>
         <span class="rounded-full px-2.5 py-1 text-xs ring-1 {{ $badge }}">
           {{ ucfirst(str_replace('_',' ',$asset->status)) }}
         </span>
@@ -29,9 +25,9 @@
       <p class="text-xs text-zinc-500">Last updated {{ $asset->updated_at?->diffForHumans() }}</p>
     </div>
     <div class="flex flex-wrap items-center gap-2">
-      <a href="{{ route('assets.edit', $asset) }}" class="inline-flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800">
-        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
-        Edit
+      <a href="{{ route('assets.index') }}" class="inline-flex items-center gap-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50" aria-label="Back to list">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+        Back
       </a>
       <button onclick="window.print()" class="inline-flex items-center gap-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50">
         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
@@ -50,14 +46,13 @@
 @endsection
 
 @section('content')
-  {{-- Summary --}}
   <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
     <div class="lg:col-span-2 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
       <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div class="space-y-3">
           <div class="flex flex-wrap items-center gap-3">
             <div class="flex items-center gap-1 text-sm text-zinc-500">
-              <span>Asset Code:</span>
+              <span>รหัสครุภัณฑ์:</span>
               <span class="font-medium text-zinc-700">{{ $asset->asset_code ?? '—' }}</span>
             </div>
             @if($asset->serial_number)
@@ -65,65 +60,64 @@
             @endif
           </div>
           <div>
-            <div class="text-xs uppercase tracking-wide text-zinc-500">Name</div>
+            <div class="text-xs uppercase tracking-wide text-zinc-500">ชื่อ</div>
             <div class="text-lg font-semibold text-zinc-900">{{ $asset->name ?? '—' }}</div>
           </div>
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div class="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-center">
-            <div class="text-[11px] font-medium text-zinc-500">Repair Requests</div>
+            <div class="text-[11px] font-medium text-zinc-500">คำขอซ่อม</div>
             <div class="text-xl font-semibold text-zinc-800">{{ $asset->maintenance_requests_count ?? 0 }}</div>
           </div>
           <div class="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-center">
-            <div class="text-[11px] font-medium text-zinc-500">Attachments</div>
+            <div class="text-[11px] font-medium text-zinc-500">ไฟล์แนบ</div>
             <div class="text-xl font-semibold text-zinc-800">{{ $asset->attachments_count ?? 0 }}</div>
           </div>
         </div>
       </div>
 
       <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-	  <x-asset.meta label="Department" :value="optional($asset->department)->name ?? '—'" />
-	  <x-asset.meta label="Category"  :value="optional($asset->categoryRef)->name ?? '—'" />
-        <x-asset.meta label="Location"  :value="$asset->location ?? '—'" />
-        <x-asset.meta label="Type"      :value="$asset->type ?? '—'" />
-        <x-asset.meta label="Brand / Model" :value="trim(($asset->brand ?? '').' '.($asset->model ?? '')) ?: '—'" />
-        <x-asset.meta label="Warranty" :value="optional($asset->warranty_expire)?->format('Y-m-d') ?? '—'" />
-        <x-asset.meta label="Purchased" :value="optional($asset->purchase_date)?->format('Y-m-d') ?? '—'" />
-        <x-asset.meta label="Updated" :value="$asset->updated_at?->format('Y-m-d H:i')" />
+	  <x-asset.meta label="หน่วยงาน" :value="optional($asset->department)->name ?? '—'" />
+	  <x-asset.meta label="หมวดหมู่"  :value="optional($asset->categoryRef)->name ?? '—'" />
+        <x-asset.meta label="สถานที่"  :value="$asset->location ?? '—'" />
+        <x-asset.meta label="ประเภท"      :value="$asset->type ?? '—'" />
+        <x-asset.meta label="ยี่ห้อ / รุ่น" :value="trim(($asset->brand ?? '').' '.($asset->model ?? '')) ?: '—'" />
+        <x-asset.meta label="ประกัน" :value="optional($asset->warranty_expire)?->format('Y-m-d') ?? '—'" />
+        <x-asset.meta label="วันที่ซื้อ" :value="optional($asset->purchase_date)?->format('Y-m-d') ?? '—'" />
+        <x-asset.meta label="อัปเดตเมื่อ" :value="$asset->updated_at?->format('Y-m-d H:i')" />
       </div>
     </div>
     <div class="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
       <div class="flex items-center justify-between">
-        <div class="font-medium text-zinc-800">Quick Actions</div>
+        <div class="font-medium text-zinc-800">การดำเนินการด่วน</div>
         <svg class="h-4 w-4 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
       </div>
       <div class="mt-4 grid gap-2">
         <a href="{{ route('assets.edit', $asset) }}" class="group flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50">
-          <span>Edit details</span>
+          <span>แก้ไขข้อมูล</span>
           <svg class="h-4 w-4 text-zinc-400 group-hover:text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
         </a>
         <a href="{{ url('/maintenance/requests/create?asset_id='.$asset->id) }}" class="group flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50">
-          <span>Create repair request</span>
+          <span>สร้างคำขอซ่อม</span>
           <svg class="h-4 w-4 text-zinc-400 group-hover:text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
         </a>
         <a href="{{ url('/maintenance/requests?asset_id='.$asset->id) }}" class="group flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50">
-          <span>View repair history</span>
+          <span>ดูประวัติการซ่อม</span>
           <svg class="h-4 w-4 text-zinc-400 group-hover:text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
         </a>
         <a href="{{ url('/api/assets/'.$asset->id.'?pretty=1') }}" target="_blank" class="group flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50">
-          <span>View JSON</span>
+          <span>ดูข้อมูล JSON</span>
           <svg class="h-4 w-4 text-zinc-400 group-hover:text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
         </a>
       </div>
     </div>
   </div>
 
-  {{-- History & Attachments (placeholder/ready) --}}
   <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
     <div class="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
       <div class="mb-4 flex items-center justify-between">
-        <div class="font-medium text-zinc-800">Recent Repair Logs</div>
-        <span class="text-[11px] text-zinc-500">{{ $logs->count() }} entries</span>
+        <div class="font-medium text-zinc-800">บันทึกการซ่อมล่าสุด</div>
+        <span class="text-[11px] text-zinc-500">{{ $logs->count() }} รายการ</span>
       </div>
       <div class="divide-y divide-zinc-200">
       @forelse($logs as $log)
@@ -137,14 +131,14 @@
           </div>
         </div>
       @empty
-        <div class="py-4 text-sm text-zinc-500">No recent logs.</div>
+        <div class="py-4 text-sm text-zinc-500">ไม่มีบันทึกล่าสุด</div>
       @endforelse
       </div>
     </div>
     <div class="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
       <div class="mb-4 flex items-center justify-between">
-        <div class="font-medium text-zinc-800">Attachments</div>
-        <span class="text-[11px] text-zinc-500">{{ ($attachments ?? collect())->count() }} files</span>
+        <div class="font-medium text-zinc-800">ไฟล์แนบ</div>
+        <span class="text-[11px] text-zinc-500">{{ ($attachments ?? collect())->count() }} ไฟล์</span>
       </div>
       @php $attList = $attachments ?? collect(); @endphp
       <div class="divide-y divide-zinc-200">
@@ -154,20 +148,19 @@
           @if(!empty($att->url))
             <a href="{{ $att->url }}" target="_blank" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50">
               <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14L21 3"/><path d="M21 3v6"/><path d="M21 3h-6"/><path d="M13 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2v-7"/></svg>
-              Open
+              เปิด
             </a>
           @else
-            <span class="text-[11px] text-zinc-500">no link</span>
+            <span class="text-[11px] text-zinc-500">ไม่มีลิงก์</span>
           @endif
         </div>
       @empty
-        <div class="py-4 text-sm text-zinc-500">No attachments.</div>
+        <div class="py-4 text-sm text-zinc-500">ไม่มีไฟล์แนบ</div>
       @endforelse
       </div>
     </div>
   </div>
 
-  {{-- Print only: simple styles --}}
   <style>
     @media print {
       nav, aside, .no-print, .btn, .rounded-lg.border { display:none !important; }

@@ -1,4 +1,3 @@
-{{-- resources/views/maintenance/requests/create.blade.php --}}
 @extends('layouts.app')
 @section('title','Create Maintenance')
 
@@ -61,7 +60,6 @@
 @section('content')
   <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
 
-    {{-- Error summary --}}
     @if ($errors->any())
       <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-800">
         <p class="font-medium">มีข้อผิดพลาดในการบันทึกข้อมูล:</p>
@@ -80,14 +78,12 @@
       @csrf
 
       <div class="space-y-6">
-        {{-- ===== ข้อมูลหลัก ===== --}}
         <section>
           <h2 class="text-base font-semibold text-slate-900">ข้อมูลหลัก</h2>
           <p class="text-sm text-slate-500">เลือกทรัพย์สิน และ (ถ้าจำเป็น) ผู้แจ้ง</p>
 
           <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
 
-            {{-- ทรัพย์สิน (nullable) ใช้ search-select --}}
             @php $field='asset_id'; $assetList = is_iterable($assets ?? null) ? collect($assets) : collect(); @endphp
             <div>
               <label for="{{ $field }}" class="block text-sm font-medium text-slate-700">
@@ -101,7 +97,6 @@
               @error($field) <p id="{{ $field }}_error" class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
             </div>
 
-            {{-- ผู้แจ้ง (ออปชัน) ใช้ search-select --}}
             @php $field='reporter_id'; $userList = is_iterable($users ?? null) ? collect($users) : collect(); @endphp
             <div>
               <label for="{{ $field }}" class="block text-sm font-medium text-slate-700">
@@ -117,13 +112,11 @@
           </div>
         </section>
 
-        {{-- ===== รายละเอียดปัญหา ===== --}}
         <section class="pt-4 border-t border-slate-200">
           <h2 class="text-base font-semibold text-slate-900">รายละเอียดปัญหา</h2>
           <p class="text-sm text-slate-500">สรุปหัวข้อและอาการ เพื่อการคัดแยกที่รวดเร็ว</p>
 
           <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-            {{-- หัวข้อ --}}
             @php $field='title'; @endphp
             <div class="md:col-span-2">
               <label for="{{ $field }}" class="block text-sm font-medium text-slate-700">
@@ -138,7 +131,6 @@
               @error($field) <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
             </div>
 
-            {{-- รายละเอียด (nullable) --}}
             @php $field='description'; @endphp
             <div class="md:col-span-2">
               <label for="{{ $field }}" class="block text-sm font-medium text-slate-700">รายละเอียด <span class="ml-1 text-xs text-slate-500">(ไม่บังคับ)</span></label>
@@ -150,13 +142,11 @@
           </div>
         </section>
 
-        {{-- ===== ความสำคัญ + วันที่แจ้ง ===== --}}
         <section class="pt-4 border-t border-slate-200">
           <h2 class="text-base font-semibold text-slate-900">ความสำคัญ</h2>
           <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
             @php
               $field='priority';
-              // ปรับให้ตรงกับ validation/migration: low|medium|high|urgent
               $priorities=['low'=>'ต่ำ','medium'=>'ปานกลาง','high'=>'สูง','urgent'=>'ด่วน'];
             @endphp
             <div>
@@ -172,7 +162,6 @@
               @error($field) <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
             </div>
 
-            {{-- วันที่แจ้ง (nullable) --}}
             @php $field='request_date'; @endphp
             <div>
               <label for="{{ $field }}" class="block text-sm font-medium text-slate-700">
@@ -186,7 +175,6 @@
           </div>
         </section>
 
-        {{-- ===== แนบไฟล์ (หลายไฟล์) ===== --}}
         <section class="pt-4 border-t border-slate-200">
           <h2 class="text-base font-semibold text-slate-900">ไฟล์แนบ</h2>
           <p class="text-sm text-slate-500">รองรับรูปภาพและ PDF (สูงสุดไฟล์ละ 10MB)</p>
@@ -210,8 +198,6 @@
           </div>
         </section>
       </div>
-
-      {{-- Actions --}}
       <div class="mt-6 flex justify-end gap-2">
         <a href="{{ route('maintenance.requests.index') }}"
            class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-slate-700 hover:bg-slate-50">
