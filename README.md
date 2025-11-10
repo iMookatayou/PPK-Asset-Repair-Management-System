@@ -29,6 +29,8 @@ docker compose exec app php artisan migrate --seed
 
 # Optional: run tests
 docker compose exec app php artisan test -q
+
+Request Me if you want .env.docker.example 
 ```
 
 URLs:
