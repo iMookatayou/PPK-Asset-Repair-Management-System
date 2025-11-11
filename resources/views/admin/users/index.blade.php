@@ -121,7 +121,7 @@
             <th class="px-3 py-2 hidden lg:table-cell">Department</th>
             <th class="px-3 py-2 hidden md:table-cell">Role</th>
             <th class="px-3 py-2 hidden xl:table-cell">Created</th>
-            <th class="px-3 py-2 text-right min-w-[180px]">Actions</th>
+            <th class="px-3 py-2 text-center min-w-[180px]">Actions</th>
           </tr>
         </thead>
 
@@ -154,8 +154,8 @@
               <td class="px-3 py-2 hidden xl:table-cell text-zinc-700 whitespace-nowrap">
                 {{ $u->created_at?->format('Y-m-d H:i') }}
               </td>
-              <td class="px-3 py-2">
-                <div class="flex items-center justify-end gap-1.5">
+              <td class="px-3 py-2 text-center align-middle whitespace-nowrap">
+                <div class="h-full flex items-center justify-center gap-1.5">
                   <a href="{{ route('admin.users.edit', $u) }}"
                      class="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 px-2.5 md:px-3 py-1.5 text-[11px] md:text-xs font-medium text-emerald-700 hover:bg-emerald-50 whitespace-nowrap min-w-[74px] justify-center">
                     <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

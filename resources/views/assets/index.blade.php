@@ -132,7 +132,7 @@
             <th class="p-3 text-left font-medium hidden xl:table-cell">{!! $th('category','Category') !!}</th>
             <th class="p-3 text-left font-medium hidden lg:table-cell">Location</th>
             <th class="p-3 text-left font-medium">{!! $th('status','Status') !!}</th>
-            <th class="p-3 text-right font-medium whitespace-nowrap min-w-[200px]">การดำเนินการ</th>
+            <th class="p-3 text-center font-medium whitespace-nowrap min-w-[200px]">การดำเนินการ</th>
           </tr>
         </thead>
         <tbody>
@@ -151,7 +151,7 @@
                   {{ ucfirst(str_replace('_',' ', $a->status)) }}
                 </span>
               </td>
-              <td class="p-3 text-right whitespace-nowrap align-middle">
+              <td class="p-3 text-center whitespace-nowrap align-middle">
                 <div class="h-full flex items-center justify-center gap-2">
                   <a href="{{ route('assets.show',$a) }}"
               class="inline-flex items-center gap-1.5 rounded-md border border-indigo-300 px-2.5 md:px-3 py-1.5 text-[11px] md:text-xs font-medium text-indigo-700 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 whitespace-nowrap min-w-[84px] justify-center" aria-label="ดูรายละเอียดทรัพย์สิน">

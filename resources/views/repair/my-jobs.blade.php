@@ -132,7 +132,7 @@
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-28">ความสำคัญ</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-36">สถานะ</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-40">ช่างผู้รับผิดชอบ</th>
-            <th class="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap min-w-[200px]">ดำเนินการ</th>
+            <th class="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap min-w-[200px]">ดำเนินการ</th>
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
@@ -186,8 +186,8 @@
                 <span class="text-gray-400 text-sm">-</span>
               @endif
             </td>
-            <td class="px-4 py-3 text-right align-middle whitespace-nowrap">
-              <div class="h-full flex items-center justify-end gap-2">
+            <td class="px-4 py-3 text-center align-middle whitespace-nowrap">
+              <div class="h-full flex items-center justify-center gap-2">
                 @if($canAccept)
                   <form method="POST" action="{{ route('repairs.accept', $r) }}">
                     @csrf

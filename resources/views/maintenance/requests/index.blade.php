@@ -149,7 +149,7 @@
             <th class="p-3 text-left font-medium w-[14%]">หน่วยงาน</th>
             <th class="p-3 text-left font-medium w-[10%]">ความสำคัญ</th>
             <th class="p-3 text-left font-medium w-[10%]">สถานะ</th>
-            <th class="p-3 text-right font-medium whitespace-nowrap min-w-[200px]">การดำเนินการ</th>
+            <th class="p-3 text-center font-medium whitespace-nowrap min-w-[200px]">การดำเนินการ</th>
           </tr>
         </thead>
 
@@ -199,8 +199,8 @@
               </span>
             </td>
 
-            <td class="p-3 text-right whitespace-nowrap">
-              <div class="flex justify-center items-center gap-2">
+            <td class="p-3 text-center whitespace-nowrap align-middle">
+              <div class="h-full flex justify-center items-center gap-2">
                 <a href="{{ route('maintenance.requests.show', $row) }}"
                    class="inline-flex items-center gap-1.5 rounded-md border border-indigo-300 px-2.5 md:px-3 py-1.5 text-[11px] md:text-xs font-medium text-indigo-700 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 whitespace-nowrap min-w-[84px] justify-center"
                    onclick="showLoader()" aria-label="ดูรายละเอียด">

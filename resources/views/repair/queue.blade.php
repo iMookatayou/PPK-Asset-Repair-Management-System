@@ -124,7 +124,7 @@
             <th class="p-3 text-left font-medium w-[20%]">ทรัพย์สิน</th>
             <th class="p-3 text-left font-medium w-[18%]">ผู้แจ้ง</th>
             <th class="p-3 text-left font-medium w-[14%]">วันที่แจ้ง</th>
-            <th class="p-3 text-right font-medium whitespace-nowrap min-w-[200px]">การดำเนินการ</th>
+            <th class="p-3 text-center font-medium whitespace-nowrap min-w-[200px]">การดำเนินการ</th>
           </tr>
         </thead>
 
@@ -185,7 +185,7 @@
               @endif
             </td>
 
-            <td class="p-3 text-right">
+            <td class="p-3 text-center align-middle">
               @can('tech-only')
                 <div class="relative inline-block text-left">
                   <details class="group inline-block queue-actions">
