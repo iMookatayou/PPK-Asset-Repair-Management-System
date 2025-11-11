@@ -354,7 +354,7 @@
                 <path d="M3 7h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
                 <path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
               </svg>
-              <h3 class="text-sm font-semibold text-gray-900">ภาระงานทีม</h3>
+              <h3 class="text-sm font-semibold text-gray-900">Technician Jobs</h3>
             </div>
             <button type="button" onclick="closeTeamDrawer()" class="p-1.5 rounded-md hover:bg-gray-100" aria-label="ปิด">
               <svg class="h-5 w-5 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 18L18 6M6 6l12 12"/></svg>

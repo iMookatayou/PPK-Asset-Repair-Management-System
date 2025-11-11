@@ -127,11 +127,11 @@
         <thead class="bg-zinc-50">
           <tr class="text-zinc-700 border-b border-zinc-200">
             <th class="p-3 text-left font-medium">{!! $th('id','#') !!}</th>
-            <th class="p-3 text-left font-medium">{!! $th('asset_code','Asset Code') !!}</th>
-            <th class="p-3 text-left font-medium">{!! $th('name','Name') !!}</th>
-            <th class="p-3 text-left font-medium hidden xl:table-cell">{!! $th('category','Category') !!}</th>
-            <th class="p-3 text-left font-medium hidden lg:table-cell">Location</th>
-            <th class="p-3 text-left font-medium">{!! $th('status','Status') !!}</th>
+            <th class="p-3 text-left font-medium">{!! $th('asset_code','รหัสทรัพย์สิน') !!}</th>
+            <th class="p-3 text-left font-medium">{!! $th('name','ชื่อ') !!}</th>
+            <th class="p-3 text-left font-medium hidden xl:table-cell">{!! $th('category','หมวดหมู่') !!}</th>
+            <th class="p-3 text-left font-medium hidden lg:table-cell">สถานที่</th>
+            <th class="p-3 text-left font-medium">{!! $th('status','สถานะ') !!}</th>
             <th class="p-3 text-center font-medium whitespace-nowrap min-w-[200px]">การดำเนินการ</th>
           </tr>
         </thead>
@@ -193,9 +193,9 @@
         </div>
 
         <div class="mt-3 grid grid-cols-2 gap-2 text-sm">
-          <div class="text-zinc-500">Category</div>
+          <div class="text-zinc-500">หมวดหมู่</div>
           <div>{{ optional($a->categoryRef)->name ?? '—' }}</div>
-          <div class="text-zinc-500">Location</div>
+          <div class="text-zinc-500">สถานที่</div>
           <div>{{ $a->location ?? '—' }}</div>
         </div>
 

@@ -96,42 +96,6 @@
                 Filters
               </button>
 
-              {{-- Status dropdown (replaces quick pills) --}}
-              @php
-                $statusMap = [
-                  '' => 'All',
-                  'pending' => 'Pending',
-                  'in_progress' => 'In progress',
-                  'completed' => 'Completed',
-                ];
-                $currStatus = (string) request('status','');
-                $currStatusLabel = $statusMap[$currStatus] ?? 'All';
-              @endphp
-              <div class="relative">
-                <button id="statusMenuBtn" type="button"
-                        class="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
-                        aria-haspopup="menu" aria-expanded="false" aria-controls="statusMenu">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18M6 8h12M9 12h6M11 16h2"/>
-                  </svg>
-                  <span>Status: {{ $currStatusLabel }}</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9l6 6 6-6"/>
-                  </svg>
-                </button>
-                <div id="statusMenu" role="menu"
-                     class="absolute right-0 mt-2 w-44 rounded-lg border border-zinc-200 bg-white shadow-lg hidden z-40">
-                  <a href="{{ request()->fullUrlWithQuery(['status'=>'']) }}"
-                     class="block px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50" role="menuitem">All</a>
-                  <a href="{{ request()->fullUrlWithQuery(['status'=>'pending']) }}"
-                     class="block px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50" role="menuitem">Pending</a>
-                  <a href="{{ request()->fullUrlWithQuery(['status'=>'in_progress']) }}"
-                     class="block px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50" role="menuitem">In progress</a>
-                  <a href="{{ request()->fullUrlWithQuery(['status'=>'completed']) }}"
-                     class="block px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50" role="menuitem">Completed</a>
-                </div>
-              </div>
-
               <a href="{{ route('repair.dashboard') }}"
                  class="inline-flex items-center rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50">
                 Refresh
@@ -380,7 +344,7 @@
 
   <script>
   (function(){
-    // ===== Filters toggle + Status dropdown =====
+    // ===== Filters toggle =====
     document.addEventListener('DOMContentLoaded', () => {
       // Filters panel
       const btn = document.getElementById('filterToggle');
@@ -390,19 +354,6 @@
           const hidden = panel.classList.toggle('hidden');
           btn.setAttribute('aria-expanded', hidden ? 'false' : 'true');
         });
-      }
-
-      // Status dropdown
-      const menuBtn = document.getElementById('statusMenuBtn');
-      const menu    = document.getElementById('statusMenu');
-      if (menuBtn && menu) {
-        const closeMenu = () => { if (!menu.classList.contains('hidden')) menu.classList.add('hidden'); menuBtn.setAttribute('aria-expanded','false'); };
-        const toggleMenu = () => { const hidden = menu.classList.toggle('hidden'); menuBtn.setAttribute('aria-expanded', hidden ? 'false' : 'true'); };
-        menuBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleMenu(); });
-        document.addEventListener('click', (e) => {
-          if (!menu.contains(e.target) && e.target !== menuBtn) closeMenu();
-        });
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
       }
     });
 
