@@ -200,7 +200,7 @@
             </td>
 
             <td class="p-3 text-right whitespace-nowrap">
-              <div class="flex justify-end items-center gap-2">
+              <div class="flex justify-center items-center gap-2">
                 <a href="{{ route('maintenance.requests.show', $row) }}"
                    class="inline-flex items-center gap-1.5 rounded-md border border-indigo-300 px-2.5 md:px-3 py-1.5 text-[11px] md:text-xs font-medium text-indigo-700 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 whitespace-nowrap min-w-[84px] justify-center"
                    onclick="showLoader()" aria-label="ดูรายละเอียด">
@@ -232,9 +232,7 @@
     </div>
   </div>
 
-  <div class="mt-4">
-    {{ $list->withQueryString()->links() }}
-  </div>
+  <div class="-mt-3">{{ $list->withQueryString()->links() }}</div>
 </div>
 @endsection
 

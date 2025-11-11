@@ -132,7 +132,7 @@
             <th class="p-3 text-left font-medium hidden xl:table-cell">{!! $th('category','Category') !!}</th>
             <th class="p-3 text-left font-medium hidden lg:table-cell">Location</th>
             <th class="p-3 text-left font-medium">{!! $th('status','Status') !!}</th>
-            <th class="p-3 text-right font-medium">การดำเนินการ</th>
+            <th class="p-3 text-right font-medium whitespace-nowrap min-w-[200px]">การดำเนินการ</th>
           </tr>
         </thead>
         <tbody>
@@ -151,17 +151,19 @@
                   {{ ucfirst(str_replace('_',' ', $a->status)) }}
                 </span>
               </td>
-              <td class="p-3 text-right whitespace-nowrap">
-                <div class="flex items-center justify-end gap-2">
+              <td class="p-3 text-right whitespace-nowrap align-middle">
+                <div class="h-full flex items-center justify-center gap-2">
                   <a href="{{ route('assets.show',$a) }}"
               class="inline-flex items-center gap-1.5 rounded-md border border-indigo-300 px-2.5 md:px-3 py-1.5 text-[11px] md:text-xs font-medium text-indigo-700 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 whitespace-nowrap min-w-[84px] justify-center" aria-label="ดูรายละเอียดทรัพย์สิน">
                     <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg>
-                    <span class="hidden sm:inline">ดูรายละเอียด</span><span class="sm:hidden">ดู</span>
+                    <span class="hidden sm:inline">ดูรายละเอียด</span>
+                    <span class="sm:hidden">ดู</span>
                   </a>
                   <a href="{{ route('assets.edit',$a) }}"
               class="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 px-2.5 md:px-3 py-1.5 text-[11px] md:text-xs font-medium text-emerald-700 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 whitespace-nowrap min-w-[74px] justify-center" aria-label="แก้ไขทรัพย์สิน">
                     <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
-                    <span class="hidden sm:inline">แก้ไข</span><span class="sm:hidden">แก้</span>
+                    <span class="hidden sm:inline">แก้ไข</span>
+                    <span class="sm:hidden">แก้</span>
                   </a>
                 </div>
               </td>
@@ -217,8 +219,6 @@
     @endforelse
   </div>
 
-  <div class="mt-4">
-    {{ $assets->links() }}
-  </div>
+  <div class="-mt-3">{{ $assets->links() }}</div>
 </div>
 @endsection

@@ -88,15 +88,73 @@ class MaintenanceRequestController extends Controller
     public function myJobsPage(Request $request)
     {
         \Gate::authorize('view-my-jobs');
-        $userId = Auth::id();
+        $user = Auth::user();
+        $userId = $user->id;
 
-        $list = MR::query()
+        $filter = $request->string('filter')->toString() ?: 'all'; // my|available|all
+        $status = $request->string('status')->toString();
+        $q      = $request->string('q')->toString();
+        $tech   = $request->integer('tech'); // optional technician filter
+
+        // สถิติภาพรวม
+        $stats = [
+            'pending'     => MR::whereIn('status', ['pending'])->count(),
+            'in_progress' => MR::whereIn('status', ['accepted','in_progress','on_hold'])->count(),
+            'completed'   => MR::whereIn('status', ['resolved','closed'])->count(),
+            'my_active'   => MR::where('technician_id', $userId)
+                ->whereNotIn('status', ['resolved','closed','cancelled'])->count(),
+        ];
+
+        // ทีมงานช่าง + admin พร้อมจำนวนงาน
+        $team = \App\Models\User::query()
+            ->whereIn('role', ['admin','technician'])
+            ->withCount([
+                'assignedRequests as active_count' => fn($q) => $q->whereNotIn('status', ['resolved','closed','cancelled']),
+                'assignedRequests as total_count',
+            ])
+            ->orderBy('name')
+            ->get(['id','name','role']);
+
+        // รายการงาน
+        $query = MR::query()
             ->with(['asset','reporter:id,name,email','technician:id,name'])
-            ->where('technician_id', $userId)
-            ->orderByDesc('updated_at')
-            ->paginate(20);
+            ->when($filter === 'my', fn($qb) => $qb->where('technician_id', $userId))
+            ->when($filter === 'available', fn($qb) => $qb->whereNull('technician_id')->whereIn('status', ['pending','accepted']))
+            ->when($tech, fn($qb) => $qb->where('technician_id', $tech))
+            ->when($status, fn($qb) => $qb->where('status', $status))
+            ->when($q, function ($qb) use ($q) {
+                $qb->where(function ($w) use ($q) {
+                    $w->where('title','like',"%{$q}%")
+                      ->orWhere('description','like',"%{$q}%")
+                      ->orWhereHas('asset', fn($qa) => $qa->where('name','like',"%{$q}%")->orWhere('asset_code','like',"%{$q}%"));
+                });
+            })
+            ->whereNotIn('status', ['cancelled'])
+            ->orderByRaw("FIELD(status,'pending','accepted','in_progress','on_hold','resolved','closed')")
+            ->orderByRaw("FIELD(priority,'urgent','high','medium','low')")
+            ->orderByDesc('updated_at');
 
-        return view('repair.my-jobs', compact('list'));
+        $list = $query->paginate(20)->withQueryString();
+
+        return view('repair.my-jobs', compact('list','stats','team','filter','status','q','tech'));
+    }
+
+    public function acceptJobQuick(Request $request, MR $req)
+    {
+        \Gate::authorize('view-my-jobs');
+
+        if ($req->technician_id && $req->technician_id !== Auth::id()) {
+            return redirect()->back()->with('toast', \App\Support\Toast::warning('งานนี้ถูกรับไปแล้วโดยคนอื่น', 2000));
+        }
+
+        $payload = [
+            'status' => 'accepted',
+            'note'   => 'รับงานผ่านหน้า My Jobs',
+        ];
+
+        $updated = $this->applyTransition($req, $payload, Auth::id());
+
+    return redirect()->back()->with('toast', \App\Support\Toast::success('รับงาน #'.$req->id.' เรียบร้อย', 1800));
     }
 
     public function showPage(MR $req)

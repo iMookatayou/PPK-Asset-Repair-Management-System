@@ -168,12 +168,6 @@
             </li>
           @endforeach
         </ul>
-
-        <div class="px-5 py-4 border-t border-slate-200">
-          <div class="flex justify-center">
-            {{ $threads->withQueryString()->links() }}
-          </div>
-        </div>
       @else
         <div class="p-10 text-center">
           <div class="mx-auto mb-3 size-12 grid place-items-center rounded-full bg-slate-100">
@@ -187,6 +181,12 @@
         </div>
       @endif
     </div>
+
+    @if($threads->count())
+      <div class="mt-2">
+        {{ $threads->withQueryString()->links() }}
+      </div>
+    @endif
 
   </div>
 @endsection

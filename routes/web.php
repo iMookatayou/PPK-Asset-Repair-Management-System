@@ -107,6 +107,7 @@ Route::middleware(['auth'])->group(function () {
     });
 
     Route::get('/repairs/my-jobs', [MaintenanceRequestController::class, 'myJobsPage'])->name('repairs.my_jobs');
+    Route::post('/repairs/accept/{req}', [MaintenanceRequestController::class, 'acceptJobQuick'])->name('repairs.accept');
     Route::get('/repairs/queue',   [MaintenanceRequestController::class, 'queuePage'])->name('repairs.queue');
 
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');

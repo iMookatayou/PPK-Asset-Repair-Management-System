@@ -124,7 +124,7 @@
             <th class="p-3 text-left font-medium w-[20%]">ทรัพย์สิน</th>
             <th class="p-3 text-left font-medium w-[18%]">ผู้แจ้ง</th>
             <th class="p-3 text-left font-medium w-[14%]">วันที่แจ้ง</th>
-            <th class="p-3 text-right font-medium w-[8%]">การดำเนินการ</th>
+            <th class="p-3 text-right font-medium whitespace-nowrap min-w-[200px]">การดำเนินการ</th>
           </tr>
         </thead>
 
@@ -225,9 +225,7 @@
     </div>
   </div>
 
-  <div class="mt-4">
-    {{ $list->withQueryString()->links() }}
-  </div>
+  <div class="-mt-3">{{ $list->withQueryString()->links() }}</div>
 
 </div>
 @endsection
