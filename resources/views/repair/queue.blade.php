@@ -93,10 +93,6 @@
                       class="rounded-md border border-emerald-700 bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800">
                 ค้นหา
               </button>
-              <a href="{{ request()->url() }}"
-                 class="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50">
-                ล้าง
-              </a>
             </div>
           </div>
         </form>
