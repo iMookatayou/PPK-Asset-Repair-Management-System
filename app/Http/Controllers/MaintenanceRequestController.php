@@ -183,6 +183,9 @@ class MaintenanceRequestController extends Controller
             'technician:id,name',
             'attachments' => fn($qq) => $qq->with('file'),
             'logs.user:id,name',
+
+            'rating',
+            'rating.rater:id,name',
         ]);
 
         // รายชื่อทีมงาน (หัวหน้า + ช่าง) สำหรับ dropdown เลือกผู้รับผิดชอบ

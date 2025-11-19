@@ -15,6 +15,8 @@ class Department extends Model
         'name_en',
     ];
 
+    // ===== Relations =====
+
     public function assets()
     {
         return $this->hasMany(Asset::class);
@@ -32,6 +34,9 @@ class Department extends Model
         );
     }
 
+    // ===== Accessors =====
+
+    // ให้เรียก $department->name ได้ และจะเลือกชื่อไทยก่อน ถ้าไม่มีค่อยใช้อังกฤษ
     public function getNameAttribute(): string
     {
         return $this->name_th ?: ($this->name_en ?: '');
@@ -41,15 +46,19 @@ class Department extends Model
     {
         $th = trim((string) $this->name_th);
         $en = trim((string) $this->name_en);
+
         if ($th && $en) {
             return "{$th} ({$en})";
         }
+
         return $th ?: $en;
     }
 
     protected $appends = [
         'display_name',
     ];
+
+    // ===== Scopes =====
 
     public function scopeCode($q, ?string $code)
     {

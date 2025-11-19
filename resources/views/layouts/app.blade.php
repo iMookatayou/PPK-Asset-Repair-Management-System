@@ -7,8 +7,11 @@
   <meta name="csrf-token" content="{{ csrf_token() }}" />
   <meta name="theme-color" content="#0E2B51">
 
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  {{-- Tom Select CSS สำหรับ searchable <select> เช่น หน่วยงาน --}}
+  <link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
 
   <title>@yield('title', config('app.name', 'Asset Repair'))</title>
 
@@ -489,6 +492,23 @@
     })();
     // Expose for other scripts
     window.openTeamDrawer = openTeamDrawer; window.closeTeamDrawer = closeTeamDrawer;
+  </script>
+
+    {{-- ===== Tom Select (Searchable <select> for elements with .ts-department) ===== --}}
+  <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll('.ts-department').forEach(function (el) {
+        if (el.tomselect) return;
+
+        new TomSelect(el, {
+          allowEmptyOption: true,
+          placeholder: 'ค้นหา/เลือกหน่วยงาน...',
+          maxOptions: 2000,
+          plugins: ['dropdown_input'],
+        });
+      });
+    });
   </script>
 
   @stack('scripts')

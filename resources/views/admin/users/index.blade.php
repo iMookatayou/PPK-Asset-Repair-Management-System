@@ -1,9 +1,17 @@
+{{-- resources/views/admin/users/index.blade.php --}}
 @extends('layouts.app')
 @section('title','Manage Users')
 
 @php
-  $roles   = $roles   ?? \App\Models\User::availableRoles();
-  $filters = $filters ?? ['s'=>'','role'=>'','department'=>''];
+  /** @var \Illuminate\Pagination\LengthAwarePaginator $list */
+
+  use App\Models\User as UserModel;
+
+  // roles: ถ้า controller ส่งมาให้ก็ใช้เลย ไม่งั้น fallback เป็น User::availableRoles()
+  $roles       = $roles       ?? UserModel::availableRoles();
+  // roleLabels: ถ้า controller ส่งมาให้ก็ใช้ ไม่งั้น fallback ไปดึงจาก model
+  $roleLabels  = $roleLabels  ?? UserModel::roleLabels();
+  $filters     = $filters     ?? ['s'=>'','role'=>'','department'=>''];
 
   $CTL = 'h-10 text-sm rounded-lg border border-zinc-300 px-3 focus:border-emerald-500 focus:ring-emerald-500';
   $SEL = $CTL . ' pr-9';
@@ -29,7 +37,7 @@
                 </svg>
               </div>
               <div>
-                <h1 class="text-lg font-semibold text-slate-800">Manage User</h1>
+                <h1 class="text-lg font-semibold text-slate-800">Manage Users</h1>
                 <p class="text-sm text-slate-500">เรียกดู กรอง และจัดการผู้ใช้</p>
               </div>
             </div>
@@ -49,18 +57,30 @@
           {{-- Search/Filter Form --}}
           <div class="pt-3 border-t border-zinc-200">
             <form method="GET" class="grid grid-cols-1 gap-2 md:grid-cols-5">
-              <input name="s" value="{{ $filters['s'] }}" placeholder="ค้นหาชื่อ/อีเมล/หน่วยงาน"
-                     class="w-full {{ $CTL }}" />
+              <input
+                type="text"
+                name="s"
+                value="{{ $filters['s'] }}"
+                placeholder="ค้นหาชื่อ/อีเมล/หน่วยงาน"
+                class="w-full {{ $CTL }}"
+              />
 
               <select name="role" class="w-full {{ $SEL }}">
                 <option value="">บทบาททั้งหมด</option>
                 @foreach ($roles as $r)
-                  <option value="{{ $r }}" @selected($filters['role']===$r)>{{ \App\Models\User::roleLabels()[$r] ?? ucfirst($r) }}</option>
+                  <option value="{{ $r }}" @selected($filters['role']===$r)>
+                    {{ $roleLabels[$r] ?? ucfirst($r) }}
+                  </option>
                 @endforeach
               </select>
 
-              <input name="department" value="{{ $filters['department'] }}" placeholder="หน่วยงาน"
-                     class="w-full {{ $CTL }}" />
+              <input
+                type="text"
+                name="department"
+                value="{{ $filters['department'] }}"
+                placeholder="หน่วยงาน (รหัสแผนก เช่น IT, EM)"
+                class="w-full {{ $CTL }}"
+              />
 
               <div class="col-span-1 flex items-center gap-2">
                 <button class="{{ $BTN }} min-w-[96px] justify-center bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500" title="Filter">
@@ -89,8 +109,11 @@
   </div>
 
   @if (session('status'))
-    @php session()->flash('toast', \App\Support\Toast::success(session('status'))); @endphp
+    @php
+      session()->flash('toast', \App\Support\Toast::success(session('status')));
+    @endphp
   @endif
+
   @if ($errors->any())
     <div class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-rose-700 text-sm">
       <ul class="list-disc pl-5 space-y-0.5">
@@ -102,75 +125,100 @@
   @endif
 
   <div class="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
-      <table class="min-w-full divide-y divide-zinc-200">
-        <thead class="bg-zinc-50 text-left text-xs font-medium text-zinc-700">
+    <table class="min-w-full divide-y divide-zinc-200">
+      <thead class="bg-zinc-50 text-left text-xs font-medium text-zinc-700">
+        <tr>
+          <th class="px-3 py-2">ชื่อ</th>
+          <th class="px-3 py-2">อีเมล</th>
+          <th class="px-3 py-2 hidden lg:table-cell">หน่วยงาน</th>
+          <th class="px-3 py-2 hidden md:table-cell">บทบาท</th>
+          <th class="px-3 py-2 hidden xl:table-cell">สร้างเมื่อ</th>
+          <th class="px-3 py-2 text-center min-w-[180px]">การดำเนินการ</th>
+        </tr>
+      </thead>
+
+      <tbody class="divide-y divide-zinc-100 text-sm">
+        @forelse ($list as $u)
           <tr>
-            <th class="px-3 py-2">ชื่อ</th>
-            <th class="px-3 py-2">อีเมล</th>
-            <th class="px-3 py-2 hidden lg:table-cell">หน่วยงาน</th>
-            <th class="px-3 py-2 hidden md:table-cell">บทบาท</th>
-            <th class="px-3 py-2 hidden xl:table-cell">สร้างเมื่อ</th>
-            <th class="px-3 py-2 text-center min-w-[180px]">การดำเนินการ</th>
-          </tr>
-        </thead>
-
-        <tbody class="divide-y divide-zinc-100 text-sm">
-          @forelse ($users as $u)
-            <tr>
-              <td class="px-3 py-2">
-                <div class="flex items-center gap-2">
-                  <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-xs font-semibold text-white">
-                    {{ strtoupper(mb_substr($u->name,0,1)) }}
-                  </div>
-                  <div>
-                    <div class="truncate max-w-[180px] font-medium">{{ $u->name }}</div>
-                    <div class="text-xs text-zinc-500">#{{ $u->id }}</div>
-                  </div>
+            <td class="px-3 py-2">
+              <div class="flex items-center gap-2">
+                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-xs font-semibold text-white">
+                  {{ strtoupper(mb_substr($u->name,0,1)) }}
                 </div>
-              </td>
-              <td class="px-3 py-2 truncate max-w-[240px]">{{ $u->email }}</td>
-              <td class="px-3 py-2 hidden lg:table-cell truncate max-w-[160px]">{{ $u->department ?: '-' }}</td>
-              <td class="px-3 py-2 hidden md:table-cell">
-                @php $isSup = method_exists($u,'isSupervisor') ? $u->isSupervisor() : false; @endphp
-                <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] leading-5 {{ $isSup ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-zinc-50 text-zinc-700 border-zinc-300' }}">
-                  {{ $u->role_label ?? ucfirst($u->role) }}
-                </span>
-              </td>
-              <td class="px-3 py-2 hidden xl:table-cell text-zinc-700 whitespace-nowrap">
-                {{ $u->created_at?->format('Y-m-d H:i') }}
-              </td>
-              <td class="px-3 py-2 text-center align-middle whitespace-nowrap">
-                <div class="h-full flex items-center justify-center gap-1.5">
-                  <a href="{{ route('admin.users.edit', $u) }}"
-                     class="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 px-2.5 md:px-3 py-1.5 text-[11px] md:text-xs font-medium text-emerald-700 hover:bg-emerald-50 whitespace-nowrap min-w-[74px] justify-center">
+                <div>
+                  <div class="truncate max-w-[180px] font-medium">{{ $u->name }}</div>
+                  <div class="text-xs text-zinc-500">#{{ $u->id }}</div>
+                </div>
+              </div>
+            </td>
+
+            <td class="px-3 py-2 truncate max-w-[240px]">
+              {{ $u->email }}
+            </td>
+
+            <td class="px-3 py-2 hidden lg:table-cell truncate max-w-[200px]">
+              @php
+                // ถ้ามี relation departmentRef ให้ใช้ชื่อจากตรงนั้นก่อน
+                $depName = $u->departmentRef->name ?? null;
+              @endphp
+              {{ $depName ?? $u->department ?? '-' }}
+            </td>
+
+            <td class="px-3 py-2 hidden md:table-cell">
+              @php
+                $isSup = method_exists($u,'isSupervisor') ? $u->isSupervisor() : false;
+              @endphp
+              <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] leading-5
+                {{ $isSup ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-zinc-50 text-zinc-700 border-zinc-300' }}">
+                {{ $u->role_label ?? ($roleLabels[$u->role] ?? ucfirst($u->role)) }}
+              </span>
+            </td>
+
+            <td class="px-3 py-2 hidden xl:table-cell text-zinc-700 whitespace-nowrap">
+              {{ $u->created_at?->format('Y-m-d H:i') }}
+            </td>
+
+            <td class="px-3 py-2 text-center align-middle whitespace-nowrap">
+              <div class="h-full flex items-center justify-center gap-1.5">
+                <a href="{{ route('admin.users.edit', $u) }}"
+                   class="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 px-2.5 md:px-3 py-1.5 text-[11px] md:text-xs font-medium text-emerald-700 hover:bg-emerald-50 whitespace-nowrap min-w-[74px] justify-center">
+                  <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 20h9"/>
+                    <path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/>
+                  </svg>
+                  <span class="hidden sm:inline">แก้ไข</span>
+                  <span class="sm:hidden">แก้ไข</span>
+                </a>
+
+                @if($u->id !== auth()->id())
+                  <button type="button"
+                          class="inline-flex items-center gap-1.5 rounded-md border border-rose-300 px-2.5 md:px-3 py-1.5 text-[11px] md:text-xs font-medium text-rose-600 hover:bg-rose-50 whitespace-nowrap min-w-[74px] justify-center"
+                          onclick="return window.confirmDeleteUser('{{ route('admin.users.destroy', $u) }}');">
                     <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/>
+                      <path d="M3 6h18"/>
+                      <path d="M8 6V4h8v2"/>
+                      <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                      <path d="M10 11v6M14 11v6"/>
                     </svg>
-                    <span class="hidden sm:inline">แก้ไข</span>
-                    <span class="sm:hidden">แก้ไข</span>
-                  </a>
-                  @if($u->id !== auth()->id())
-                    <button type="button"
-                      class="inline-flex items-center gap-1.5 rounded-md border border-rose-300 px-2.5 md:px-3 py-1.5 text-[11px] md:text-xs font-medium text-rose-600 hover:bg-rose-50 whitespace-nowrap min-w-[74px] justify-center"
-                      onclick="return window.confirmDeleteUser('{{ route('admin.users.destroy', $u) }}');">
-                      <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/>
-                      </svg>
-                      <span class="hidden sm:inline">ลบ</span>
-                      <span class="sm:hidden">ลบ</span>
-                    </button>
-                  @endif
-                </div>
-              </td>
-            </tr>
-          @empty
-            <tr><td colspan="6" class="px-3 py-6 text-center text-zinc-500">ไม่พบผู้ใช้</td></tr>
-          @endforelse
-        </tbody>
-      </table>
-    </div>
+                    <span class="hidden sm:inline">ลบ</span>
+                    <span class="sm:hidden">ลบ</span>
+                  </button>
+                @endif
+              </div>
+            </td>
+          </tr>
+        @empty
+          <tr>
+            <td colspan="6" class="px-3 py-6 text-center text-zinc-500">
+              ไม่พบผู้ใช้
+            </td>
+          </tr>
+        @endforelse
+      </tbody>
+    </table>
+  </div>
 
-  {{-- Hidden global delete form & script (outside bulk form to avoid nested forms) --}}
+  {{-- Hidden global delete form & script --}}
   <form id="delete-user-form" method="POST" class="hidden">
     @csrf
     @method('DELETE')
@@ -182,9 +230,11 @@
       if(!f) return true;
       f.action = url;
       f.submit();
-      return false; // prevent default link/button behavior
+      return false;
     };
   </script>
 
-  <div class="mt-3">{{ $users->links() }}</div>
+  <div class="mt-3">
+    {{ $list->links() }}
+  </div>
 @endsection

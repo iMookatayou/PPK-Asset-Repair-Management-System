@@ -108,6 +108,10 @@ class MaintenanceRequest extends Model
         return $this->morphOne(\App\Models\Attachment::class, 'attachable')->latestOfMany('id');
     }
 
+    public function rating()
+    {
+        return $this->hasOne(MaintenanceRating::class, 'maintenance_request_id');
+    }
     public function getNormalizedStatusAttribute(): string
     {
         if ($this->status === self::STATUS_COMPLETED && $this->resolved_at) {

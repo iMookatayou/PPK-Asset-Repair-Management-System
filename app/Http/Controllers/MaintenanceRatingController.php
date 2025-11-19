@@ -1,0 +1,161 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\MaintenanceRequest;
+use App\Models\MaintenanceRating;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
+
+class MaintenanceRatingController extends Controller
+{
+    /**
+     * กำหนดช่วงเวลาที่อนุญาตให้ให้คะแนน (หน่วย: วัน)
+     * เช่น 7 วันหลังจากปิดงาน
+     */
+    protected int $ratingDeadlineDays = 7;
+
+    /**
+     * แสดงฟอร์มให้คะแนน
+     *
+     * GET /maintenance/{maintenanceRequest}/rating
+     */
+    public function create(MaintenanceRequest $maintenanceRequest)
+    {
+        $user = Auth::user();
+
+        // 1) ต้องเป็นคนแจ้งซ่อมเท่านั้น (reporter ในระบบ)
+        if ($maintenanceRequest->reporter_id !== $user->id) {
+            abort(403, 'คุณไม่มีสิทธิ์ให้คะแนนงานนี้');
+        }
+
+        // 2) สถานะต้องอยู่ใน resolved หรือ closed ถึงจะให้คะแนนได้
+        if (! in_array($maintenanceRequest->status, [
+            MaintenanceRequest::STATUS_RESOLVED,
+            MaintenanceRequest::STATUS_CLOSED,
+        ], true)) {
+            abort(403, 'สามารถให้คะแนนได้เฉพาะงานที่ปิดแล้วเท่านั้น');
+        }
+
+        // 3) ถ้ามี rating แล้ว ห้ามให้ซ้ำ
+        if ($maintenanceRequest->rating) {
+            return redirect()
+                ->route('maintenance.show', $maintenanceRequest)
+                ->with('toast', [
+                    'type'    => 'info',
+                    'message' => 'งานนี้มีการให้คะแนนไปแล้ว',
+                ]);
+        }
+
+        // 4) เช็คว่าอยู่ในช่วงเวลาที่ให้คะแนนได้มั้ย
+        if (! $this->withinRatingWindow($maintenanceRequest)) {
+            return redirect()
+                ->route('maintenance.show', $maintenanceRequest)
+                ->with('toast', [
+                    'type'    => 'warning',
+                    'message' => 'เลยระยะเวลาที่สามารถให้คะแนนงานนี้ได้แล้ว',
+                ]);
+        }
+
+        // แสดง view ฟอร์มให้คะแนน เช่น resources/views/maintenance/rating/form.blade.php
+        return view('maintenance.rating.form', [
+            'req' => $maintenanceRequest,
+        ]);
+    }
+
+    /**
+     * บันทึกคะแนน
+     *
+     * POST /maintenance/{maintenanceRequest}/rating
+     */
+    public function store(Request $request, MaintenanceRequest $maintenanceRequest)
+    {
+        $user = Auth::user();
+
+        // 1) ต้องเป็นคนแจ้งซ่อมเท่านั้น
+        if ($maintenanceRequest->reporter_id !== $user->id) {
+            abort(403, 'คุณไม่มีสิทธิ์ให้คะแนนงานนี้');
+        }
+
+        // 2) ต้องปิดงานแล้วเท่านั้น
+        if (! in_array($maintenanceRequest->status, [
+            MaintenanceRequest::STATUS_RESOLVED,
+            MaintenanceRequest::STATUS_CLOSED,
+        ], true)) {
+            abort(403, 'สามารถให้คะแนนได้เฉพาะงานที่ปิดแล้วเท่านั้น');
+        }
+
+        // 3) กันการให้คะแนนซ้ำ
+        if ($maintenanceRequest->rating) {
+            return redirect()
+                ->route('maintenance.show', $maintenanceRequest)
+                ->with('toast', [
+                    'type'    => 'info',
+                    'message' => 'งานนี้มีการให้คะแนนไปแล้ว',
+                ]);
+        }
+
+        // 4) เช็ค window เวลา
+        if (! $this->withinRatingWindow($maintenanceRequest)) {
+            return redirect()
+                ->route('maintenance.show', $maintenanceRequest)
+                ->with('toast', [
+                    'type'    => 'warning',
+                    'message' => 'เลยระยะเวลาที่สามารถให้คะแนนงานนี้ได้แล้ว',
+                ]);
+        }
+
+        // 5) validate + rule: ถ้าให้ 1–2 ดาว ต้องกรอก comment
+        $validator = Validator::make($request->all(), [
+            'score'   => ['required', 'integer', 'between:1,5'],
+            'comment' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $validator->after(function ($v) {
+            $data    = $v->getData();
+            $score   = isset($data['score']) ? (int) $data['score'] : null;
+            $comment = trim($data['comment'] ?? '');
+
+            if ($score !== null && $score <= 2 && $comment === '') {
+                $v->errors()->add('comment', 'ถ้าให้ 1–2 ดาว กรุณาระบุความคิดเห็นเพิ่มเติม');
+            }
+        });
+
+        $data = $validator->validate();
+
+        // 6) สร้าง rating ใหม่ (ให้คะแนนได้ครั้งเดียว ไม่เปิด edit)
+        MaintenanceRating::create([
+            'maintenance_request_id' => $maintenanceRequest->id,
+            'rater_id'               => $user->id,
+            'technician_id'          => $maintenanceRequest->technician_id,
+            'score'                  => $data['score'],
+            'comment'                => $data['comment'] ?? null,
+        ]);
+
+        return redirect()
+            ->route('maintenance.show', $maintenanceRequest)
+            ->with('toast', [
+                'type'    => 'success',
+                'message' => 'บันทึกคะแนนเรียบร้อย ขอบคุณสำหรับความคิดเห็นค่ะ',
+            ]);
+    }
+
+    /**
+     * เช็คว่าตอนนี้ยังอยู่ในช่วงเวลาที่ให้คะแนนได้ไหม
+     * ใช้ลำดับเวลา: closed_at > resolved_at > completed_date
+     */
+    protected function withinRatingWindow(MaintenanceRequest $maintenanceRequest): bool
+    {
+        $base = $maintenanceRequest->closed_at
+            ?? $maintenanceRequest->resolved_at
+            ?? $maintenanceRequest->completed_date;
+
+        if (! $base) {
+            // ถ้าไม่มีข้อมูลเวลาเลย ก็ไม่อนุญาตให้ให้คะแนน
+            return false;
+        }
+
+        return now()->diffInDays($base) <= $this->ratingDeadlineDays;
+    }
+}

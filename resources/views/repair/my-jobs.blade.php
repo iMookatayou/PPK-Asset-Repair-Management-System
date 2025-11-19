@@ -11,190 +11,239 @@
   $tech     = $tech ?? request('tech');
 
   $filterLabels = [
-    'my' => 'งานของฉัน',
+    'my'        => 'งานของฉัน',
     'available' => 'งานว่าง',
-    'all' => 'ทั้งหมด',
+    'all'       => 'ทั้งหมด',
   ];
-  $human = fn($s) => [
+
+  $statusLabel = fn(?string $s) => [
     'pending'     => 'รอดำเนินการ',
     'accepted'    => 'รับงานแล้ว',
     'in_progress' => 'กำลังดำเนินการ',
     'on_hold'     => 'พักไว้ชั่วคราว',
     'resolved'    => 'แก้ไขเสร็จสิ้น',
     'closed'      => 'ปิดงาน',
-  ][$s] ?? Str::of($s)->replace('_',' ')->title();
+  ][strtolower((string)$s)] ?? Str::of((string)$s)->replace('_',' ')->title();
+
+  $statusClass = fn(?string $s) => match(strtolower((string)$s)) {
+    'pending'     => 'ring-1 ring-amber-300 text-amber-800 bg-white',
+    'accepted'    => 'ring-1 ring-indigo-300 text-indigo-800 bg-white',
+    'in_progress' => 'ring-1 ring-sky-300 text-sky-800 bg-white',
+    'on_hold'     => 'ring-1 ring-zinc-300 text-zinc-700 bg-white',
+    'resolved'    => 'ring-1 ring-emerald-300 text-emerald-800 bg-white',
+    'closed'      => 'ring-1 ring-zinc-300 text-zinc-700 bg-zinc-50',
+    default       => 'ring-1 ring-zinc-300 text-zinc-700 bg-white',
+  };
+
+  $priorityLabel = fn(?string $p) => [
+    'low'    => 'ต่ำ',
+    'medium' => 'ปานกลาง',
+    'high'   => 'สูง',
+    'urgent' => 'เร่งด่วน',
+  ][strtolower((string)$p)] ?? '-';
+
+  $priorityClass = fn(?string $p) => match(strtolower((string)$p)) {
+    'low'    => 'ring-1 ring-zinc-300 text-zinc-700 bg-white',
+    'medium' => 'ring-1 ring-sky-300 text-sky-800 bg-white',
+    'high'   => 'ring-1 ring-amber-300 text-amber-800 bg-white',
+    'urgent' => 'ring-1 ring-rose-300 text-rose-800 bg-white',
+    default  => 'ring-1 ring-zinc-300 text-zinc-700 bg-white',
+  };
 @endphp
 
-<div class="container mx-auto px-4 py-4 max-w-[1600px]" id="myJobsContainer">
-  {{-- Header + Stats + Search/Filter in a single sticky card --}}
-  <div class="mb-4 sticky top-[5.5rem] z-20 bg-slate-50/90 backdrop-blur">
-    <div class="bg-white rounded-lg border border-gray-200 p-3 lg:p-4 shadow-sm">
-      <div class="flex flex-col gap-3">
-        {{-- Top row: Icon + Title + Stats --}}
-        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
-          <div class="flex items-center gap-3">
-            <svg class="h-8 w-8 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-              <rect x="3" y="7" width="18" height="13" rx="2" class="stroke-current"></rect>
-              <path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" class="stroke-current"></path>
-              <path d="M3 12h18" class="stroke-current"></path>
-            </svg>
+<div class="pt-3 md:pt-4"></div>
+
+<div class="w-full px-4 md:px-6 lg:px-8 flex flex-col gap-5" id="myJobsContainer">
+  {{-- ===== Sticky Header + Filter Card (ราชการโทนเดียวกับ Maintenance Requests) ===== --}}
+  <div class="sticky top-[6rem] z-20 bg-slate-50/90 backdrop-blur">
+    <div class="rounded-lg border border-zinc-300 bg-white shadow-sm">
+      <div class="px-5 py-4">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          {{-- Left: Icon + Title --}}
+          <div class="flex items-start gap-3">
+            <div class="grid h-9 w-9 place-items-center rounded-md bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200">
+              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                <rect x="3" y="7" width="18" height="13" rx="2" />
+                <path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                <path d="M3 12h18" />
+              </svg>
+            </div>
             <div>
-              <h1 class="text-xl font-bold text-gray-900">My Jobs</h1>
-              <p class="text-xs text-gray-600 mt-0.5">จัดการและติดตามงานซ่อมบำรุงทรัพย์สิน</p>
+              <h1 class="text-[17px] font-semibold text-zinc-900">My Jobs</h1>
+              <p class="text-[13px] text-zinc-600">
+                จัดการและติดตามงานซ่อมบำรุงทรัพย์สินของคุณ • งานที่รับผิดชอบและงานที่สามารถรับเพิ่มได้
+              </p>
             </div>
           </div>
 
-          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 w-full lg:w-auto">
-            <div class="text-center lg:px-2">
-              <div class="text-[10px] text-gray-600 mb-0.5">รอดำเนินการ</div>
-              <div class="text-xl font-bold text-amber-600" id="stat-pending">{{ $stats['pending'] ?? 0 }}</div>
+          {{-- Right: Stats (โทนเรียบ ๆ) --}}
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 w-full md:w-auto text-[11px]">
+            <div class="min-w-[90px] px-2 py-1.5 rounded-lg bg-slate-50 border border-slate-200">
+              <p class="text-[11px] text-zinc-600">รอดำเนินการ</p>
+              <p class="mt-0.5 text-lg font-semibold text-amber-700" id="stat-pending">{{ $stats['pending'] ?? 0 }}</p>
             </div>
-            <div class="text-center lg:border-l lg:border-gray-200 lg:pl-4">
-              <div class="text-[10px] text-gray-600 mb-0.5">กำลังดำเนินการ</div>
-              <div class="text-xl font-bold text-blue-600" id="stat-in-progress">{{ $stats['in_progress'] ?? 0 }}</div>
+            <div class="min-w-[90px] px-2 py-1.5 rounded-lg bg-slate-50 border border-slate-200">
+              <p class="text-[11px] text-zinc-600">กำลังดำเนินการ</p>
+              <p class="mt-0.5 text-lg font-semibold text-sky-700" id="stat-in-progress">{{ $stats['in_progress'] ?? 0 }}</p>
             </div>
-            <div class="text-center lg:border-l lg:border-gray-200 lg:pl-4">
-              <div class="text-[10px] text-gray-600 mb-0.5">เสร็จสิ้น</div>
-              <div class="text-xl font-bold text-green-600" id="stat-completed">{{ $stats['completed'] ?? 0 }}</div>
+            <div class="min-w-[90px] px-2 py-1.5 rounded-lg bg-slate-50 border border-slate-200">
+              <p class="text-[11px] text-zinc-600">เสร็จสิ้น</p>
+              <p class="mt-0.5 text-lg font-semibold text-emerald-700" id="stat-completed">{{ $stats['completed'] ?? 0 }}</p>
             </div>
-            <div class="text-center lg:border-l lg:border-gray-200 lg:pl-4">
-              <div class="text-[10px] text-gray-600 mb-0.5">งานของฉัน</div>
-              <div class="text-xl font-bold text-indigo-600" id="stat-my-active">{{ $stats['my_active'] ?? 0 }}</div>
+            <div class="min-w-[90px] px-2 py-1.5 rounded-lg bg-slate-50 border border-slate-200">
+              <p class="text-[11px] text-zinc-600">งานของฉัน (กำลังทำ)</p>
+              <p class="mt-0.5 text-lg font-semibold text-indigo-700" id="stat-my-active">{{ $stats['my_active'] ?? 0 }}</p>
             </div>
           </div>
         </div>
 
-        {{-- Search/Filter Form --}}
-        <div class="pt-3 border-t border-gray-200">
-          <form method="GET" class="flex flex-col sm:flex-row gap-2">
-            <div class="flex-1 min-w-[280px]">
-              <input type="text" name="q" value="{{ $q }}" placeholder="ค้นหาเรื่อง, ทรัพย์สิน..."
-                     class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
-            </div>
+        <div class="mt-4 h-px bg-zinc-200"></div>
 
-            <div class="w-full sm:w-52">
-              <select name="filter" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" onchange="this.form.submit()">
-                @foreach(['all' => 'ทั้งหมด', 'my' => 'งานของฉัน', 'available' => 'งานว่าง'] as $key => $label)
-                  <option value="{{ $key }}" @selected($filter===$key)>{{ $label }}</option>
-                @endforeach
-              </select>
+        {{-- Search / Filter Form --}}
+        <form method="GET"
+              class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-12">
+          {{-- Search --}}
+          <div class="md:col-span-5 min-w-0">
+            <label for="q" class="mb-1 block text-[12px] text-zinc-600">คำค้นหา</label>
+            <div class="relative">
+              <input type="text" id="q" name="q" value="{{ $q }}"
+                     placeholder="ค้นหาเรื่อง, ทรัพย์สิน..."
+                     class="w-full rounded-md border border-zinc-300 pl-10 pr-3 py-2 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600" />
+              <span class="pointer-events-none absolute inset-y-0 left-0 flex w-9 items-center justify-center text-zinc-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M21 21l-4.3-4.3M17 10a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+              </span>
             </div>
+          </div>
 
-            <div class="w-full sm:w-56">
-              <select name="status" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                <option value="">ทุกสถานะ</option>
-                @foreach(['pending','accepted','in_progress','on_hold','resolved','closed'] as $s)
-                  <option value="{{ $s }}" @selected($status===$s)>{{ $human($s) }}</option>
-                @endforeach
-              </select>
-            </div>
+          {{-- Filter: scope --}}
+          <div class="md:col-span-2">
+            <label for="filter" class="mb-1 block text-[12px] text-zinc-600">ช่วงงาน</label>
+            <select id="filter" name="filter"
+                    class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    onchange="this.form.submit()">
+              @foreach($filterLabels as $key => $label)
+                <option value="{{ $key }}" @selected($filter===$key)>{{ $label }}</option>
+              @endforeach
+            </select>
+          </div>
 
-            @if($tech)
-              <input type="hidden" name="tech" value="{{ $tech }}" />
+          {{-- Status --}}
+          <div class="md:col-span-3">
+            <label for="status" class="mb-1 block text-[12px] text-zinc-600">สถานะ</label>
+            <select id="status" name="status"
+                    class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
+              <option value="">ทุกสถานะ</option>
+              @foreach(['pending','accepted','in_progress','on_hold','resolved','closed'] as $s)
+                <option value="{{ $s }}" @selected($status===$s)>{{ $statusLabel($s) }}</option>
+              @endforeach
+            </select>
+          </div>
+
+          {{-- Hidden tech (ถ้ามี) --}}
+          @if($tech)
+            <input type="hidden" name="tech" value="{{ $tech }}" />
+          @endif
+
+          {{-- Buttons --}}
+          <div class="md:col-span-2 flex items-end gap-2">
+            <button type="submit"
+                    class="inline-flex items-center justify-center rounded-md border border-emerald-700 bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
+              ค้นหา
+            </button>
+            @if($q || $status)
+              <a href="{{ route('repairs.my_jobs', ['filter' => $filter] + ($tech ? ['tech'=>$tech] : [])) }}"
+                 class="inline-flex items-center justify-center rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50">
+                ล้างค่า
+              </a>
             @endif
-
-            <div class="flex gap-2 shrink-0">
-              <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500">
-                ค้นหา
-              </button>
-              @if($q || $status)
-                <a href="{{ route('repairs.my_jobs', ['filter' => $filter]) }}"
-                   class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
-                  ล้าง
-                </a>
-              @endif
-            </div>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
     </div>
   </div>
 
-  {{-- Main Card --}}
-  <div class="bg-white rounded-lg border border-gray-200">
-    {{-- Table --}}
-    <div class="overflow-x-auto">
-      @php
-        $activeTech = isset($tech) && isset($team) ? $team->firstWhere('id', (int)$tech) : null;
-      @endphp
-      @if($activeTech)
-        <div class="px-4 py-2 bg-indigo-50 text-indigo-800 border-b border-indigo-200">
-          <div class="text-sm">กำลังดูงานของ: <span class="font-medium">{{ $activeTech->name }}</span></div>
-        </div>
-      @endif
-      <table class="w-full text-sm">
-        <thead class="bg-gray-50 border-b border-gray-200">
-          <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-[35%]">เรื่อง</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-40">ทรัพย์สิน</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-28">ความสำคัญ</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-36">สถานะ</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-40">ช่างผู้รับผิดชอบ</th>
-            <th class="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap min-w-[200px]">ดำเนินการ</th>
+  {{-- ===== Main Table Card (โทนเดียวกับ Maintenance Requests) ===== --}}
+  <div class="rounded-lg border border-zinc-300 bg-white overflow-hidden">
+    @php
+      $activeTech = isset($tech) && isset($team) ? $team->firstWhere('id', (int)$tech) : null;
+    @endphp
+
+    @if($activeTech)
+      <div class="px-5 py-2.5 bg-emerald-50 text-emerald-900 border-b border-emerald-100 text-sm">
+        กำลังดูงานของ: <span class="font-medium">{{ $activeTech->name }}</span>
+      </div>
+    @endif
+
+    <div class="relative overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-zinc-50 border-b border-zinc-200">
+          <tr class="text-zinc-700">
+            <th class="px-4 py-3 text-left font-medium w-[32%]">เรื่อง</th>
+            <th class="px-4 py-3 text-left font-medium w-40">ทรัพย์สิน</th>
+            <th class="px-4 py-3 text-left font-medium w-28">ความสำคัญ</th>
+            <th class="px-4 py-3 text-left font-medium w-36">สถานะ</th>
+            <th class="px-4 py-3 text-left font-medium w-40">ช่างผู้รับผิดชอบ</th>
+            <th class="px-4 py-3 text-center font-medium whitespace-nowrap min-w-[200px]">การดำเนินการ</th>
           </tr>
         </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
+
+        <tbody class="bg-white">
         @forelse($list as $r)
           @php
             $canAccept = !$r->technician_id && in_array($r->status, ['pending','accepted']);
-
-            $priorityClasses = [
-              'low'    => 'bg-green-100 text-green-800 border-green-200',
-              'medium' => 'bg-blue-100 text-blue-800 border-blue-200',
-              'high'   => 'bg-amber-100 text-amber-800 border-amber-200',
-              'urgent' => 'bg-red-100 text-red-800 border-red-200',
-            ];
-            $priorityClass = $priorityClasses[strtolower($r->priority ?? 'medium')] ?? $priorityClasses['medium'];
-
-            $statusClasses = [
-              'pending'     => 'bg-amber-100 text-amber-800 border-amber-200',
-              'accepted'    => 'bg-blue-100 text-blue-800 border-blue-200',
-              'in_progress' => 'bg-indigo-100 text-indigo-800 border-indigo-200',
-              'on_hold'     => 'bg-gray-100 text-gray-800 border-gray-200',
-              'resolved'    => 'bg-green-100 text-green-800 border-green-200',
-              'closed'      => 'bg-gray-200 text-gray-700 border-gray-300',
-            ];
-            $statusClass = $statusClasses[$r->status] ?? $statusClasses['pending'];
           @endphp
-          <tr class="hover:bg-gray-50">
+          <tr class="align-top hover:bg-zinc-50 border-b last:border-0">
             <td class="px-4 py-3">
-              <a href="{{ route('maintenance.requests.show', $r) }}" class="block max-w-full truncate font-medium text-indigo-600 hover:text-indigo-900 hover:underline">
+              <a href="{{ route('maintenance.requests.show', $r) }}"
+                 class="block max-w-full truncate font-medium text-zinc-900 hover:underline">
                 #{{ $r->id }} — {{ $r->title }}
               </a>
               @if($r->description)
-                <div class="text-xs text-gray-500 mt-0.5 max-w-full truncate">{{ Str::limit($r->description, 60) }}</div>
+                <p class="mt-1 text-xs leading-relaxed text-zinc-600 max-w-full">
+                  {{ Str::limit($r->description, 80) }}
+                </p>
               @endif
             </td>
-            <td class="px-4 py-3 text-gray-700 max-w-[220px] truncate">{{ $r->asset->name ?? '-' }}</td>
+
+            <td class="px-4 py-3 text-zinc-700 max-w-[220px] truncate">
+              {{ $r->asset->name ?? '-' }}
+            </td>
+
             <td class="px-4 py-3">
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border {{ $priorityClass }}">
-                {{ ucfirst(strtolower($r->priority ?? 'medium')) }}
+              <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] {{ $priorityClass($r->priority ?? null) }}">
+                {{ $priorityLabel($r->priority ?? null) }}
               </span>
             </td>
+
             <td class="px-4 py-3">
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border {{ $statusClass }}">
-                {{ $human($r->status) }}
+              <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] {{ $statusClass($r->status ?? null) }}">
+                {{ $statusLabel($r->status ?? null) }}
               </span>
             </td>
+
             <td class="px-4 py-3">
               @if($r->technician)
-                <span class="text-sm text-gray-700">{{ $r->technician->name }}</span>
+                <span class="text-sm text-zinc-800">{{ $r->technician->name }}</span>
               @else
-                <span class="text-gray-400 text-sm">-</span>
+                <span class="text-sm text-zinc-400">-</span>
               @endif
             </td>
-            <td class="px-4 py-3 text-center align-middle whitespace-nowrap">
+
+            <td class="px-4 py-3 text-center whitespace-nowrap align-middle">
               <div class="h-full flex items-center justify-center gap-2">
                 @if($canAccept)
                   <form method="POST" action="{{ route('repairs.accept', $r) }}">
                     @csrf
-                    <button type="submit" class="px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:ring-2 focus:ring-green-500">
+                    <button type="submit"
+                            class="inline-flex items-center gap-1.5 rounded-md border border-emerald-600 bg-emerald-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-600">
                       รับงาน
                     </button>
                   </form>
                 @endif
                 <a href="{{ route('maintenance.requests.show', $r) }}"
-                   class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                   class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-[11px] font-medium text-zinc-800 hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-400">
                   ดูรายละเอียด
                 </a>
               </div>
@@ -202,12 +251,12 @@
           </tr>
         @empty
           <tr>
-            <td colspan="6" class="px-4 py-12 text-center">
-              <div class="text-gray-400">
-                <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <td colspan="6" class="px-4 py-12 text-center text-zinc-500">
+              <div class="flex flex-col items-center gap-2">
+                <svg class="w-10 h-10 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
-                <p class="text-sm">ไม่พบรายการ</p>
+                <p class="text-sm">ไม่พบรายการงานตามเงื่อนไขที่เลือก</p>
               </div>
             </td>
           </tr>
@@ -219,15 +268,16 @@
 
   {{-- Pagination --}}
   @if($list->hasPages())
-  <div class="mt-4">
-    {{ $list->withQueryString()->links() }}
-  </div>
+    <div class="mt-3">
+      {{ $list->withQueryString()->links() }}
+    </div>
   @endif
 </div>
+@endsection
 
 @push('scripts')
 <script>
-// Real-time updates every 30 seconds
+// Real-time updates every 30 seconds (รักษา logic เดิม)
 let refreshInterval;
 
 function refreshMyJobs() {
@@ -249,13 +299,13 @@ function refreshMyJobs() {
       if (newStat && currentStat && newStat.textContent !== currentStat.textContent) {
         currentStat.textContent = newStat.textContent;
         currentStat.classList.add('animate-pulse');
-        setTimeout(() => currentStat.classList.remove('animate-pulse'), 1000);
+        setTimeout(() => currentStat.classList.remove('animate-pulse'), 800);
       }
     });
 
     // Update table body
     const newTbody = doc.querySelector('tbody.bg-white');
-    const currentTbody = document.querySelector('tbody.bg-white');
+    const currentTbody = document.querySelector('#myJobsContainer tbody.bg-white');
     if (newTbody && currentTbody) {
       const currentRows = currentTbody.querySelectorAll('tr').length;
       const newRows = newTbody.querySelectorAll('tr').length;
@@ -274,15 +324,14 @@ function refreshMyJobs() {
 
 function showNotification(message) {
   const toast = document.createElement('div');
-  toast.className = 'fixed top-4 right-4 bg-indigo-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-bounce';
+  toast.className = 'fixed top-4 right-4 bg-emerald-700 text-white px-5 py-2.5 rounded-lg shadow-lg z-50';
   toast.textContent = message;
   document.body.appendChild(toast);
 
   setTimeout(() => {
-    toast.classList.remove('animate-bounce');
     toast.classList.add('opacity-0', 'transition-opacity');
-    setTimeout(() => toast.remove(), 300);
-  }, 3000);
+    setTimeout(() => toast.remove(), 250);
+  }, 2500);
 }
 
 refreshInterval = setInterval(refreshMyJobs, 30000);
@@ -292,4 +341,3 @@ window.addEventListener('beforeunload', () => {
 });
 </script>
 @endpush
-@endsection

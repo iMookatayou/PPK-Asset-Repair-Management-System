@@ -18,6 +18,8 @@ class DatabaseSeeder extends Seeder
             AssetCategorySeeder::class,
             AssetSeeder::class,
             ChatSeeder::class,
+            DemoRatingSeeder::class,
+            RoleSeeder::class,
         ]);
     }
 }

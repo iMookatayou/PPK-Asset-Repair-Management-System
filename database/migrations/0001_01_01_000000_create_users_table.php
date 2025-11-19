@@ -16,12 +16,18 @@ return new class extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
 
-            // เก็บรหัสแผนก (เช่น IT, ER, OPD) แบบ string ไม่ผูก FK
-            $table->string('department', 100)->nullable();
+            // เก็บรหัสหน่วยงาน (code จากตาราง departments) เผื่อ filter
+            $table->string('department', 100)
+                  ->nullable()
+                  ->index();
 
-            // Legacy originally stored enum('admin','technician','staff'). Replaced by flexible string roles.
-            $table->string('role', 50)->default('computer_officer')->comment('Role code (admin, supervisor, it_support, network, developer, computer_officer)');
+            // เก็บ role เป็น code (ไปแมปกับ roles.code)
+            $table->string('role', 50)
+                  ->default('computer_officer')
+                  ->comment('Role code roles.code เช่น member, admin, supervisor, it_support, network, developer, technician, computer_officer')
+                  ->index();
 
+            // รูปโปรไฟล์
             $table->string('profile_photo_path', 2048)->nullable();
             $table->string('profile_photo_thumb', 2048)->nullable();
 

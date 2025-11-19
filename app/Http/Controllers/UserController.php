@@ -18,18 +18,41 @@ class UserController extends Controller
 
         $users = User::query()
             ->select([
-                'id', 'name', 'email', 'department', 'role',
-                'profile_photo_thumb', 'created_at', 'updated_at'
+                'id',
+                'name',
+                'email',
+                'department',
+                'role',
+                'profile_photo_thumb',
+                'created_at',
+                'updated_at',
             ])
             ->with([
-                'departmentRef:id,code,name',
+                'departmentRef' => function ($qq) {
+                    $qq->select([
+                        'id',
+                        'code',
+                        'name_th',
+                        'name_en',
+                    ]);
+                },
+                'roleRef' => function ($qq) {
+                    $qq->select([
+                        'id',
+                        'code',
+                        'name_th',
+                        'name_en',
+                    ]);
+                },
             ])
-            ->when($q, fn($qq) => $qq->where(function ($w) use ($q) {
+            ->withAvg('technicianRatings as rating_average', 'score')
+            ->withCount('technicianRatings as rating_count')
+            ->when($q, fn ($qq) => $qq->where(function ($w) use ($q) {
                 $w->where('name', 'like', "%{$q}%")
-                  ->orWhere('email', 'like', "%{$q}%");
+                ->orWhere('email', 'like', "%{$q}%");
             }))
-            ->when($role, fn($qq) => $qq->where('role', $role))
-            ->when($dept, fn($qq) => $qq->where('department', $dept))
+            ->when($role, fn ($qq) => $qq->where('role', $role))
+            ->when($dept, fn ($qq) => $qq->where('department', $dept))
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
@@ -39,20 +62,46 @@ class UserController extends Controller
 
     public function show(User $user)
     {
-        $user->load('departmentRef:id,code,name');
+        $user->load([
+                'departmentRef' => function ($qq) {
+                    $qq->select([
+                        'id',
+                        'code',
+                        'name_th',
+                        'name_en',
+                    ]);
+                },
+                'roleRef' => function ($qq) {
+                    $qq->select([
+                        'id',
+                        'code',
+                        'name_th',
+                        'name_en',
+                    ]);
+                },
+            ])
+            ->loadAvg('technicianRatings as rating_average', 'score')
+            ->loadCount('technicianRatings as rating_count');
+
         return response()->json($user);
     }
 
     public function update(Request $request, User $user)
     {
         $data = $request->validate([
-            'name'       => ['sometimes','string','max:255'],
-            'email'      => ['sometimes','email','max:255', Rule::unique('users','email')->ignore($user->id)],
-            'department' => ['nullable','string','max:100'],
-            'role'       => ['sometimes', Rule::in(['admin','technician','computer_officer'])],
-            'password'   => ['nullable','string','min:8'],
+            'name'       => ['sometimes', 'string', 'max:255'],
+            'email'      => [
+                'sometimes',
+                'email',
+                'max:255',
+                Rule::unique('users', 'email')->ignore($user->id),
+            ],
+            'department' => ['nullable', 'string', 'max:100'],
+            'role'       => ['sometimes', Rule::in(User::availableRoles())],
+            'password'   => ['nullable', 'string', 'min:8'],
         ]);
 
+        // ถ้าไม่มี password หรือว่าง string → ไม่อัปเดต
         if (array_key_exists('password', $data)) {
             if (!$data['password']) {
                 unset($data['password']);
@@ -62,7 +111,19 @@ class UserController extends Controller
         }
 
         $user->update($data);
-        $user->load('departmentRef:id,code,name');
+
+        $user->load([
+                'departmentRef' => function ($qq) {
+                    $qq->select([
+                        'id',
+                        'code',
+                        'name_th',
+                        'name_en',
+                    ]);
+                },
+            ])
+            ->loadAvg('technicianRatings as rating_average', 'score')
+            ->loadCount('technicianRatings as rating_count');
 
         return response()->json([
             'message' => 'อัปเดตเรียบร้อยแล้ว',
@@ -70,9 +131,17 @@ class UserController extends Controller
         ]);
     }
 
-    public function destroy(User $user)
+    public function destroy(Request $request, User $user)
     {
+        // กันไม่ให้ลบตัวเองผ่าน API
+        if ($request->user() && $request->user()->id === $user->id) {
+            return response()->json([
+                'message' => 'ไม่สามารถลบบัญชีผู้ใช้ของตัวเองผ่าน API นี้ได้',
+            ], 422);
+        }
+
         $user->delete();
+
         return response()->json(['message' => 'ลบเรียบร้อยแล้ว']);
     }
 }
