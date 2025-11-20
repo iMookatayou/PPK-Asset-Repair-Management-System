@@ -1,3 +1,4 @@
+{{-- resources/views/maintenance/requests/create.blade.php --}}
 @extends('layouts.app')
 @section('title','Create Maintenance')
 
@@ -50,31 +51,31 @@
       class="maint-form rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
       novalidate
       aria-label="แบบฟอร์มสร้างคำขอซ่อม">
-    @csrf
+      @csrf
 
-        @include('maintenance.requests._form', [
-            'req'         => null,
-            'assets'      => $assets ?? [],
-            'depts'       => $depts ?? [],
-            'attachments' => [],   // สร้างใหม่ยังไม่มีไฟล์
-        ])
+      @include('maintenance.requests._form', [
+          'req'         => null,
+          'assets'      => $assets ?? [],
+          'depts'       => $depts ?? [],
+          'attachments' => [],   // สร้างใหม่ยังไม่มีไฟล์
+      ])
 
-        <div class="mt-6 flex justify-end gap-2">
-            <a href="{{ route('maintenance.requests.index') }}"
-               class="maint-btn maint-btn-outline">
-              ยกเลิก
-            </a>
-            <button type="submit"
-                    class="maint-btn maint-btn-primary">
-              บันทึก
-            </button>
-        </div>
+      <div class="mt-6 flex justify-end gap-2">
+        <a href="{{ route('maintenance.requests.index') }}"
+           class="maint-btn maint-btn-outline">
+          ยกเลิก
+        </a>
+        <button type="submit"
+                class="maint-btn maint-btn-primary">
+          บันทึก
+        </button>
+      </div>
     </form>
   </div>
 @endsection
 
 {{-- ===========================
-     Tom Select + Styling ช่องเดียว
+     Tom Select + Styling
 =========================== --}}
 <link rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css">
@@ -179,7 +180,7 @@
     border-radius: 0.5rem;
     border-color: rgb(226,232,240);       /* slate-200 */
     box-shadow: 0 10px 15px -3px rgba(15,23,42,0.15);
-    z-index: 50; /* dropdown ล้นก็ยังอยู่บน */
+    z-index: 50;
     font-size: 0.875rem;                  /* text-sm ให้ dropdown text เท่ากันด้วย */
     line-height: 1.25rem;
   }
@@ -189,42 +190,74 @@
     border-color: rgb(248,113,113) !important; /* rose-400 */
   }
 
-  /* ===== FIX: Search box ใน Dropdown ไม่ให้บวม ===== */
-  .maint-form .ts-dropdown .ts-dropdown-input {
-    padding: 0.25rem 0.75rem 0.5rem; /* บีบให้พอดี ไม่สูงเกิน */
+  /* ===== ไอคอนแว่นขยายบนกล่องหลัก ===== */
+  .maint-form .ts-wrapper.ts-with-icon {
+    position: relative;
   }
 
-  .maint-form .ts-dropdown .ts-dropdown-input input {
-    height: 32px !important;   /* เตี้ยกว่าฟิลด์หลักเล็กน้อย */
-    padding-top: 0.25rem;
-    padding-bottom: 0.25rem;
-    font-size: 0.875rem;
-    line-height: 1.25rem;
+  .maint-form .ts-wrapper.ts-with-icon .ts-select-icon {
+    position: absolute;
+    left: 0.85rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    color: rgb(148,163,184);   /* text-slate-400 */
   }
+
+  .maint-form .ts-wrapper.ts-with-icon .ts-select-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .maint-form select.ts-hidden-accessible {
+    display: none !important;
+    }
 </style>
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-    if (document.getElementById('asset_id')) {
-      new TomSelect('#asset_id', {
+
+    function initTomSelectWithIcon(selector, placeholderText) {
+      const el = document.querySelector(selector);
+      if (!el) return;
+
+      const ts = new TomSelect(selector, {
         create: false,
         allowEmptyOption: true,
-        plugins: ['dropdown_input'],
-        sortField: { field: 'text', direction: 'asc' },
-        placeholder: '— เลือกทรัพย์สิน —',
+        // ❗ ไม่มี plugin 'dropdown_input' แล้ว
+        // search จะเกิดในกล่องหลักเลย
         maxOptions: 500,
+        sortField: { field: 'text', direction: 'asc' },
+        placeholder: placeholderText,
+        searchField: ['text'],   // ให้ค้นจาก text ของ option
       });
+
+      // เพิ่ม class + icon ลงใน wrapper ให้กลายเป็น select แบบมีแว่นขยาย
+      const wrapper = ts.wrapper; // <div class="ts-wrapper ...">
+      if (wrapper) {
+        wrapper.classList.add('ts-with-icon');
+
+        const icon = document.createElement('span');
+        icon.className = 'ts-select-icon';
+        icon.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M15.5 15.5L20 20" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="11" cy="11" r="5"
+                    stroke="currentColor" stroke-width="2" />
+          </svg>
+        `;
+        wrapper.insertBefore(icon, wrapper.firstChild);
+      }
     }
 
-    if (document.getElementById('department_id')) {
-      new TomSelect('#department_id', {
-        create: false,
-        allowEmptyOption: true,
-        plugins: ['dropdown_input'],
-        sortField: { field: 'text', direction: 'asc' },
-        placeholder: '— เลือกหน่วยงาน —',
-        maxOptions: 500,
-      });
-    }
+    // ทรัพย์สิน: กล่องเดียว = เลือก + ค้นหาในตัว
+    initTomSelectWithIcon('#asset_id', '— เลือกทรัพย์สิน —');
+
+    // หน่วยงาน: กล่องเดียว = เลือก + ค้นหาในตัว
+    initTomSelectWithIcon('#department_id', '— เลือกหน่วยงาน —');
   });
 </script>

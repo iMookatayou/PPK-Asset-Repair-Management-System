@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Department;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Hash;
@@ -32,7 +33,6 @@ class UserController extends Controller
 
         $q = User::query()
             ->with([
-                // departments: ไม่มีคอลัมน์ name แล้ว → เลือก name_th, name_en พอ
                 'departmentRef' => function ($qq) {
                     $qq->select([
                         'id',
@@ -41,7 +41,6 @@ class UserController extends Controller
                         'name_en',
                     ]);
                 },
-                // preload roleRef ด้วย เผื่ออยากใช้ใน Blade
                 'roleRef' => function ($qq) {
                     $qq->select([
                         'id',
@@ -58,8 +57,8 @@ class UserController extends Controller
             $needle = mb_strtolower($search);
             $q->where(function ($qq) use ($needle) {
                 $qq->whereRaw('LOWER(name) LIKE ?', ["%{$needle}%"])
-                   ->orWhereRaw('LOWER(email) LIKE ?', ["%{$needle}%"])
-                   ->orWhereRaw('LOWER(COALESCE(department, \'\')) LIKE ?', ["%{$needle}%"]);
+                ->orWhereRaw('LOWER(email) LIKE ?', ["%{$needle}%"])
+                ->orWhereRaw('LOWER(COALESCE(department, \'\')) LIKE ?', ["%{$needle}%"]);
             });
         }
 
@@ -69,7 +68,7 @@ class UserController extends Controller
             $q->where('role', $role);
         }
 
-        // filter ตาม department (เก็บเป็น code)
+        // filter ตาม department (เก็บเป็น code ใน users.department)
         $dep = $request->get('department');
         if ($dep !== null && $dep !== '') {
             $q->where('department', $dep);
@@ -80,15 +79,24 @@ class UserController extends Controller
             ->paginate(20)
             ->withQueryString();
 
+        // ⬇️⬇️ เพิ่มตรงนี้ เพื่อให้ dropdown หน่วยงานมีข้อมูล
+        $departments = Department::orderBy('code')->get([
+            'id',
+            'code',
+            'name_th',
+            'name_en',
+        ]);
+
         return view('admin.users.index', [
-            'list'       => $list,
-            'roles'      => $roleCodes,   // ใช้ใน filter / select ก็ได้
-            'roleLabels' => $roleLabels,  // ใช้แสดง label ไทย ๆ
-            'filters'    => [
+            'list'        => $list,
+            'roles'       => $roleCodes,
+            'roleLabels'  => $roleLabels,
+            'filters'     => [
                 's'          => $search,
                 'role'       => $role,
                 'department' => $dep,
             ],
+            'departments' => $departments,
         ]);
     }
 

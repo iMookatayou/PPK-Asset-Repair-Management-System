@@ -18,7 +18,7 @@
           </p>
         </div>
 
-        {{-- ปุ่ม Back ใช้สไตล์เดียวกับปุ่มล่าง (เหมือน Maintenance) --}}
+        {{-- ปุ่ม Back --}}
         <a href="{{ route('assets.index') }}"
            class="asset-btn asset-btn-outline">
           <svg class="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -42,7 +42,9 @@
           if (window.showToast) {
             window.showToast({ type:'error', message: msg, position:'uc', timeout: 3600, size:'lg' });
           } else {
-            window.dispatchEvent(new CustomEvent('app:toast',{ detail:{ type:'error', message: msg, position:'uc', timeout:3600, size:'lg' } }));
+            window.dispatchEvent(new CustomEvent('app:toast',{
+              detail:{ type:'error', message: msg, position:'uc', timeout:3600, size:'lg' }
+            }));
           }
         })();
       </script>
@@ -77,156 +79,194 @@
 @endsection
 
 {{-- ===========================
-     Tom Select + Styling ใช้กับ: #category_id, #department_id
+     Tom Select + Styling แบบเดียวกับหน้า User/Edit Asset
+     ใช้กับ: #category_id, #department_id, #status
 =========================== --}}
 <link rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css">
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 
 <style>
-  /* ====== Scope ทั้งหมดให้เฉพาะหน้า Create Asset ====== */
-
-  /* ให้ input / select ปกติสูงเท่ากัน + font-size เท่ากัน (เหมือน maint-form) */
+  /* ให้ input / select ปกติสูงเท่ากัน + font-size เท่ากัน */
   .asset-form input[type="text"],
+  .asset-form input[type="email"],
+  .asset-form input[type="password"],
   .asset-form input[type="date"],
   .asset-form input[type="number"],
   .asset-form select:not([multiple]) {
-      height: 44px;
-      border-radius: 0.75rem;
-      box-sizing: border-box;
-      padding-top: 0.5rem;
-      padding-bottom: 0.5rem;
-      font-size: 0.875rem;   /* text-sm */
-      line-height: 1.25rem;
+    height: 44px;
+    border-radius: 0.75rem;
+    box-sizing: border-box;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
   }
 
-  /* --- ปุ่มทุกประเภท (Back / ยกเลิก / บันทึก) --- */
+  /* ========== ปุ่ม (Back / ยกเลิก / บันทึก) ========== */
   .asset-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.25rem;
-      padding: 0 1rem;
-      height: 44px;              /* เท่ากับช่อง input */
-      border-radius: 0.75rem;
-      font-size: 0.875rem;       /* text-sm */
-      line-height: 1.25rem;
-      font-weight: 500;
-      border: 1px solid rgb(148,163,184);  /* slate-400 */
-      background-color: #ffffff;
-      color: rgb(51,65,85);      /* slate-700 */
-      transition: background-color 0.15s ease,
-                  border-color 0.15s ease,
-                  color 0.15s ease;
-      text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 1rem;
+    height: 44px;
+    border-radius: 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    border: 1px solid rgb(148,163,184);
+    background-color: #ffffff;
+    color: rgb(51,65,85);
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    text-decoration: none;
+    gap: 0.25rem;
   }
 
   .asset-btn svg {
-      flex-shrink: 0;
+    flex-shrink: 0;
   }
 
   .asset-btn:hover {
-      background-color: rgb(248,250,252);
+    background-color: rgb(248,250,252);
   }
 
   .asset-btn-primary {
-      border-color: rgb(5,150,105);
-      background-color: rgb(5,150,105);
-      color: white;
+    border-color: rgb(5,150,105);
+    background-color: rgb(5,150,105);
+    color: #ffffff;
   }
 
   .asset-btn-primary:hover {
-      background-color: rgb(4,120,87);
-      border-color: rgb(4,120,87);
+    background-color: rgb(4,120,87);
+    border-color: rgb(4,120,87);
   }
 
-  /* ============================================
-     TomSelect Styling (เฉพาะภายใน asset-form)
-     ============================================ */
-
-  /* Wrapper */
+  /* ========== TomSelect เฉพาะในฟอร์มนี้ ========== */
   .asset-form .ts-wrapper.ts-basic {
-      border: none !important;
-      padding: 0 !important;
-      box-shadow: none !important;
-      background: transparent;
+    border: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    background: transparent;
   }
 
-  /* Control (กล่องหลัก) */
   .asset-form .ts-wrapper.ts-basic .ts-control {
-      border-radius: 0.75rem;
-      border: 1px solid rgb(226,232,240);  /* slate-200 */
-      padding: 0 0.75rem;                  /* px-3 */
-      box-shadow: none;
-      min-height: 44px;                    /* เท่ากับ input */
-      background-color: #fff;
-      display: flex;
-      align-items: center;
-      font-size: 0.875rem;
-      line-height: 1.25rem;
+    position: relative;             /* ให้ icon absolute อ้างอิงได้ */
+    border-radius: 0.75rem;
+    border: 1px solid rgb(226,232,240);
+    padding: 0 0.75rem;
+    box-shadow: none;
+    min-height: 44px;
+    background-color: #fff;
+    display: flex;
+    align-items: center;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    white-space: nowrap;
+    overflow: hidden;
   }
 
-  /* เผื่อไอคอนแว่นขยาย */
+  .asset-form .ts-wrapper.ts-basic .ts-control .item {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  /* เวลามีไอคอนแว่นขยาย ให้ขยับ text เข้าไปหน่อย */
   .asset-form .ts-wrapper.ts-basic.ts-with-icon .ts-control {
-      padding-left: 2.6rem;
+    padding-left: 2.6rem;
   }
 
-  /* Input ข้างใน control */
   .asset-form .ts-wrapper.ts-basic .ts-control input {
-      font-size: 0.875rem;
-      line-height: 1.25rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    min-width: 0;
+    flex: 1 1 auto;
   }
 
-  /* Focus */
   .asset-form .ts-wrapper.ts-basic .ts-control.focus {
-      border-color: rgb(5,150,105);
-      box-shadow: none;
+    border-color: rgb(5,150,105);
+    box-shadow: none;
   }
 
-  /* Dropdown */
   .asset-form .ts-wrapper.ts-basic .ts-dropdown {
-      border-radius: 0.5rem;
-      border-color: rgb(226,232,240);
-      box-shadow: 0 10px 15px -3px rgba(15,23,42,0.15);
-      z-index: 50;
-      font-size: 0.875rem;
-      line-height: 1.25rem;
+    border-radius: 0.5rem;
+    border-color: rgb(226,232,240);
+    box-shadow: 0 10px 15px -3px rgba(15,23,42,0.15);
+    z-index: 50;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
   }
 
-  /* Error border */
+  /* กรณี error ให้กรอบแดง */
   .asset-form .ts-wrapper.ts-basic.ts-error .ts-control {
-      border-color: rgb(248,113,113) !important;
+    border-color: rgb(248,113,113) !important;
   }
 
-  /* ============================================
-     FIX: Search box ใน Dropdown ไม่ให้บวม
-     ============================================ */
-
-  .asset-form .ts-dropdown .ts-dropdown-input {
-      padding: 0.25rem 0.75rem 0.5rem; /* บีบให้พอดี ไม่สูงเกิน */
+  /* ===== ไอคอนแว่นขยายบนกล่องหลัก (อยู่ใน .ts-control) ===== */
+  .asset-form .ts-wrapper.ts-with-icon .ts-control .ts-select-icon {
+    position: absolute;
+    left: 0.85rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    color: rgb(148,163,184);
   }
 
-  .asset-form .ts-dropdown .ts-dropdown-input input {
-      height: 32px !important;   /* เตี้ยกว่าฟิลด์หลักเล็กน้อย */
-      padding-top: 0.25rem;
-      padding-bottom: 0.25rem;
-      font-size: 0.875rem;
-      line-height: 1.25rem;
+  .asset-form .ts-wrapper.ts-with-icon .ts-control .ts-select-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* ซ่อน select เดิมที่ TomSelect แปะ ts-hidden-accessible ให้ */
+  .asset-form select.ts-hidden-accessible {
+    display: none !important;
   }
 </style>
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-    ['category_id', 'department_id'].forEach(function (id) {
-      if (document.getElementById(id)) {
-        new TomSelect('#' + id, {
-          create: false,
-          allowEmptyOption: true,
-          plugins: ['dropdown_input'],
-          sortField: { field: 'text', direction: 'asc' },
-          maxOptions: 500,
-        });
-      }
-    });
+
+    function initTomSelectWithIcon(selector, placeholderText) {
+      const el = document.querySelector(selector);
+      if (!el) return;
+
+      const ts = new TomSelect(selector, {
+        create: false,
+        allowEmptyOption: true,
+        maxOptions: 500,
+        sortField: { field: 'text', direction: 'asc' },
+        placeholder: placeholderText,
+        searchField: ['text'],
+      });
+
+      const wrapper = ts.wrapper;
+      if (!wrapper) return;
+
+      wrapper.classList.add('ts-with-icon');
+
+      const control = wrapper.querySelector('.ts-control');
+      if (!control) return;
+
+      // ====== ใส่ไอคอนแว่นขยายเข้าไปใน .ts-control ======
+      const icon = document.createElement('span');
+      icon.className = 'ts-select-icon';
+      icon.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="11" cy="11" r="5" stroke="currentColor" stroke-width="2"></circle>
+          <path d="M15 15l4 4" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+      `;
+      control.insertBefore(icon, control.firstChild);
+    }
+
+    // ให้เหมือนหน้า User / Maintenance: ช่องเดียว, มีไอคอน, search ได้
+    initTomSelectWithIcon('#category_id',   '— เลือกหมวดหมู่ —');
+    initTomSelectWithIcon('#department_id', '— เลือกหน่วยงาน —');
+    initTomSelectWithIcon('#status',        '— เลือกสถานะ —');
   });
 </script>

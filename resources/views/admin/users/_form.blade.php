@@ -1,24 +1,25 @@
+{{-- resources/views/admin/users/_form.blade.php --}}
 @php
   use App\Models\User as UserModel;
   /** @var \App\Models\User|null $user */
 
-  // ถ้า $user เป็น null (กรณีหน้า create) ให้สร้าง instance เปล่า ๆ
+  // ถ้า $user เป็น null (หน้า create) ให้สร้าง instance เปล่า ๆ
   $user = $user instanceof UserModel ? $user : new UserModel();
 
-  $roles      = $roles      ?? UserModel::availableRoles();
-  $roleLabels = $roleLabels ?? UserModel::roleLabels();
-  $isEdit     = $user->exists;
+  $roles       = $roles       ?? UserModel::availableRoles();
+  $roleLabels  = $roleLabels  ?? UserModel::roleLabels();
+  $departments = $departments ?? collect();
+  $isEdit      = $user->exists;
 
-  // role ที่ควรเลือก
+  // role ปัจจุบัน
   $currentRole = old('role');
   if ($currentRole === null) {
       $currentRole = $user->role ?: UserModel::ROLE_COMPUTER_OFFICER;
   }
 
-  // base classes
+  // base class ของ input ปกติ (ไม่ใช่ select ที่เป็น TomSelect)
   $CTL = 'mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm
-          focus:border-emerald-500 focus:ring-emerald-500';
-  $SEL = $CTL . ' pr-9 bg-white appearance-none';
+          focus:border-emerald-500 focus:ring-emerald-500 bg-white';
 @endphp
 
 <div class="grid gap-6 md:grid-cols-2">
@@ -59,70 +60,75 @@
     @enderror
   </div>
 
-  {{-- หน่วยงาน (ถ้ามี) --}}
-  <div class="space-y-1.5">
-    <label for="department" class="block text-sm font-medium text-slate-700">
-      หน่วยงาน (ถ้ามี)
-    </label>
+  {{-- หน่วยงาน (ถ้ามี) - TomSelect ใช้ฟังก์ชันเดียวกับ Maintenance --}}
+<div class="space-y-1.5">
+  <label for="department_id" class="block text-sm font-medium text-slate-700">
+    หน่วยงาน (ถ้ามี)
+  </label>
 
-    <div class="relative">
-      <select
-        id="department"
-        name="department_id"
-        class="{{ $SEL }}"
-      >
-        <option value="">— ไม่ระบุหน่วยงาน —</option>
-        @foreach($departments as $dept)
-          <option value="{{ $dept->id }}"
-            @selected(old('department_id', $user->department_id) == $dept->id)>
-            {{ $dept->code }} — {{ $dept->display_name ?? $dept->name }}
-          </option>
-        @endforeach
-      </select>
+  <div class="relative mt-1">
+    {{-- ไอคอนแว่นขยาย --}}
+    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 z-10 text-slate-400">
+      <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2"></circle>
+        <line x1="16" y1="16" x2="20" y2="20"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+      </svg>
+    </span>
 
-      {{-- ลูกศร dropdown --}}
-      <div class="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-        <svg class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M7 10l5 5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
-      </div>
-    </div>
-
-    @error('department_id')
-      <p class="text-xs text-rose-600 mt-1">{{ $message }}</p>
-    @enderror
+    <select
+      id="department_id"
+      name="department_id"
+      placeholder="— เลือกหน่วยงาน —"
+      class="ts-basic ts-with-icon w-full @error('department_id') ts-error @enderror"
+    >
+      <option value="">— ไม่ระบุหน่วยงาน —</option>
+      @foreach($departments as $dept)
+        <option value="{{ $dept->id }}"
+          @selected(old('department_id', $user->department_id) == $dept->id)>
+          {{ $dept->code }} — {{ $dept->display_name ?? $dept->name }}
+        </option>
+      @endforeach
+    </select>
   </div>
 
-  {{-- บทบาท --}}
-  <div class="space-y-1.5">
+  @error('department_id')
+    <p class="text-xs text-rose-600 mt-1">{{ $message }}</p>
+  @enderror
+    </div>
+
+    {{-- บทบาท - TomSelect ใช้ฟังก์ชันเดียวกัน --}}
+    <div class="space-y-1.5">
     <label for="role" class="block text-sm font-medium text-slate-700">
-      บทบาท <span class="text-rose-500">*</span>
+        บทบาท <span class="text-rose-500">*</span>
     </label>
 
-    <div class="relative">
-      <select
+    <div class="relative mt-1">
+        {{-- ไอคอนแว่นขยาย --}}
+        <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 z-10 text-slate-400">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2"></circle>
+            <line x1="16" y1="16" x2="20" y2="20"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+        </svg>
+        </span>
+
+        <select
         id="role"
         name="role"
-        class="{{ $SEL }}"
+        class="ts-basic ts-with-icon w-full @error('role') ts-error @enderror"
         required
-      >
+        >
         @foreach($roles as $role)
-          <option value="{{ $role }}" @selected($currentRole === $role)>
+            <option value="{{ $role }}" @selected($currentRole === $role)>
             {{ $roleLabels[$role] ?? $role }}
-          </option>
+            </option>
         @endforeach
-      </select>
-
-      {{-- ลูกศร dropdown --}}
-      <div class="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-        <svg class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M7 10l5 5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
-      </div>
+        </select>
     </div>
 
     @error('role')
-      <p class="text-xs text-rose-600 mt-1">{{ $message }}</p>
+        <p class="text-xs text-rose-600 mt-1">{{ $message }}</p>
     @enderror
   </div>
 
@@ -130,9 +136,15 @@
   <div class="space-y-1.5">
     <label for="password" class="block text-sm font-medium text-slate-700">
       รหัสผ่าน
-      <span class="text-xs font-normal text-slate-500">
-        (เว้นว่างหากไม่ต้องการเปลี่ยน)
-      </span>
+      @if($isEdit)
+        <span class="text-xs font-normal text-slate-500">
+          (เว้นว่างหากไม่ต้องการเปลี่ยน)
+        </span>
+      @else
+        <span class="text-xs font-normal text-slate-500">
+          (อย่างน้อย 8 ตัวอักษร)
+        </span>
+      @endif
     </label>
     <input
       id="password"
@@ -140,6 +152,7 @@
       type="password"
       class="{{ $CTL }}"
       autocomplete="new-password"
+      @if(!$isEdit) required @endif
     >
     @error('password')
       <p class="text-xs text-rose-600 mt-1">{{ $message }}</p>
@@ -151,7 +164,7 @@
     <label for="password_confirmation" class="block text-sm font-medium text-slate-700">
       ยืนยันรหัสผ่าน
       <span class="text-xs font-normal text-slate-500">
-        (กรอกเมื่อต้องการเปลี่ยนรหัสผ่าน)
+        (กรอกให้ตรงกับรหัสผ่าน)
       </span>
     </label>
     <input
@@ -160,6 +173,7 @@
       type="password"
       class="{{ $CTL }}"
       autocomplete="new-password"
+      @if(!$isEdit) required @endif
     >
     @error('password_confirmation')
       <p class="text-xs text-rose-600 mt-1">{{ $message }}</p>
