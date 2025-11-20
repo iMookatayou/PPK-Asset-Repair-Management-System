@@ -23,8 +23,8 @@ return new class extends Migration
 
             // เก็บ role เป็น code (ไปแมปกับ roles.code)
             $table->string('role', 50)
-                  ->default('computer_officer')
-                  ->comment('Role code roles.code เช่น member, admin, supervisor, it_support, network, developer, technician, computer_officer')
+                  ->default('member')
+                  ->comment('Role code roles.code เช่น member, admin, supervisor, it_support, network, developer, technician')
                   ->index();
 
             // รูปโปรไฟล์
