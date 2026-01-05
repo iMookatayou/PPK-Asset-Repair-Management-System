@@ -1,0 +1,48 @@
+html.intro-pending .navbar-pinwheel{
+  opacity: 0;
+  pointer-events: none;
+}
+
+.navbar-pinwheel{
+  transition: opacity .55s ease;
+}
+
+.intro-frame-overlay{
+  position: fixed;
+  inset: 0;
+  z-index: 1000002;
+  pointer-events: none;
+}
+
+.intro-frame-overlay .dim{
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,1);
+  opacity: 1;
+}
+
+.intro-frame-overlay svg{
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.intro-frame-overlay .frame{
+  fill: transparent;
+  stroke: rgba(15,45,92,.62);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 10px 22px rgba(0,0,0,.06));
+}
+
+.intro-frame-overlay .frame-fill{
+  fill: rgba(255,255,255,.72);
+  stroke: transparent;
+}
+
+@media (prefers-reduced-motion: reduce){
+  .intro-frame-overlay{ display:none !important; }
+}
+
