@@ -21,37 +21,61 @@ return new class extends Migration
                 ->cascadeOnUpdate()
                 ->cascadeOnDelete();
 
+            // บทบาทในงาน (เช่น tech, helper)
             $table->string('role', 50)->nullable();
+
+            // เป็นช่างหลักหรือไม่
             $table->boolean('is_lead')->default(false);
 
+            // วันที่ถูกมอบหมาย
             $table->dateTime('assigned_at')->nullable();
 
-            // การตอบรับงานของช่าง (MyJob ใช้อันนี้เป็นหลัก)
+            /**
+             * การตอบรับงานของช่าง
+             * - pending        : ยังไม่ตอบ
+             * - acknowledged  : รับทราบแล้ว
+             * - accepted      : รับเรื่อง
+             * - rejected      : ไม่รับเรื่อง
+             */
             $table->enum('response_status', [
                 'pending',
+                'acknowledged',
                 'accepted',
                 'rejected',
-                'acknowledged',
             ])->default('pending');
 
+            // วันที่ตอบรับ / ปฏิเสธ
             $table->dateTime('responded_at')->nullable();
 
-            // สถานะความคืบหน้างาน
+            /**
+             * เหตุผล / บันทึกการตอบรับ
+             * ใช้กับกรณี "ไม่รับเรื่อง" เป็นหลัก
+             */
+            $table->string('remark', 2000)->nullable();
+
+            /**
+             * สถานะความคืบหน้างาน (ระดับ assignment)
+             * - assigned     : อยู่ในรายการ / ยังไม่เริ่ม
+             * - in_progress  : กำลังดำเนินการ
+             * - done         : เสร็จสิ้น
+             * - cancelled    : ยกเลิก / คืนงาน / ไม่รับเรื่อง
+             */
             $table->enum('status', [
+                'assigned',
                 'in_progress',
                 'done',
                 'cancelled',
-            ])->default('in_progress');
+            ])->default('assigned');
 
             $table->timestamps();
 
-            // unique
+            // หนึ่งช่าง ต่อหนึ่งใบงาน
             $table->unique(
                 ['maintenance_request_id', 'user_id'],
                 'ma_req_user_uniq'
             );
 
-            // index สำหรับงาน
+            // index สำหรับงานของช่าง
             $table->index(
                 ['user_id', 'status'],
                 'ma_user_status_idx'
