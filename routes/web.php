@@ -61,29 +61,26 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/create', [MaintenanceRequestController::class, 'createPage'])->name('create');
             Route::post('/', [MaintenanceRequestController::class, 'store'])->name('store');
 
-            Route::get('/{maintenanceRequest}', [MaintenanceRequestController::class, 'showPage'])->name('show');
-            Route::get('/{maintenanceRequest}/edit', [MaintenanceRequestController::class, 'edit'])->name('edit');
-            Route::put('/{maintenanceRequest}', [MaintenanceRequestController::class, 'update'])->name('update');
-
-            Route::post('/{req}/accept', [MaintenanceRequestController::class, 'acceptJobQuick'])
-                ->name('accept');
+            Route::get('/{req}', [MaintenanceRequestController::class, 'showPage'])->name('show');
+            Route::get('/{req}/edit', [MaintenanceRequestController::class, 'edit'])->name('edit');
+            Route::put('/{req}', [MaintenanceRequestController::class, 'update'])->name('update');
 
             // Work Order
-            Route::get('/{maintenanceRequest}/work-order', [MaintenanceRequestController::class, 'printWorkOrder'])
+            Route::get('/{req}/work-order', [MaintenanceRequestController::class, 'printWorkOrder'])
                 ->name('work-order');
 
-            // Operation Log
+            // Operation Log (คงเดิมไว้ ถ้า controller อีกฝั่งยังใช้ $maintenanceRequest)
             Route::post('/{maintenanceRequest}/operation-log', [MaintenanceOperationLogController::class, 'upsert'])
                 ->name('operation-log');
 
-            // Attachments
-            Route::post('/{maintenanceRequest}/attachments', [MaintenanceRequestController::class, 'uploadAttachmentFromBlade'])
+            // Attachments (controller รับ MR $req)
+            Route::post('/{req}/attachments', [MaintenanceRequestController::class, 'uploadAttachmentFromBlade'])
                 ->name('attachments');
 
-            Route::delete('/{maintenanceRequest}/attachments/{attachment}', [MaintenanceRequestController::class, 'destroyAttachment'])
+            Route::delete('/{req}/attachments/{attachment}', [MaintenanceRequestController::class, 'destroyAttachment'])
                 ->name('attachments.destroy');
 
-            // Assignments
+            // Assignments (คงเดิมไว้ ถ้า controller อีกฝั่งยังใช้ $maintenanceRequest)
             Route::post('/{maintenanceRequest}/assignments', [MaintenanceAssignmentController::class, 'store'])
                 ->name('assignments.store');
 
@@ -94,6 +91,20 @@ Route::middleware(['auth'])->group(function () {
                 Route::get('/evaluate', [MaintenanceRatingController::class, 'evaluateList'])->name('evaluate');
                 Route::get('/technicians', [MaintenanceRatingController::class, 'technicianDashboard'])->name('technicians');
             });
+
+            // Accept (รับเรื่อง) : acknowledged -> accepted
+            Route::post('/{req}/accept', [MaintenanceRequestController::class, 'acceptCase'])
+                ->name('accept');
+
+            // Acknowledge (รับทราบ) : pending -> acknowledged
+            Route::post('/{req}/acknowledge', [MaintenanceRequestController::class, 'acknowledgeCase'])
+                ->name('acknowledge');
+
+            // Reject (ไม่รับเรื่อง) : (ตาม logic ของมึงคือหลัง acknowledged)
+            Route::post('/{req}/reject', [MaintenanceRequestController::class, 'rejectCase'])->name('reject');
+
+            // Cancel (ยกเลิก/คืนงานเข้าคิว) : ตาม controller cancelCase()
+            Route::post('/{req}/cancel', [MaintenanceRequestController::class, 'cancelCase'])->name('cancel');
         });
     });
 
