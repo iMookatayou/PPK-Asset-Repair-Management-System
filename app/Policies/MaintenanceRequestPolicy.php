@@ -36,17 +36,28 @@ class MaintenanceRequestPolicy
             ->exists();
     }
 
-    protected function isOpenForTech(MR $req): bool
+    /**
+     * งานว่างสำหรับ “รับทราบ” (my-jobs): pending และยังไม่มีช่างหลัก
+     */
+    protected function isOpenForAcknowledge(MR $req): bool
     {
-        return empty($req->technician_id) && $req->status === 'pending';
+        return empty($req->technician_id) && $req->status === MR::STATUS_PENDING;
+    }
+
+    /**
+     * งานว่างสำหรับ “รับเรื่อง”: acknowledged และยังไม่มีช่างหลัก
+     */
+    protected function isOpenForAccept(MR $req): bool
+    {
+        return empty($req->technician_id) && $req->status === MR::STATUS_ACKNOWLEDGED;
     }
 
     public function view(User $user, MR $req): Response
     {
         if ($this->isAdminTeam($user)) return Response::allow();
 
-        // ช่างเห็นงานว่างเพื่อเข้า queue
-        if ($this->isTech($user) && $this->isOpenForTech($req)) return Response::allow();
+        // ช่างเห็นงาน “รอรับทราบ” เพื่อเข้า queue
+        if ($this->isTech($user) && $this->isOpenForAcknowledge($req)) return Response::allow();
 
         // ช่างในทีมงานนี้
         if ($this->isAssignedTech($user, $req)) return Response::allow();
@@ -67,7 +78,7 @@ class MaintenanceRequestPolicy
         if (
             (int) $req->reporter_id === (int) $user->id &&
             empty($req->technician_id) &&
-            in_array($req->status, ['pending'], true)
+            in_array($req->status, [MR::STATUS_PENDING], true)
         ) {
             return Response::allow();
         }
@@ -84,15 +95,32 @@ class MaintenanceRequestPolicy
         return Response::deny('อนุญาตให้เปลี่ยนสถานะเฉพาะช่างที่รับผิดชอบหรือผู้ดูแลระบบเท่านั้น');
     }
 
+    /**
+     * ✅ เพิ่มตาม flow ใหม่: my-jobs กด “รับทราบ” ได้เฉพาะงาน pending (และยังไม่มีช่างหลัก)
+     */
+    public function acknowledge(User $user, MR $req): Response
+    {
+        if ($this->isAdminTeam($user)) return Response::allow();
+
+        if (!$this->isTech($user)) return Response::deny('เฉพาะช่างเท่านั้น');
+
+        if ($this->isOpenForAcknowledge($req)) return Response::allow();
+
+        return Response::deny('งานนี้ไม่อยู่ในสถานะที่รับทราบได้');
+    }
+
+    /**
+     * ✅ ปรับตาม flow ใหม่: “รับเรื่อง” ได้เฉพาะ acknowledged -> accepted
+     */
     public function accept(User $user, MR $req): Response
     {
         if ($this->isAdminTeam($user)) return Response::allow();
 
         if (!$this->isTech($user)) return Response::deny('เฉพาะช่างเท่านั้น');
 
-        if ($this->isOpenForTech($req)) return Response::allow();
+        if ($this->isOpenForAccept($req)) return Response::allow();
 
-        return Response::deny('งานนี้ถูกมอบหมายแล้วหรือไม่อยู่ในสถานะที่รับได้');
+        return Response::deny('งานนี้ถูกมอบหมายแล้วหรือไม่อยู่ในสถานะที่รับเรื่องได้');
     }
 
     public function attach(User $user, MR $req): Response
@@ -114,7 +142,7 @@ class MaintenanceRequestPolicy
 
         if (
             (int) $req->reporter_id === (int) $user->id &&
-            !in_array($req->status, ['resolved','closed'], true)
+            !in_array($req->status, [MR::STATUS_RESOLVED, MR::STATUS_CLOSED], true)
         ) {
             return Response::allow();
         }
@@ -131,14 +159,14 @@ class MaintenanceRequestPolicy
         return Response::deny('อนุญาตให้มอบหมายทีมช่างเฉพาะผู้ดูแล/ช่างในทีมงานนี้เท่านั้น');
     }
 
-        public function reject(User $user, MR $req): Response
+    public function reject(User $user, MR $req): Response
     {
         if ($this->isAdminTeam($user)) return Response::allow();
 
         if (!$this->isTech($user)) return Response::deny('เฉพาะช่างเท่านั้น');
 
-        // ไม่รับเรื่องได้เฉพาะงานว่างจริง
-        if ($this->isOpenForTech($req)) return Response::allow();
+        // ไม่รับเรื่องได้เฉพาะงานว่างจริง (ยังไม่รับทราบ/รับเรื่อง)
+        if ($this->isOpenForAcknowledge($req)) return Response::allow();
 
         return Response::deny('งานนี้ไม่อยู่ในสถานะที่ไม่รับเรื่องได้');
     }
@@ -149,7 +177,7 @@ class MaintenanceRequestPolicy
 
         // ผู้แจ้งยกเลิกได้ช่วงต้น
         if ((int) $req->reporter_id === (int) $user->id) {
-            if (in_array($req->status, ['pending','accepted'], true)) {
+            if (in_array($req->status, [MR::STATUS_PENDING, MR::STATUS_ACKNOWLEDGED, MR::STATUS_ACCEPTED], true)) {
                 return Response::allow();
             }
         }
@@ -162,7 +190,7 @@ class MaintenanceRequestPolicy
         if ($this->isAdminTeam($user)) return Response::allow();
         if (!$this->isTech($user)) return Response::deny('เฉพาะช่างเท่านั้น');
 
-        if ($this->isOpenForTech($req)) {
+        if ($this->isOpenForAcknowledge($req) || $this->isOpenForAccept($req)) {
             return Response::allow();
         }
 
@@ -170,7 +198,7 @@ class MaintenanceRequestPolicy
             return Response::deny('อนุญาตให้ยกเลิกเฉพาะงานที่ได้รับมอบหมายเท่านั้น');
         }
 
-        if (!in_array($req->status, ['resolved','closed','cancelled'], true)) {
+        if (!in_array($req->status, [MR::STATUS_RESOLVED, MR::STATUS_CLOSED, MR::STATUS_CANCELLED], true)) {
             return Response::allow();
         }
 

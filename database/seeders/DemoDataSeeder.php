@@ -16,14 +16,12 @@ class DemoDataSeeder extends Seeder
     {
         DB::connection()->disableQueryLog();
 
-        // ===== Config =====
         $assetCount   = (int) env('DEMO_ASSET_COUNT', 120);
         $techCount    = (int) env('DEMO_TECH_COUNT', 6);
         $staffCount   = (int) env('DEMO_MEMBER_COUNT', 18);
         $requestCount = (int) env('DEMO_SEED_COUNT', 300);
         $chunkSize    = (int) env('DEMO_CHUNK', 500);
 
-        // ===== Departments (codes) =====
         $deptCodes     = ['IT','ER','OPD','WARD','ADMIN','LAB'];
         $departmentIds = [];
 
@@ -54,7 +52,6 @@ class DemoDataSeeder extends Seeder
             }
         }
 
-        // ===== Admin =====
         $adminCitizenId = env('DEMO_ADMIN_CITIZEN_ID', '1000000000001');
         $adminEmail     = 'admin@example.com';
 
@@ -72,29 +69,36 @@ class DemoDataSeeder extends Seeder
             ]
         );
 
-        // ===== Users: Technicians / Members =====
         $techDefault = in_array('IT', $deptCodes, true) ? 'IT' : ($deptCodes[0] ?? null);
+
+        fake()->unique(true);
 
         $technicians = User::factory()
             ->count($techCount)
             ->state(fn () => [
                 'role'       => 'technician',
                 'department' => $techDefault,
+
+                'citizen_id' => fake()->unique()->numerify('#############'),
+                'email'      => fake()->unique()->safeEmail(),
             ])
             ->create();
 
+        // พนักงาน/ผู้แจ้งภายใน (ปล่อยเป็น member ได้ ไม่กระทบ teamRoles)
         $staffs = User::factory()
             ->count($staffCount)
             ->state(fn () => [
                 'role'       => 'member',
                 'department' => fake()->randomElement($deptCodes),
+
+                'citizen_id' => fake()->unique()->numerify('#############'),
+                'email'      => fake()->unique()->safeEmail(),
             ])
             ->create();
 
         $techIds  = $technicians->pluck('id')->all();
         $staffIds = $staffs->pluck('id')->all();
 
-        // ===== asset_categories (optional) =====
         $categoryIds = [];
         if (Schema::hasTable('asset_categories')) {
             $hasSlug = Schema::hasColumn('asset_categories', 'slug');
@@ -137,7 +141,6 @@ class DemoDataSeeder extends Seeder
             $categoryIds = DB::table('asset_categories')->pluck('id')->all();
         }
 
-        // ===== Assets (seed เฉพาะตอนว่าง) =====
         if (Schema::hasTable('assets') && !DB::table('assets')->exists()) {
             $types     = ['เครื่องใช้ไฟฟ้า','อุปกรณ์สำนักงาน','คอมพิวเตอร์','เครื่องมือแพทย์'];
             $brands    = ['HP','Dell','Acer','Lenovo','Brother','Mitsubishi','Daikin'];
@@ -203,7 +206,6 @@ class DemoDataSeeder extends Seeder
 
         $assetIds = Schema::hasTable('assets') ? DB::table('assets')->pluck('id')->all() : [];
 
-        // ===== Maintenance Requests flags =====
         $mrTable = 'maintenance_requests';
 
         $hasAssetId           = Schema::hasColumn($mrTable, 'asset_id');
@@ -249,6 +251,7 @@ class DemoDataSeeder extends Seeder
 
         $statuses = [
             MR::STATUS_PENDING,
+            MR::STATUS_ACKNOWLEDGED,
             MR::STATUS_ACCEPTED,
             MR::STATUS_IN_PROGRESS,
             MR::STATUS_ON_HOLD,
@@ -289,13 +292,12 @@ class DemoDataSeeder extends Seeder
 
             if ($status === 'closed') {
                 $closed = (clone ($resolved ?? $base))->addHours(random_int(1, 24));
-                $completedDate = $closed; // ✅ ให้ completed_date = closed_at
+                $completedDate = $closed;
             }
 
             return [$assigned, $accepted, $started, $onHold, $resolved, $closed, $completedDate];
         };
 
-        // ===== request_no generator (LEGACY: YY + TYPE(2) + RUN(5)) =====
         $existingSet  = [];
         $yearCounters = [];
 
@@ -335,7 +337,6 @@ class DemoDataSeeder extends Seeder
             return $candidate;
         };
 
-        // ===== Seed maintenance_requests =====
         DB::transaction(function () use (
             $requestCount, $assetIds, $staffIds, $techIds, $priorities, $statuses, $now, $chunkSize, $departmentIds,
             $makeTimeline, $makeRequestNo,
@@ -401,9 +402,8 @@ class DemoDataSeeder extends Seeder
                 $isExternal = random_int(1, 100) <= 10;
                 if ($isExternal) $reporter = null;
 
-                // ✅ pending/cancelled ต้องว่าง เพื่อให้รับงานได้จริง
                 $techId = null;
-                if (!in_array($status, ['pending','cancelled'], true)) {
+                if (!in_array($status, ['pending','acknowledged','cancelled'], true)) {
                     $techId = $techIds ? $techIds[array_rand($techIds)] : null;
                 }
 
@@ -480,14 +480,15 @@ class DemoDataSeeder extends Seeder
 
                 if ($hasRemark) {
                     $row['remark'] = match ($status) {
-                        'pending'      => null,
-                        'accepted'     => 'รับเข้าคิวแล้ว',
-                        'in_progress'  => 'กำลังดำเนินการ',
-                        'on_hold'      => 'รอชิ้นส่วน/ช่างเฉพาะทาง',
-                        'resolved'     => 'แก้เสร็จ รอปิดงาน',
-                        'closed'       => 'ปิดงานเรียบร้อย',
-                        'cancelled'    => 'ผู้แจ้งยกเลิก',
-                        default        => null,
+                        'pending'       => null,
+                        'acknowledged'  => 'รับทราบแล้ว รอช่างรับเรื่อง',
+                        'accepted'      => 'รับเรื่องแล้ว',
+                        'in_progress'   => 'กำลังดำเนินการ',
+                        'on_hold'       => 'รอชิ้นส่วน/ช่างเฉพาะทาง',
+                        'resolved'      => 'แก้เสร็จ รอปิดงาน',
+                        'closed'        => 'ปิดงานเรียบร้อย',
+                        'cancelled'     => 'ผู้แจ้งยกเลิก',
+                        default         => null,
                     };
                 }
 
@@ -517,8 +518,19 @@ class DemoDataSeeder extends Seeder
             if ($rows) DB::table('maintenance_requests')->insert($rows);
         });
 
-        // ===== Maintenance Assignments =====
         if (Schema::hasTable('maintenance_assignments')) {
+            $hasAsgRemark = Schema::hasColumn('maintenance_assignments', 'remark');
+
+            $updateCols = [
+                'role',
+                'is_lead',
+                'assigned_at',
+                'status',
+                'response_status',
+                'responded_at',
+                'updated_at',
+            ];
+            if ($hasAsgRemark) $updateCols[] = 'remark';
             $reqs = DB::table('maintenance_requests')
                 ->select('id','technician_id','status','assigned_date','accepted_at','request_date','created_at')
                 ->whereNotNull('technician_id')
@@ -530,26 +542,45 @@ class DemoDataSeeder extends Seeder
             foreach ($reqs as $r) {
                 $assignedAt = $r->assigned_date ?? $r->accepted_at ?? $r->request_date ?? $r->created_at ?? $nowTs;
 
-                $asgRows[] = [
+                $row = [
                     'maintenance_request_id' => $r->id,
                     'user_id'                => $r->technician_id,
                     'role'                   => 'technician',
                     'is_lead'                => true,
                     'assigned_at'            => $assignedAt,
-                    'status'                 => match ($r->status) {
+
+                    // ความคืบหน้างาน (ระดับ assignment)
+                    'status' => match ($r->status) {
                         'resolved','closed' => 'done',
                         'cancelled'         => 'cancelled',
                         default             => 'in_progress',
                     },
-                    'created_at'             => $nowTs,
-                    'updated_at'             => $nowTs,
+
+                    // response (ระดับช่าง)
+                    'response_status' => match ($r->status) {
+                        'cancelled' => 'pending',
+                        default     => 'accepted', // demo: ถ้ามี technician_id ถือว่ารับเรื่องแล้ว
+                    },
+                    'responded_at' => match ($r->status) {
+                        'cancelled' => null,
+                        default     => $assignedAt,
+                    },
+
+                    'created_at' => $nowTs,
+                    'updated_at' => $nowTs,
                 ];
+
+                if ($hasAsgRemark) {
+                    $row['remark'] = null;
+                }
+
+                $asgRows[] = $row;
 
                 if (count($asgRows) >= 1000) {
                     DB::table('maintenance_assignments')->upsert(
                         $asgRows,
                         ['maintenance_request_id','user_id'],
-                        ['role','is_lead','assigned_at','status','updated_at']
+                        $updateCols
                     );
                     $asgRows = [];
                 }
@@ -559,12 +590,75 @@ class DemoDataSeeder extends Seeder
                 DB::table('maintenance_assignments')->upsert(
                     $asgRows,
                     ['maintenance_request_id','user_id'],
-                    ['role','is_lead','assigned_at','status','updated_at']
+                    $updateCols
+                );
+            }
+
+            $ackReqs = DB::table('maintenance_requests')
+                ->select('id','status','assigned_date','accepted_at','request_date','created_at')
+                ->where('status', 'acknowledged')
+                ->inRandomOrder()
+                ->limit((int) max(10, floor($requestCount * 0.15)))
+                ->get();
+
+            $ackRows = [];
+            $rejectEvery = 4; // ทุก ๆ 4 งาน acknowledged จะมี 1 งาน "ไม่รับเรื่อง"
+            $idx = 0;
+
+            foreach ($ackReqs as $r) {
+                $idx++;
+                $assignedAt = $r->assigned_date ?? $r->accepted_at ?? $r->request_date ?? $r->created_at ?? $nowTs;
+
+                $techId = $techIds ? $techIds[array_rand($techIds)] : null;
+                if (!$techId) continue;
+
+                $isReject = ($idx % $rejectEvery === 0);
+
+                $row = [
+                    'maintenance_request_id' => $r->id,
+                    'user_id'                => $techId,
+                    'role'                   => 'technician',
+                    'is_lead'                => false,
+                    'assigned_at'            => $assignedAt,
+
+                    // ถ้าไม่รับเรื่อง ให้ status cancelled เพื่อไม่ไปอยู่ active
+                    'status'                 => $isReject ? 'cancelled' : 'in_progress',
+
+                    // จุดสำคัญ: response_status สำหรับ MyJob
+                    'response_status'        => $isReject ? 'rejected' : 'acknowledged',
+                    'responded_at'           => $assignedAt,
+
+                    'created_at'             => $nowTs,
+                    'updated_at'             => $nowTs,
+                ];
+
+                if ($hasAsgRemark) {
+                    $row['remark'] = $isReject
+                        ? 'ภาระงานเต็ม/ไม่อยู่เวร/ไม่เชี่ยวชาญงานประเภทนี้'
+                        : null;
+                }
+
+                $ackRows[] = $row;
+
+                if (count($ackRows) >= 1000) {
+                    DB::table('maintenance_assignments')->upsert(
+                        $ackRows,
+                        ['maintenance_request_id','user_id'],
+                        $updateCols
+                    );
+                    $ackRows = [];
+                }
+            }
+
+            if ($ackRows) {
+                DB::table('maintenance_assignments')->upsert(
+                    $ackRows,
+                    ['maintenance_request_id','user_id'],
+                    $updateCols
                 );
             }
         }
 
-        // ===== Maintenance Operation Logs (upsert + join assets for property_code) =====
         if (Schema::hasTable('maintenance_operation_logs')) {
             $hasPropertyCode = Schema::hasColumn('maintenance_operation_logs', 'property_code');
 

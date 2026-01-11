@@ -3,151 +3,119 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
-use App\Models\MaintenanceRequest;
 use App\Models\User;
-use App\Models\Asset;
-use App\Models\Department;
+use App\Models\MaintenanceRequest as MR;
+use App\Models\MaintenanceAssignment as MA;
 
 class MaintenanceRequestSeeder extends Seeder
 {
     public function run(): void
     {
-        DB::transaction(function () {
+        $admin    = User::query()->where('role', 'admin')->first();
+        $techs    = User::query()->where('role', 'tech')->take(3)->get();
+        $reporter = User::query()->where('role', 'user')->first();
 
-            // ===== USERS =====
-            // Reporter (บุคลากร HIM)
-            $reporter = User::firstWhere('citizen_id', '9000000000001');
-            if (!$reporter) {
-                $reporter = User::create([
-                    'name'        => 'นางสาวอัญชัน ศรีสมบัติ',
-                    'citizen_id'  => '9000000000001',                          // ✅ เพิ่ม citizen_id
-                    'email'       => 'nurse.ppk@example.com',
-                    'password'    => Hash::make('password1234'),
-                    'role'        => User::ROLE_COMPUTER_OFFICER,
-                    'department'  => 'HIM',
-                    'email_verified_at' => now(),
-                ]);
-            }
-
-            // Technician (ฝ่ายซ่อมบำรุง)
-            $technician = User::firstWhere('citizen_id', '9000000000002');
-            if (!$technician) {
-                $technician = User::create([
-                    'name'        => 'นายสมชาย ช่างอาคาร',
-                    'citizen_id'  => '9000000000002',                          // ✅ เพิ่ม citizen_id
-                    'email'       => 'technician.ppk@example.com',
-                    'password'    => Hash::make('password1234'),
-                    'role'        => User::ROLE_IT_SUPPORT,
-                    'department'  => 'FAC',
-                    'email_verified_at' => now(),
-                ]);
-            }
-
-            // ===== DEPARTMENT =====
-            $dept = $this->upsertDepartment('FAC', 'อาคารสถานที่/ซ่อมบำรุง', 'Facilities & Maintenance');
-
-            // ===== ASSET =====
-            $asset = Asset::firstOrCreate(
-                ['asset_code' => 'AC-PPK-302'],
-                [
-                    'name'          => 'เครื่องปรับอากาศ Panasonic CS-PN9WKT',
-                    'type'          => 'เครื่องปรับอากาศ',
-                    'brand'         => 'Panasonic',
-                    'model'         => 'CS-PN9WKT',
-                    'serial_number' => 'PN9WKT-2301-302',
-                    'location'      => 'ห้องผู้ป่วย 302',
-                    'department_id' => $dept->id,
-                    'status'        => 'active',
-                ]
-            );
-
-            // ===== MAINTENANCE REQUESTS =====
-            $requests = [
-                [
-                    'request_no'    => 'REQ-' . now()->format('ymd') . '-001',
-                    'asset_id'      => $asset->id,
-                    'reporter_id'   => $reporter->id,
-                    'department_id' => $dept->id,
-                    'location_text' => 'ห้องผู้ป่วย 302 (เตียง 3)',
-                    'title'         => 'แอร์มีเสียงดังและไม่เย็น',
-                    'description'   => 'เปิดแล้วมีเสียงดังคล้ายพัดลมเสียดใบพัด ลมไม่เย็น และมีน้ำหยดจากตัวเครื่อง',
-                    'priority'      => 'high',
-                    'status'        => 'in_progress',
-                    'technician_id' => $technician->id,
-                    'request_date'  => now()->subDays(3),
-                    'assigned_date' => now()->subDays(2),
-                    'started_at'    => now()->subDays(2)->addHours(3),
-                    'remark'        => 'ตรวจสอบแล้วต้องเปลี่ยน bearing ของพัดลม',
-                    'source'        => 'web',
-                    'extra'         => json_encode(['contact' => 'ภายใน 302 กด 1423']),
-                ],
-                [
-                    'request_no'    => 'REQ-' . now()->format('ymd') . '-002',
-                    'asset_id'      => null,
-                    'reporter_id'   => $reporter->id,
-                    'department_id' => $dept->id,
-                    'location_text' => 'โถงชั้น 2 หน้าห้อง ER',
-                    'title'         => 'ไฟฟ้าดับบางจุด',
-                    'description'   => 'โซนหน้าห้องฉุกเฉินมีไฟดับ 2 จุด คาดว่าสายไฟชำรุด',
-                    'priority'      => 'urgent',
-                    'status'        => 'pending',
-                    'technician_id' => null,
-                    'request_date'  => now()->subDay(),
-                    'source'        => 'mobile',
-                ],
-                [
-                    'request_no'       => 'REQ-' . now()->format('ymd') . '-003',
-                    'asset_id'         => null,
-                    'reporter_id'      => $reporter->id,
-                    'department_id'    => $dept->id,
-                    'location_text'    => 'ห้องประชุมใหญ่ ชั้น 5',
-                    'title'            => 'โปรเจกเตอร์ไม่ติด',
-                    'description'      => 'เสียบสายแล้วไม่แสดงภาพ คาดว่า adapter เสีย',
-                    'priority'         => 'medium',
-                    'status'           => 'resolved',
-                    'technician_id'    => $technician->id,
-                    'request_date'     => now()->subDays(5),
-                    'started_at'       => now()->subDays(5)->addHour(),
-                    'resolved_at'      => now()->subDays(4),
-                    'resolution_note'  => 'เปลี่ยนสาย HDMI และ adapter ใหม่ ใช้งานได้แล้ว',
-                    'cost'             => 450.00,
-                    'source'           => 'web',
-                ],
-            ];
-
-            foreach ($requests as $data) {
-                MaintenanceRequest::updateOrCreate(
-                    ['request_no' => $data['request_no']],
-                    $data
-                );
-            }
-        });
-    }
-
-    /**
-     * Upsert แผนกแบบรองรับทั้ง schema ใหม่/เก่า
-     */
-    private function upsertDepartment(string $code, string $nameTh, ?string $nameEn = null): Department
-    {
-        $hasNameTh = Schema::hasColumn('departments', 'name_th');
-        $hasName   = Schema::hasColumn('departments', 'name'); // legacy
-
-        if ($hasNameTh) {
-            return Department::updateOrCreate(
-                ['code' => $code],
-                ['name_th' => $nameTh, 'name_en' => $nameEn]
-            );
-        } elseif ($hasName) {
-            return Department::updateOrCreate(
-                ['code' => $code],
-                ['name' => $nameTh]
-            );
+        if (!$admin || $techs->count() < 2 || !$reporter) {
+            $this->command?->warn('Seeder ต้องการ admin, tech อย่างน้อย 2 คน และ user');
+            return;
         }
 
-        return Department::firstOrCreate(['code' => $code]);
+        [$tech1, $tech2] = [$techs[0], $techs[1]];
+
+        $reqNo = fn () => 'MR-' . now()->format('ymd') . '-' . strtoupper(Str::random(5));
+
+        MR::factory()->create([
+            'request_no'    => $reqNo(),
+            'status'        => MR::STATUS_PENDING,
+            'technician_id' => null,
+        ]);
+
+        $mrAck = MR::factory()->create([
+            'request_no'    => $reqNo(),
+            'status'        => MR::STATUS_ACKNOWLEDGED,
+            'technician_id' => null,
+        ]);
+
+        MA::create([
+            'maintenance_request_id' => $mrAck->id,
+            'user_id'                => $tech1->id,
+            'role'                   => 'tech',
+            'is_lead'                => false,
+            'assigned_at'            => now()->subHours(3),
+
+            'response_status'        => MA::RESP_ACKNOWLEDGED,
+            'responded_at'           => now()->subHours(2),
+            'remark'                 => null,
+
+            'status'                 => MA::STATUS_IN_PROGRESS,
+        ]);
+
+        $mrReject = MR::factory()->create([
+            'request_no'    => $reqNo(),
+            'status'        => MR::STATUS_ACKNOWLEDGED,
+            'technician_id' => null,
+        ]);
+
+        MA::create([
+            'maintenance_request_id' => $mrReject->id,
+            'user_id'                => $tech2->id,
+            'role'                   => 'tech',
+            'is_lead'                => false,
+            'assigned_at'            => now()->subHours(6),
+
+            'response_status'        => MA::RESP_REJECTED,
+            'responded_at'           => now()->subHours(5),
+            'remark'                 => 'ภาระงานเต็มและไม่อยู่เวรในช่วงเวลาที่แจ้ง',
+
+            'status'                 => MA::STATUS_CANCELLED,
+        ]);
+
+        $mrAccepted = MR::factory()->create([
+            'request_no'    => $reqNo(),
+            'status'        => MR::STATUS_ACCEPTED,
+            'technician_id' => $tech1->id,
+        ]);
+
+        MA::create([
+            'maintenance_request_id' => $mrAccepted->id,
+            'user_id'                => $tech1->id,
+            'role'                   => 'tech',
+            'is_lead'                => true,
+            'assigned_at'            => now()->subHours(8),
+
+            'response_status'        => MA::RESP_ACCEPTED,
+            'responded_at'           => now()->subHours(7),
+            'remark'                 => null,
+
+            'status'                 => MA::STATUS_IN_PROGRESS,
+        ]);
+
+        $mrInProgress = MR::factory()->create([
+            'request_no'    => $reqNo(),
+            'status'        => MR::STATUS_IN_PROGRESS,
+            'technician_id' => $tech1->id,
+        ]);
+
+        MA::create([
+            'maintenance_request_id' => $mrInProgress->id,
+            'user_id'                => $tech1->id,
+            'role'                   => 'tech',
+            'is_lead'                => true,
+            'assigned_at'            => now()->subDay(),
+
+            'response_status'        => MA::RESP_ACCEPTED,
+            'responded_at'           => now()->subDay()->addMinutes(10),
+            'remark'                 => null,
+
+            'status'                 => MA::STATUS_IN_PROGRESS,
+        ]);
+
+        MR::factory()->create([
+            'request_no'    => $reqNo(),
+            'status'        => MR::STATUS_CANCELLED,
+            'technician_id' => null,
+        ]);
     }
 }

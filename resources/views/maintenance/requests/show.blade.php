@@ -1,200 +1,241 @@
-{{-- resources/views/maintenance/requests/show.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'สรุปใบงานซ่อม #'.$req->id)
 
 @section('page-header')
 @php
-  $status = strtolower((string) $req->status);
-  $statusLabel = [
-    'pending'     => 'รอคิว',
-    'accepted'    => 'รับงานแล้ว',
-    'in_progress' => 'ระหว่างดำเนินการ',
-    'on_hold'     => 'พักไว้',
-    'resolved'    => 'แก้ไขแล้ว',
-    'closed'      => 'ปิดงาน',
-    'cancelled'   => 'ยกเลิก',
-  ][$status] ?? $status;
+  use App\Models\MaintenanceRequest as MR;
+  use Carbon\Carbon;
 
-  $statusTone = match ($status) {
-    'pending'     => 'bg-sky-50 text-sky-900 border-sky-200 ring-sky-100',
-    'accepted'    => 'bg-indigo-50 text-indigo-900 border-indigo-200 ring-indigo-100',
-    'in_progress' => 'bg-sky-50 text-sky-900 border-sky-200 ring-sky-100',
-    'on_hold'     => 'bg-amber-50 text-amber-900 border-amber-200 ring-amber-100',
-    'resolved'    => 'bg-emerald-50 text-emerald-900 border-emerald-200 ring-emerald-100',
-    'closed'      => 'bg-emerald-50 text-emerald-900 border-emerald-200 ring-emerald-100',
-    'cancelled'   => 'bg-rose-50 text-rose-900 border-rose-200 ring-rose-100',
-    default       => 'bg-slate-50 text-slate-800 border-slate-200 ring-slate-100',
-  };
-
-  $prio = strtolower((string) $req->priority);
-  $prioLabel = [
-    'low'    => 'ต่ำ',
-    'medium' => 'ปานกลาง',
-    'high'   => 'สูง',
-    'urgent' => 'เร่งด่วน',
-  ][$prio] ?? ($req->priority ?? '—');
-
-  // ✅ ใส่กลับมาเพื่อกันส่วนอื่นอ้างถึง (แก้ error)
-  $prioTone = match ($prio) {
-    'low'    => 'bg-slate-50 text-slate-800 border-slate-200 ring-slate-100',
-    'medium' => 'bg-sky-50 text-sky-900 border-sky-200 ring-sky-100',
-    'high'   => 'bg-amber-50 text-amber-900 border-amber-200 ring-amber-100',
-    'urgent' => 'bg-rose-50 text-rose-900 border-rose-200 ring-rose-100',
-    default  => 'bg-slate-50 text-slate-800 border-slate-200 ring-slate-100',
-  };
-
-  // ✅ แต่ Section 3 จะใช้แค่สีตัวหนังสือ
-  $prioTextTone = match ($prio) {
-    'low'    => 'text-slate-700',
-    'medium' => 'text-sky-700',
-    'high'   => 'text-amber-700',
-    'urgent' => 'text-rose-700',
-    default  => 'text-slate-700',
-  };
-
-  $acceptUrl = route('maintenance.requests.accept', $req->id);
-
+  // ===== UI tokens (ให้เหมือน edit) =====
   $line = 'border-slate-200';
 
-  $btnBase = "inline-flex items-center gap-2 rounded-md border $line bg-white px-3 py-1.5 text-xs sm:text-[13px]
-              font-medium text-slate-700 hover:bg-slate-50 whitespace-nowrap";
+  // 1) แปลงสถานะเป็นภาษาไทย
+  $statusLabels = [
+      'pending'      => 'รอรับเรื่อง',
+      'acknowledged' => 'รับทราบแล้ว',
+      'accepted'     => 'รับเรื่องแล้ว',
+      'in_progress'  => 'กำลังดำเนินการ',
+      'resolved'     => 'เสร็จสิ้น',
+      'closed'       => 'ปิดงาน',
+      'cancelled'    => 'ยกเลิก',
+  ];
+  $currentStatusTH = $statusLabels[$req->status] ?? $req->status;
 
-  $btnPrimary = "inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs sm:text-[13px]
-                 font-semibold text-white shadow-sm whitespace-nowrap focus:outline-none focus:ring-2";
+  // 2) Timeline level mapping
+  $status = $req->status;
+  $level = 1;
+  if ($status === MR::STATUS_ACKNOWLEDGED) $level = 2;
+  if ($status === MR::STATUS_ACCEPTED)     $level = 3;
+  if ($status === MR::STATUS_IN_PROGRESS)  $level = 4;
+  if (in_array($status, [MR::STATUS_RESOLVED, MR::STATUS_CLOSED])) $level = 5;
+  if ($status === MR::STATUS_CANCELLED)    $level = 0;
 
-  $requestedAt  = optional($req->request_date ?? $req->created_at);
-  $assignedAt   = optional($req->assigned_date);
-  $completedAt  = optional($req->completed_date);
+  // Dates
+  $dates = [
+      1 => $req->request_date ?? $req->created_at,
+      2 => $req->acknowledged_at,
+      3 => $req->accepted_at,
+      4 => $req->in_progress_at ?? ($level >= 4 ? $req->accepted_at : null),
+      5 => $req->resolved_at ?? $req->closed_at,
+  ];
+
+  $fmt = fn($d) => $d ? Carbon::parse($d)->format('d/m/Y H:i') : '';
+
+  // Progress Bar Width
+  $widthMap = [1 => '0%', 2 => '25%', 3 => '50%', 4 => '75%', 5 => '100%'];
+  $lineWidth = $widthMap[$level] ?? '0%';
+
+  // Permissions (ป้องกัน Error)
+  $canAcknowledge = ($status === MR::STATUS_PENDING) && \Gate::allows('acknowledge', $req);
+  $canAccept      = ($status === MR::STATUS_ACKNOWLEDGED) && \Gate::allows('accept', $req);
+  $canReject      = ($status === MR::STATUS_ACKNOWLEDGED) && \Gate::allows('accept', $req);
+  $canCancel      = in_array($status, [MR::STATUS_PENDING, MR::STATUS_ACKNOWLEDGED, MR::STATUS_ACCEPTED]);
+
+  // ===== Action button base (ทำให้ปุ่มเล็กลง) =====
+  $btnBase = 'inline-flex items-center justify-center gap-2
+              rounded-md px-4 py-1.5
+              text-[13px] font-medium
+              transition
+              focus:outline-none focus:ring-2 focus:ring-offset-1';
 @endphp
 
+<style>
+  /* Animation หมุนติ้วๆ สำหรับสถานะปัจจุบัน */
+  .animate-spin-slow { animation: spin 2s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+</style>
+
 <div class="w-full bg-slate-50 border-b {{ $line }}">
-  <div class="mx-auto max-w-screen-2xl px-3 sm:px-6 lg:px-8 py-4">
-    <div class="flex flex-col gap-3">
+  <div class="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8 py-5">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 
-      {{-- ROW 1 --}}
-      <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+      {{-- LEFT (เหมือน edit) --}}
+      <div class="min-w-0">
+        <div class="flex items-start gap-3">
+          {{-- ไอคอน: ไม่มีพื้นหลัง/ไม่มีกรอบ --}}
+          <span class="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-xl text-emerald-700">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M9 12h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M9 16h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M7 3h7l3 3v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
 
-        {{-- LEFT --}}
-        <div class="min-w-0">
-          <div class="flex items-start gap-3">
+          <div class="min-w-0">
+            <h1 class="text-[20px] sm:text-[22px] font-semibold text-slate-900 leading-tight">
+              Maintenance Summary
+              <span class="ml-2 text-slate-500 text-[13px] sm:text-[14px] font-semibold">
+                #{{ $req->request_no ?? $req->id }}
+              </span>
+            </h1>
 
-            {{-- ไอคอนเปล่า ๆ --}}
-            <span class="mt-0.5 inline-flex items-center justify-center text-emerald-700">
-              <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M4 7h16M4 12h10M4 17h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </span>
+            <div class="mt-1 text-xs sm:text-[13px] text-slate-600 flex flex-wrap gap-x-4 gap-y-1">
+              <span>สถานะปัจจุบัน:
+                <span class="font-semibold text-slate-900">{{ $currentStatusTH }}</span>
+              </span>
 
-            <div class="min-w-0">
-              <h1 class="text-[20px] sm:text-[22px] font-semibold text-slate-900 leading-tight">
-                Repair Summary Form
-                <span class="ml-2 text-slate-500 text-[13px] sm:text-[14px] font-semibold">#{{ $req->id }}</span>
-              </h1>
-
-              {{-- ชิป --}}
-              <div class="mt-2 flex flex-wrap items-center gap-2 text-xs sm:text-[13px]">
-                <span class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 shadow-sm ring-1 {{ $statusTone }}">
-                  <span class="text-slate-600">สถานะ</span>
-                  <span class="font-semibold">{{ $statusLabel }}</span>
+              @if($req->updated_at)
+                <span>อัปเดต:
+                  <span class="font-medium text-slate-900">{{ $req->updated_at->format('Y-m-d H:i') }}</span>
                 </span>
+              @endif
 
-                {{-- ชิปความสำคัญ (คงไว้ได้ แต่ถ้าจะเอาออกก็บอก) --}}
-                <span class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 shadow-sm ring-1 {{ $prioTone }}">
-                  <span class="text-slate-600">ความสำคัญ</span>
-                  <span class="font-semibold">{{ $prioLabel }}</span>
+              <span>ผู้รับผิดชอบหลัก:
+                <span class="font-semibold text-slate-900">
+                  {{ $req->technician?->name ?? 'ยังไม่มีช่างรับงาน' }}
                 </span>
-              </div>
-
-              {{-- ข้อมูลหลักฝั่งซ้าย --}}
-              <div class="mt-2 text-xs sm:text-[13px] text-slate-600 flex flex-wrap gap-x-4 gap-y-1">
-                @if($req->request_no)
-                  <span class="text-slate-500">เลขอ้างอิง: {{ $req->request_no }}</span>
-                @endif
-                <span>สร้าง: <span class="font-medium text-slate-900">{{ $req->created_at?->format('Y-m-d H:i') ?? '—' }}</span></span>
-                <span>อัปเดต: <span class="font-medium text-slate-900">{{ $req->updated_at?->format('Y-m-d H:i') ?? '—' }}</span></span>
-                <span>ผู้รับผิดชอบหลัก: <span class="font-semibold text-slate-900">{{ $req->technician?->name ?? 'ยังไม่มีช่างรับงาน' }}</span></span>
-              </div>
-
-              {{-- ✅ ย้าย timeline มาไว้บน header --}}
-              <div class="mt-3 flex flex-wrap gap-2 text-xs sm:text-[13px]">
-                <span class="inline-flex items-center gap-2 rounded-full border {{ $line }} bg-white px-3 py-1.5 text-slate-700">
-                  <span class="text-slate-500">รับคำขอ</span>
-                  <span class="font-semibold text-slate-900">{{ $requestedAt ? $requestedAt->format('Y-m-d H:i') : '—' }}</span>
-                </span>
-                <span class="inline-flex items-center gap-2 rounded-full border {{ $line }} bg-white px-3 py-1.5 text-slate-700">
-                  <span class="text-slate-500">มอบหมายทีมช่าง</span>
-                  <span class="font-semibold text-slate-900">{{ $assignedAt ? $assignedAt->format('Y-m-d H:i') : '—' }}</span>
-                </span>
-                <span class="inline-flex items-center gap-2 rounded-full border {{ $line }} bg-white px-3 py-1.5 text-slate-700">
-                  <span class="text-slate-500">เสร็จสิ้น</span>
-                  <span class="font-semibold text-slate-900">{{ $completedAt ? $completedAt->format('Y-m-d H:i') : '—' }}</span>
-                </span>
-              </div>
-
+              </span>
             </div>
           </div>
         </div>
-
-        {{-- RIGHT: 3 ปุ่ม --}}
-        <div class="flex flex-wrap items-center justify-start lg:justify-end gap-2">
-          <button id="copyIdBtn" class="{{ $btnBase }}">
-            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M9 9h10v10H9V9Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-              <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            คัดลอกหมายเลขงาน
-          </button>
-
-          <a href="{{ route('maintenance.requests.work-order', ['maintenanceRequest' => $req->id]) }}"
-             target="_blank"
-             class="{{ $btnBase }}">
-            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M6 9V4h12v5" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-              <path d="M6 14h12v6H6v-6Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-              <path d="M6 12H5a2 2 0 0 1-2-2v0a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v0a2 2 0 0 1-2 2h-1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-              <path d="M8 16h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            พิมพ์ใบงานซ่อม
-          </a>
-
-          <a href="{{ route('maintenance.requests.index') }}" class="{{ $btnBase }}">
-            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            กลับ
-          </a>
-        </div>
       </div>
 
-      {{-- ROW 2 --}}
-      <div class="flex flex-wrap items-center justify-start lg:justify-end gap-2">
-        @can('accept', $req)
-          <form method="POST" action="{{ $acceptUrl }}">
-            @csrf
-            <button type="submit"
-              class="{{ $btnPrimary }} bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-200">
-              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              รับเรื่อง
-            </button>
-          </form>
-        @endcan
+      {{-- RIGHT --}}
+      <div class="flex flex-wrap items-center justify-start sm:justify-end gap-2">
+        <a href="{{ route('maintenance.requests.index') }}"
+           class="inline-flex items-center gap-2 rounded-lg border {{ $line }} bg-white px-4 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Back
+        </a>
 
-        @can('assign', $req)
-          <button type="button"
-                  id="openAssignModalBtn"
-                  class="{{ $btnPrimary }} bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-200">
-            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            มอบหมาย / แก้ไขทีมช่าง
-          </button>
-        @endcan
+        <button type="button" onclick="window.print()"
+          class="inline-flex items-center gap-2 rounded-lg border {{ $line }} bg-white px-4 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M7 8V4h10v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M7 17h10v3H7v-3Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M6 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Print
+        </button>
       </div>
 
     </div>
+
+    {{-- TIMELINE AREA --}}
+    <div class="w-full px-2 sm:px-4 mt-6 mb-2">
+      <div class="relative w-full">
+        <div class="absolute top-[22px] left-0 w-full h-[6px] bg-slate-200 rounded-full z-0"></div>
+        <div class="absolute top-[22px] left-0 h-[6px] bg-[#1e3a8a] rounded-full z-0 transition-all duration-700 ease-out"
+             style="width: {{ $lineWidth }};"></div>
+
+        <div class="relative z-10 flex justify-between w-full">
+          @php
+            $steps = [
+              1 => 'แจ้งเรื่อง',
+              2 => 'รับทราบแล้ว',
+              3 => 'รับเรื่องแล้ว',
+              4 => 'กำลังดำเนินการ',
+              5 => 'เสร็จสิ้น'
+            ];
+          @endphp
+
+          @foreach($steps as $key => $label)
+            @php
+              $isDone    = $level > $key;
+              $isCurrent = $level == $key;
+              $dateVal   = $dates[$key] ?? null;
+            @endphp
+
+            <div class="flex flex-col items-center w-32">
+              <div class="w-[44px] h-[44px] rounded-full flex items-center justify-center transition-all duration-300
+                {{ $isDone ? 'bg-[#408a5c] border-4 border-[#408a5c]' : '' }}
+                {{ $isCurrent ? 'bg-white' : '' }}
+                {{ !$isDone && !$isCurrent ? 'bg-slate-200 border-4 border-slate-200' : '' }}
+              ">
+                @if($isDone)
+                  <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                @elseif($isCurrent)
+                  <div class="relative w-full h-full">
+                    <div class="absolute inset-0 rounded-full border-[4px] border-slate-100"></div>
+                    <div class="absolute inset-0 rounded-full border-[4px] border-t-blue-600 border-r-transparent border-b-transparent border-l-transparent animate-spin-slow"></div>
+                  </div>
+                @endif
+              </div>
+
+              <div class="mt-3 text-center">
+                <p class="text-[14px] font-bold {{ $isCurrent || $isDone ? 'text-slate-900' : 'text-slate-400' }}">
+                  {{ $label }}
+                </p>
+                @if($isCurrent)
+                  <p class="text-[12px] font-medium text-[#1e3a8a] mt-0.5">(ปัจจุบัน)</p>
+                @elseif($dateVal)
+                  <p class="text-[12px] text-slate-500 mt-0.5">({{ $fmt($dateVal) }})</p>
+                @else
+                  <p class="h-[18px]"></p>
+                @endif
+              </div>
+            </div>
+          @endforeach
+        </div>
+
+      </div>
+    </div>
+
+    {{-- ACTION BUTTONS (ปรับให้เล็กลงตามที่ต้องการ) --}}
+    <div class="flex justify-end gap-2 mt-6 pt-5 border-t border-slate-100">
+
+      @if($canAcknowledge)
+        <form method="POST" action="{{ route('maintenance.requests.acknowledge', $req->id) }}">
+          @csrf
+          <button class="{{ $btnBase }} bg-[#1e3a8a] text-white hover:bg-blue-900 focus:ring-blue-300">
+            รับทราบ
+          </button>
+        </form>
+      @endif
+
+      @if($canAccept)
+        <form method="POST" action="{{ route('maintenance.requests.accept', $req->id) }}">
+          @csrf
+          <button class="{{ $btnBase }} bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-300">
+            รับเรื่อง / ดำเนินการ
+          </button>
+        </form>
+      @endif
+
+      @if($canReject)
+        <button type="button" class="{{ $btnBase }} bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-300">
+          ไม่รับเรื่อง
+        </button>
+      @endif
+
+      @if($canCancel)
+        <form method="POST" action="{{ route('maintenance.requests.cancel', $req->id) }}"
+              onsubmit="return confirm('ยืนยันการยกเลิก?');">
+          @csrf
+          <button class="{{ $btnBase }} bg-slate-600 text-white hover:bg-slate-700 focus:ring-slate-300">
+            ยกเลิกซ่อม
+          </button>
+        </form>
+      @endif
+
+    </div>
+
   </div>
 </div>
 @endsection
@@ -218,6 +259,24 @@
   $accentWrap= "min-w-0 relative pl-3 pt-[1px]";
   $accentBar = "absolute left-0 top-[2px] w-[3px] h-9 rounded-full bg-emerald-600/90";
 
+  // FIX: ให้ $prioLabel / $prioTextTone มีค่าใน section นี้ (กัน Undefined variable)
+  $prio = strtolower((string) ($req->priority ?? ''));
+
+  $prioLabel = [
+    'low'    => 'ต่ำ',
+    'medium' => 'ปานกลาง',
+    'high'   => 'สูง',
+    'urgent' => 'เร่งด่วน',
+  ][$prio] ?? '-';
+
+  $prioTextTone = match ($prio) {
+    'low'    => 'text-slate-600',
+    'medium' => 'text-sky-600',
+    'high'   => 'text-amber-600',
+    'urgent' => 'text-rose-600',
+    default  => 'text-slate-600',
+  };
+
   $assetName = $req->asset?->name ?? ($req->asset_id ? '#'.$req->asset_id : '—');
   $assetCode = $req->asset?->asset_code;
   $location  = $req->location_text ?: ($req->department?->name_th ?? $req->department?->name_en ?? '—');
@@ -235,6 +294,7 @@
   $attachUploadUrl = route('maintenance.requests.attachments', $req->id);
 @endphp
 
+{{-- ✅ ด้านล่างคงของเดิมทั้งหมด --}}
 <div class="mx-auto max-w-screen-2xl px-3 sm:px-6 lg:px-8 pb-8">
   <div class="mt-6 space-y-10">
 
@@ -678,24 +738,80 @@
   </div>
 
   {{-- MODAL --}}
-  @can('assign', $req)
-    <div id="assignModal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-900/40">
+    @can('assign', $req)
+      <div id="assignModal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-900/40">
+        <div class="w-full max-w-xl rounded-2xl border {{ $line }} bg-white shadow-xl">
+          <div class="flex items-center justify-between border-b {{ $line }} px-4 py-3">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <circle cx="9" cy="7" r="3" stroke="currentColor" stroke-width="2"/>
+                </svg>
+              </span>
+              <div>
+                <div class="text-sm font-semibold text-slate-900">มอบหมาย / แก้ไขทีมช่าง</div>
+                <p class="text-xs sm:text-[13px] text-slate-500">เลือกผู้ปฏิบัติงานที่สามารถรับผิดชอบงานนี้</p>
+              </div>
+            </div>
+            <button type="button" id="closeAssignModalBtn"
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
+
+          <form method="POST" action="{{ $assignStoreUrl }}" class="px-4 py-3 space-y-3">
+            @csrf
+
+            <div class="rounded-md border {{ $line }} bg-slate-50 px-3 py-2">
+              <div class="text-xs font-medium text-slate-700 mb-2">รายชื่อทีมช่าง</div>
+              <div class="max-h-72 space-y-1 overflow-y-auto">
+                @foreach($allWorkers as $worker)
+                  <label class="flex items-center gap-2 text-xs">
+                    <input type="checkbox" name="user_ids[]" value="{{ $worker->id }}"
+                           @checked($workers->contains('id', $worker->id))>
+                    <span>{{ $worker->name }}</span>
+                  </label>
+                @endforeach
+              </div>
+            </div>
+
+            <div>
+              <label class="text-xs font-medium text-slate-700">หัวหน้าทีม</label>
+              <select name="lead_user_id" class="mt-2 w-full rounded-md border {{ $line }} bg-white px-3 py-2 text-xs">
+                <option value="">— ไม่ระบุ —</option>
+                @foreach($allWorkers as $worker)
+                  <option value="{{ $worker->id }}" @selected((int)$req->technician_id === (int)$worker->id)>
+                    {{ $worker->name }}
+                  </option>
+                @endforeach
+              </select>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-3">
+              <button type="button" id="cancelAssignModalBtn" class="px-3 py-2 text-xs border {{ $line }} rounded-md bg-white hover:bg-slate-50">
+                ยกเลิก
+              </button>
+              <button type="submit" class="px-3 py-2 text-xs bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-200">
+                บันทึกการมอบหมาย
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    @endcan
+  </div>
+
+  @if($canReject)
+    <div id="rejectModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/40">
       <div class="w-full max-w-xl rounded-2xl border {{ $line }} bg-white shadow-xl">
         <div class="flex items-center justify-between border-b {{ $line }} px-4 py-3">
-          <div class="flex items-center gap-2">
-            <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700">
-              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
-                      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <circle cx="9" cy="7" r="3" stroke="currentColor" stroke-width="2"/>
-              </svg>
-            </span>
-            <div>
-              <div class="text-sm font-semibold text-slate-900">มอบหมาย / แก้ไขทีมช่าง</div>
-              <p class="text-xs sm:text-[13px] text-slate-500">เลือกผู้ปฏิบัติงานที่สามารถรับผิดชอบงานนี้</p>
-            </div>
-          </div>
-          <button type="button" id="closeAssignModalBtn"
+          <div class="text-sm font-semibold text-slate-900">ไม่รับเรื่อง</div>
+
+          <button type="button" id="closeRejectModalBtn"
                   class="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700">
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -703,98 +819,62 @@
           </button>
         </div>
 
-        <form method="POST" action="{{ $assignStoreUrl }}" class="px-4 py-3 space-y-3">
+        <form method="POST" action="{{ route('maintenance.requests.reject', $req->id) }}" class="px-4 py-4 space-y-4">
           @csrf
 
-          <div class="rounded-md border {{ $line }} bg-slate-50 px-3 py-2">
-            <div class="text-xs font-medium text-slate-700 mb-2">รายชื่อทีมช่าง</div>
-            <div class="max-h-72 space-y-1 overflow-y-auto">
-              @foreach($allWorkers as $worker)
-                <label class="flex items-center gap-2 text-xs">
-                  <input type="checkbox" name="user_ids[]" value="{{ $worker->id }}"
-                         @checked($workers->contains('id', $worker->id))>
-                  <span>{{ $worker->name }}</span>
-                </label>
-              @endforeach
-            </div>
-          </div>
-
           <div>
-            <label class="text-xs font-medium text-slate-700">หัวหน้าทีม</label>
-            <select name="lead_user_id" class="mt-2 w-full rounded-md border {{ $line }} bg-white px-3 py-2 text-xs">
-              <option value="">— ไม่ระบุ —</option>
-              @foreach($allWorkers as $worker)
-                <option value="{{ $worker->id }}" @selected((int)$req->technician_id === (int)$worker->id)>
-                  {{ $worker->name }}
-                </option>
-              @endforeach
-            </select>
+            <label class="block text-sm font-medium text-slate-700">เหตุผล <span class="text-rose-600">*</span></label>
+            <textarea name="reject_reason" rows="4" required
+                      class="mt-2 w-full rounded-md border {{ $line }} bg-white px-3 py-2 text-sm
+                             focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
+                      placeholder="ระบุเหตุผลที่ไม่รับเรื่อง"></textarea>
           </div>
 
-          <div class="flex justify-end gap-2 pt-3">
-            <button type="button" id="cancelAssignModalBtn" class="px-3 py-2 text-xs border {{ $line }} rounded-md bg-white hover:bg-slate-50">
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" id="cancelRejectModalBtn"
+                    class="px-3 py-2 text-xs border {{ $line }} rounded-md bg-white hover:bg-slate-50">
               ยกเลิก
             </button>
-            <button type="submit" class="px-3 py-2 text-xs bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-200">
-              บันทึกการมอบหมาย
+            <button type="submit"
+                    class="px-3 py-2 text-xs bg-rose-600 text-white rounded-md hover:bg-rose-700 focus:ring-2 focus:ring-rose-200">
+              ยืนยันไม่รับเรื่อง
             </button>
           </div>
         </form>
       </div>
     </div>
-  @endcan
+  @endif
+
 </div>
 @endsection
 
 @push('scripts')
 <script>
-  (function(){
-    const btn = document.getElementById('copyIdBtn');
-    if (!btn) return;
-    btn.addEventListener('click', async () => {
-      const idText = (String({{ (int)$req->id }}));
-      try {
-        await navigator.clipboard.writeText(idText);
-        const oldHtml = btn.innerHTML;
-        btn.classList.add('bg-slate-900','text-white','border-slate-900');
-        btn.innerHTML = 'คัดลอกแล้ว';
-        setTimeout(()=> {
-          btn.classList.remove('bg-slate-900','text-white','border-slate-900');
-          btn.innerHTML = oldHtml;
-        }, 1200);
-      } catch(e) {}
-    });
-  })();
+(function () {
+  const modal  = document.getElementById('rejectModal');
+  const open   = document.getElementById('openRejectModalBtn');
+  const close  = document.getElementById('closeRejectModalBtn');
+  const cancel = document.getElementById('cancelRejectModalBtn');
 
-  (function() {
-    const modal     = document.getElementById('assignModal');
-    const openBtn   = document.getElementById('openAssignModalBtn');
-    const closeBtn  = document.getElementById('closeAssignModalBtn');
-    const cancelBtn = document.getElementById('cancelAssignModalBtn');
+  if (!modal || !open) return;
 
-    function openModal() {
-      if (!modal) return;
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-    }
+  function show() {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+  function hide() {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
 
-    function closeModal() {
-      if (!modal) return;
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-    }
+  open.addEventListener('click', show);
+  close?.addEventListener('click', hide);
+  cancel?.addEventListener('click', hide);
 
-    openBtn?.addEventListener('click', openModal);
-    closeBtn?.addEventListener('click', closeModal);
-    cancelBtn?.addEventListener('click', closeModal);
-
-    modal?.addEventListener('click', (e) => {
-      if (e.target === modal) closeModal();
-    });
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeModal();
-    });
-  })();
+  // ✅ คลิกพื้นหลังปิด
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) hide();
+  });
+})();
 </script>
 @endpush

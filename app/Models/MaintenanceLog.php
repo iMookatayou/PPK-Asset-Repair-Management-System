@@ -34,13 +34,15 @@ class MaintenanceLog extends Model
     public static function statusLabel(string $status): string
     {
         return [
-            'pending'     => 'รอคิว',
-            'accepted'    => 'รับงานแล้ว',
-            'in_progress' => 'ระหว่างดำเนินการ',
-            'on_hold'     => 'พักไว้',
-            'resolved'    => 'แก้ไขแล้ว',
-            'closed'      => 'ปิดงาน',
-            'cancelled'   => 'ยกเลิก',
+            'pending'       => 'รอรับทราบ',
+            'acknowledged'  => 'รับทราบแล้ว',
+            'accepted'      => 'รับเรื่องแล้ว',
+            'in_progress'   => 'กำลังดำเนินการ',
+
+            'on_hold'       => 'พักไว้',
+            'resolved'      => 'แก้ไขแล้ว',
+            'closed'        => 'ปิดงาน',
+            'cancelled'     => 'ยกเลิก',
         ][$status] ?? $status;
     }
 

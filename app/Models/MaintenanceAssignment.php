@@ -26,6 +26,7 @@ class MaintenanceAssignment extends Model
 
         'response_status',
         'responded_at',
+        'remark',
 
         'status',
     ];
@@ -97,11 +98,13 @@ class MaintenanceAssignment extends Model
         ])->save();
     }
 
-    public function markRejected(): bool
+    public function markRejectedWithRemark(?string $remark = null): bool
     {
         return $this->forceFill([
             'response_status' => self::RESP_REJECTED,
             'responded_at'    => now(),
+            'remark'          => $remark,
+            'status'          => self::STATUS_CANCELLED,
         ])->save();
     }
 

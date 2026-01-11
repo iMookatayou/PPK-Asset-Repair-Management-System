@@ -77,27 +77,72 @@ class MaintenanceRequest extends Model
 
     /* ================= STATUS ================= */
 
-    public const STATUS_PENDING     = 'pending';
-    public const STATUS_ACCEPTED    = 'accepted';
-    public const STATUS_IN_PROGRESS = 'in_progress';
-    public const STATUS_ON_HOLD     = 'on_hold';
-    public const STATUS_RESOLVED    = 'resolved';
-    public const STATUS_CLOSED      = 'closed';
-    public const STATUS_CANCELLED   = 'cancelled';
-    public const STATUS_REJECTED    = 'rejected';
+    public const STATUS_PENDING       = 'pending';
+    public const STATUS_ACKNOWLEDGED  = 'acknowledged'; // ✅ เพิ่มตามสเปค
+    public const STATUS_ACCEPTED      = 'accepted';
+    public const STATUS_IN_PROGRESS   = 'in_progress';
+
+    // สถานะอื่นที่ระบบเดิมมี (คงไว้เพื่อไม่กระทบโค้ดอื่น)
+    public const STATUS_ON_HOLD       = 'on_hold';
+    public const STATUS_RESOLVED      = 'resolved';
+    public const STATUS_CLOSED        = 'closed';
+    public const STATUS_CANCELLED     = 'cancelled';
+    public const STATUS_REJECTED      = 'rejected';
 
     // legacy (เผื่อยังมีข้อมูลเก่าใน DB)
-    public const STATUS_COMPLETED   = 'completed';
+    public const STATUS_COMPLETED     = 'completed';
 
     public const PRIORITY_LOW    = 'low';
     public const PRIORITY_MEDIUM = 'medium';
     public const PRIORITY_HIGH   = 'high';
     public const PRIORITY_URGENT = 'urgent';
 
+    public static function statusLabels(): array
+    {
+        return [
+            self::STATUS_PENDING      => 'รอรับทราบ',
+            self::STATUS_ACKNOWLEDGED => 'รับทราบแล้ว',
+            self::STATUS_ACCEPTED     => 'รับเรื่องแล้ว',
+            self::STATUS_IN_PROGRESS  => 'กำลังดำเนินการ',
+
+            // คง label ของสถานะอื่นเพื่อความครบถ้วน
+            self::STATUS_ON_HOLD      => 'พักไว้',
+            self::STATUS_RESOLVED     => 'แก้ไขแล้ว',
+            self::STATUS_CLOSED       => 'ปิดงาน',
+            self::STATUS_CANCELLED    => 'ยกเลิก',
+            self::STATUS_REJECTED     => 'ปฏิเสธ',
+            self::STATUS_COMPLETED    => 'เสร็จสิ้น (legacy)',
+        ];
+    }
+
+    public function statusLabel(): string
+    {
+        return self::statusLabels()[$this->status] ?? (string) $this->status;
+    }
+
     // ให้สอดคล้องกับหน้าคิว/งานของฉัน (Controller)
-    public const GROUP_PENDING    = ['pending'];
-    public const GROUP_INPROGRESS = ['accepted','in_progress','on_hold'];
-    public const GROUP_COMPLETED  = ['resolved','closed','completed'];// completed เป็น legacy
+    public const GROUP_PENDING = [
+        self::STATUS_PENDING,
+    ];
+
+    // เพิ่ม group สำหรับ acknowledged เพื่อไม่ให้ปนกับ accepted
+    public const GROUP_ACKNOWLEDGED = [
+        self::STATUS_ACKNOWLEDGED,
+    ];
+
+    // กลุ่มกำลังดำเนินการ (หลังรับเรื่องแล้ว)
+    public const GROUP_INPROGRESS = [
+        self::STATUS_ACCEPTED,
+        self::STATUS_IN_PROGRESS,
+        self::STATUS_ON_HOLD,
+    ];
+
+    // completed เป็น legacy
+    public const GROUP_COMPLETED = [
+        self::STATUS_RESOLVED,
+        self::STATUS_CLOSED,
+        self::STATUS_COMPLETED,
+    ];
 
     /* ================= RELATION ================= */
 
@@ -252,49 +297,55 @@ class MaintenanceRequest extends Model
         $isNumeric = ctype_digit($term);
         $len = strlen($term);
 
-        // ไม่ต้องไป match request_no (เลขใบงานยาว) เพราะมันจะปนเหมือนในรูป
+        // 🔎 ค้นแบบตัวเลขสั้น (id / title)
         if ($isNumeric && $len <= 5) {
             $hash = '#'.$term;
 
             return $q->where(function ($w) use ($term, $hash) {
-                    $w->where('id', (int) $term)
-                    ->orWhere('title', 'like', "%{$hash}%")
-                    ->orWhere('title', 'like', "%{$term}%"); // เผื่อบางคนพิมพ์ไม่มี #
+                    $w->where('maintenance_requests.id', (int) $term)
+                    ->orWhere('maintenance_requests.title', 'like', "%{$hash}%")
+                    ->orWhere('maintenance_requests.title', 'like', "%{$term}%");
                 })
                 ->orderByRaw(
                     "CASE
-                        WHEN id = ? THEN 0
-                        WHEN title LIKE ? THEN 1
-                        WHEN title LIKE ? THEN 2
+                        WHEN maintenance_requests.id = ? THEN 0
+                        WHEN maintenance_requests.title LIKE ? THEN 1
+                        WHEN maintenance_requests.title LIKE ? THEN 2
                         ELSE 9
                     END ASC",
                     [(int)$term, "%{$hash}%", "%{$term}%"]
                 )
-                ->orderByDesc('id');
+                ->orderByDesc('maintenance_requests.id');
         }
 
+        // 🔎 ค้นทั่วไป
         return $q->where(function ($w) use ($term) {
-            $w->where('title', 'like', "%{$term}%")
-            ->orWhere('description', 'like', "%{$term}%")
-            ->orWhere('request_no', 'like', "%{$term}%")
-            ->orWhere('reporter_name', 'like', "%{$term}%")
-            ->orWhere('reporter_phone', 'like', "%{$term}%")
-            ->orWhere('reporter_email', 'like', "%{$term}%")
-            ->orWhereHas('reporter', fn ($qr) =>
-                    $qr->where('name', 'like', "%{$term}%")
-                    ->orWhere('email', 'like', "%{$term}%")
-            )
-            ->orWhereHas('asset', fn ($qa) =>
-                    $qa->where('name', 'like', "%{$term}%")
-                    ->orWhere('asset_code', 'like', "%{$term}%")
-            );
-        })
-        ->orderByDesc('id');
+                $w->where('maintenance_requests.title', 'like', "%{$term}%")
+                ->orWhere('maintenance_requests.description', 'like', "%{$term}%")
+                ->orWhere('maintenance_requests.request_no', 'like', "%{$term}%")
+                ->orWhere('maintenance_requests.reporter_name', 'like', "%{$term}%")
+                ->orWhere('maintenance_requests.reporter_phone', 'like', "%{$term}%")
+                ->orWhere('maintenance_requests.reporter_email', 'like', "%{$term}%")
+                ->orWhereHas('reporter', fn ($qr) =>
+                        $qr->where('name', 'like', "%{$term}%")
+                        ->orWhere('email', 'like', "%{$term}%")
+                )
+                ->orWhereHas('asset', fn ($qa) =>
+                        $qa->where('name', 'like', "%{$term}%")
+                        ->orWhere('asset_code', 'like', "%{$term}%")
+                );
+            })
+            ->orderByDesc('maintenance_requests.id');
     }
 
     public function scopePendingGroup($q)
     {
         return $q->whereIn('status', self::GROUP_PENDING);
+    }
+
+    public function scopeAcknowledgedGroup($q)
+    {
+        return $q->whereIn('status', self::GROUP_ACKNOWLEDGED);
     }
 
     public function scopeInProgressGroup($q)
