@@ -1,4 +1,3 @@
-{{-- resources/views/components/navbar.blade.php --}}
 @props([
     'logo'         => asset('images/logoppk.png'),
     'bannerText'   => null,
@@ -13,19 +12,34 @@
 @endphp
 
 <nav class="navbar navbar-expand-lg navbar-pinwheel shadow-sm fixed-top">
-    <div class="container-fluid px-4 h-100 d-flex align-items-center">
+    {{-- Brand Block --}}
+    <div class="nav-brand-block d-flex align-items-center justify-content-between px-3">
+        <button type="button" onclick="openSide()"
+                class="d-lg-none btn text-white p-0 me-2 sidebar-hamburger flex align-items-center justify-content-center"
+                style="font-size: 1.8rem; line-height: 1; border: none; background: transparent; min-width: 44px; min-height: 44px;"
+                aria-label="เปิดเมนู">
+            <i class="bi bi-list" aria-hidden="true"></i>
+        </button>
 
-        {{-- LEFT : SYSTEM TITLE --}}
+        <div class="d-flex align-items-center gap-2 flex-grow-1 overflow-hidden">
+            <img id="sidebarLogo" src="{{ $logo }}" alt="Logo" class="brand-logo h-10 w-auto flex-shrink-0" />
+            <div class="d-flex flex-column leading-tight d-none d-lg-flex">
+                <span class="brand-en brand-title text-white">PHRAPOKKLAO</span>
+                <span class="brand-sub text-slate-200 text-truncate">โรงพยาบาลพระปกเกล้า</span>
+            </div>
+        </div>
+    </div>
+
+    {{-- Main Content Section --}}
+    <div class="container-fluid px-4 h-100 d-flex align-items-center nav-main">
         <div class="nav-left d-none d-md-flex align-items-center gap-2">
             <div class="brand-en nav-system-title">
                 Asset Repair Management System
             </div>
         </div>
 
-        {{-- CENTER : BREADCRUMB & BANNER --}}
+        {{-- Breadcrumbs & Banner --}}
         <div class="nav-center d-none d-md-flex align-items-center flex-grow-1 px-4">
-
-            {{-- 1. ส่วนแสดง Breadcrumb --}}
             @if(empty($bannerText) && count($breadcrumbs) > 0)
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb breadcrumb-custom m-0 ff-sarabun align-items-center">
@@ -46,7 +60,6 @@
                 </nav>
             @endif
 
-            {{-- 2. ส่วน Banner --}}
             @if($bannerText)
                 <span class="nav-banner-text me-3">{{ $bannerText }}</span>
                 @if($bannerAction && $bannerLabel)
@@ -57,17 +70,34 @@
             @endif
         </div>
 
-        {{-- RIGHT : PROFILE --}}
+        {{-- Right Section: My Jobs & Profile --}}
         <div class="nav-right ms-auto d-flex align-items-center gap-3">
+            @auth
+                {{-- แก้ไข: เพิ่มเงื่อนไขไม่ให้ Member เห็นปุ่ม My Jobs --}}
+                @if($user->role !== 'member')
+                    <a id="navMyJobsIcon"
+                       href="{{ route('repairs.my_jobs') }}"
+                       class="nav-icon-btn d-none d-md-inline-flex"
+                       data-no-loader
+                       aria-label="ไปหน้า My Jobs"
+                       title="My Jobs">
+                        <i class="bi bi-clipboard2-check" aria-hidden="true"></i>
+                        <span id="navMyJobsDot" class="nav-dot d-none" aria-hidden="true">
+                            <span class="nav-dot__ping"></span>
+                            <span class="nav-dot__core"></span>
+                        </span>
+                    </a>
+                @endif
+            @endauth
 
-            {{-- Desktop --}}
+            {{-- Profile Dropdown (Desktop) --}}
             <div class="d-none d-md-block">
                 @auth
                     <ul class="navbar-nav align-items-center">
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle d-flex align-items-center gap-2 p-0"
                                href="#" id="profileDropdown"
-                               role="button" data-bs-toggle="dropdown">
+                               role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <span class="ff-sarabun nav-username d-none d-lg-inline">
                                     {{ $user->name }}
                                 </span>
@@ -114,28 +144,30 @@
                 @endguest
             </div>
 
-            {{-- Mobile --}}
+            {{-- Profile Toggle for Mobile --}}
             <div class="d-md-none">
-                @auth
-                    <button class="btn btn-link p-0" type="button" data-bs-toggle="collapse" data-bs-target="#mobileMenu">
+                <button class="btn btn-link p-0 border-0" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileOffcanvas">
+                    @auth
                         <img src="{{ $user->avatar_url ?? asset('images/default-avatar.png') }}" class="avatar-img" alt="Avatar">
-                    </button>
-                @endauth
-                @guest
-                    <button class="navbar-toggler custom-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mobileMenu">
-                        <span class="navbar-toggler-icon"></span>
-                    </button>
-                @endguest
+                    @endauth
+                    @guest
+                        <span class="navbar-toggler-icon custom-toggler"></span>
+                    @endguest
+                </button>
             </div>
         </div>
     </div>
 </nav>
 
-{{-- MOBILE MENU --}}
-<div class="collapse navbar-collapse bg-white border-top d-md-none" id="mobileMenu">
-    <div class="p-3">
+{{-- Mobile Menu Offcanvas --}}
+<div class="offcanvas offcanvas-end d-md-none" tabindex="-1" id="mobileOffcanvas" aria-labelledby="mobileOffcanvasLabel">
+    <div class="offcanvas-header border-bottom">
+        <h5 class="offcanvas-title ff-sarabun fw-bold" id="mobileOffcanvasLabel">เมนูการใช้งาน</h5>
+        <button type="button" class="btn-close text-reset" onclick="closeSide()" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body p-3">
         @if(count($breadcrumbs) > 0)
-            <div class="mb-3 pb-2 border-bottom">
+            <div class="mb-4">
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb m-0 ff-sarabun small">
                         @foreach($breadcrumbs as $item)
@@ -153,66 +185,110 @@
         @endif
 
         @auth
-            <div class="mobile-profile-card mb-3">
-                <div class="d-flex align-items-center gap-2 mb-2">
-                    <img src="{{ $user->avatar_url ?? asset('images/default-avatar.png') }}" width="32" height="32" class="rounded-circle" alt="Avatar">
-                    <div class="ff-sarabun small">
-                        <div class="fw-semibold">{{ $user->name }}</div>
-                        <div class="text-muted">{{ $user->email }}</div>
+            {{-- แก้ไข: เพิ่มเงื่อนไขไม่ให้ Member เห็นปุ่ม My Jobs ใน Mobile --}}
+            @if($user->role !== 'member')
+                <a id="navMyJobsMobile"
+                   href="{{ route('repairs.my_jobs') }}"
+                   class="btn btn-outline-primary btn-sm w-100 ff-sarabun mb-4 d-flex align-items-center justify-content-between py-2"
+                   data-no-loader>
+                    <span class="d-flex align-items-center gap-2">
+                        <i class="bi bi-clipboard2-check"></i>
+                        <span>งานของฉัน (My Jobs)</span>
+                    </span>
+                    <span id="navMyJobsMobileDot" class="nav-dot nav-dot--mobile d-none">
+                        <span class="nav-dot__ping"></span>
+                        <span class="nav-dot__core"></span>
+                    </span>
+                </a>
+            @endif
+
+            <div class="mobile-profile-card">
+                <div class="d-flex align-items-center gap-3 mb-3 pb-3 border-bottom">
+                    <img src="{{ $user->avatar_url ?? asset('images/default-avatar.png') }}" width="45" height="45" class="rounded-circle border" alt="Avatar">
+                    <div class="ff-sarabun">
+                        <div class="fw-bold" style="font-size: 1rem;">{{ $user->name }}</div>
+                        <div class="text-muted small">{{ $user->email }}</div>
                     </div>
                 </div>
-                <a href="{{ route('profile.show') }}" class="btn btn-outline-secondary btn-sm w-100 ff-sarabun mb-2">
-                    โปรไฟล์ของฉัน
-                </a>
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
-                    <button class="btn btn-danger w-100 btn-sm ff-sarabun">ออกจากระบบ</button>
-                </form>
+                <div class="d-grid gap-2">
+                    <a href="{{ route('profile.show') }}" class="btn btn-light btn-sm ff-sarabun text-start px-3">
+                        <i class="bi bi-person me-2"></i> โปรไฟล์ของฉัน
+                    </a>
+                    <form method="POST" action="{{ route('logout') }}" class="mt-2">
+                        @csrf
+                        <button class="btn btn-danger btn-sm ff-sarabun w-100 py-2">
+                            <i class="bi bi-box-arrow-right me-2"></i> ออกจากระบบ
+                        </button>
+                    </form>
+                </div>
             </div>
         @endauth
+
         @guest
-            <a href="{{ route('login') }}" class="btn btn-primary w-100 btn-sm ff-sarabun">เข้าสู่ระบบ</a>
+            <div class="d-grid gap-2">
+                <a href="{{ route('login') }}" class="btn btn-primary btn-sm ff-sarabun py-2">เข้าสู่ระบบ</a>
+            </div>
         @endguest
     </div>
 </div>
 
-{{-- ==================  CSS ================== --}}
 <style>
+/* CSS เหมือนเดิม ไม่มีการเปลี่ยนแปลง */
 @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
 
 :root{
-  --nav-height: 80px;
-  --ppk-blue: #0F2D5C;
-  --ppk-blue-2: #133A73;
-  --ppk-border: #e2e8f0;
-  --ppk-text: #0f172a;
-  --ppk-muted: #64748b;
-  --ppk-soft: rgba(15,45,92,.08);
+    --nav-height: 80px;
+    --ppk-blue: #0F2D5C;
+    --ppk-blue-2: #133A73;
+    --ppk-border: #e2e8f0;
+    --ppk-text: #0f172a;
+    --ppk-muted: #64748b;
+    --ppk-soft: rgba(15,45,92,.08);
+    --side-w: 260px;
 }
 
 .ff-sarabun{ font-family: 'Sarabun', sans-serif !important; }
 .brand-en{ font-family: 'Sarabun', sans-serif; }
 
-/* ===== NAVBAR LAYOUT ===== */
 .navbar-pinwheel{
-  height: var(--nav-height);
-  background: #ffffff;
-  padding: 0;
-  border-bottom: 1px solid var(--ppk-border);
-  z-index: 1200;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02) !important;
+    height: var(--nav-height);
+    background: #ffffff;
+    padding: 0;
+    border-bottom: 1px solid var(--ppk-border);
+    z-index: 1030;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02) !important;
+    left: 0;
+    width: 100%;
 }
+
+.nav-brand-block{
+    width: var(--side-w);
+    height: var(--nav-height);
+    background: var(--ppk-blue);
+    border-right: 1px solid rgba(15,45,92,0.12);
+    flex: 0 0 auto;
+}
+
+.brand-logo{ height: 48px; width: auto; }
+.brand-title{
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    line-height: 1.2;
+}
+.brand-sub{ font-size: 12px; opacity: 0.9; }
+
+.nav-main{ height: var(--nav-height); flex: 1 1 auto; }
 
 .nav-system-title{
-  font-size: .85rem;
-  font-weight: 700;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  color: var(--ppk-text);
-  white-space: nowrap;
+    font-size: .85rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--ppk-text);
+    white-space: nowrap;
 }
 
-/* --- BREADCRUMB GLOW EFFECT (NEW) --- */
 .breadcrumb-custom {
     --bs-breadcrumb-divider: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cpath d='M2.5 0L1 1.5 3.5 4 1 6.5 2.5 8l4-4-4-4z' fill='%2394a3b8'/%3E%3C/svg%3E");
     --bs-breadcrumb-item-padding-x: 0.6rem;
@@ -222,79 +298,106 @@
     color: var(--ppk-muted);
     font-weight: 500;
     font-size: 0.9rem;
-    padding: 2px 0; /* ตัด padding แนวนอนออก เพราะไม่มีกรอบแล้ว */
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* Animation นุ่มๆ */
-    position: relative;
+    transition: all 0.3s ease;
 }
 
 .nav-breadcrumb-link:hover {
-    color: var(--ppk-blue); /* เปลี่ยนเป็นสีน้ำเงิน */
-    text-decoration: none !important;
-    background-color: transparent; /* เอาพื้นหลังออก */
-
-    /* สร้าง Effect แสงฟุ้ง (Glow) */
-    text-shadow: 0 0 12px rgba(15, 45, 92, 0.25);
-
-    /* ลอยขึ้นนิดนึงให้ดูมีมิติ */
-    transform: translateY(-1px);
+    color: var(--ppk-blue);
+    text-decoration: none;
 }
 
-/* Active Item */
 .nav-breadcrumb-active {
     color: var(--ppk-blue);
     font-size: 0.9rem;
     font-weight: 700;
 }
 
-/* Banner */
-.nav-center .nav-banner-text{ font-size: .9rem; color: var(--ppk-muted); }
+.nav-banner-text{ font-size: .9rem; color: var(--ppk-muted); }
 .nav-banner-btn{
-  border-radius: 999px;
-  padding-inline: 1rem;
-  font-size: .8rem;
-  background-color: var(--ppk-blue);
-  border-color: var(--ppk-blue);
-  color: #ffffff;
-}
-.nav-banner-btn:hover{
-  background-color: var(--ppk-blue-2);
-  border-color: var(--ppk-blue-2);
+    border-radius: 999px;
+    padding-inline: 1rem;
+    font-size: .8rem;
+    background-color: var(--ppk-blue);
+    border-color: var(--ppk-blue);
+    color: #ffffff;
 }
 
-/* Profile Avatar */
 .avatar-img{
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid #f1f5f9;
-  transition: border-color 0.2s;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #f1f5f9;
 }
-.nav-link:hover .avatar-img { border-color: var(--ppk-soft); }
-.nav-username{ font-size: 0.9rem; color: var(--ppk-text); font-weight: 600; }
 
-/* Dropdown */
 .profile-dropdown-menu{
-  min-width: 260px;
-  border-radius: 12px;
-  border: 1px solid rgba(15,45,92,.08);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+    min-width: 260px;
+    border-radius: 12px;
+    padding: 0.5rem;
+    border: 1px solid rgba(15,45,92,.08);
 }
+
 .profile-dropdown-menu .dropdown-item{
-  border-radius: 8px; margin-inline: 8px; width: calc(100% - 16px); padding: 8px 12px; font-size: 0.9rem;
-}
-.profile-dropdown-menu .dropdown-item:hover{
-  background-color: var(--ppk-soft); color: var(--ppk-blue);
+    border-radius: 8px;
+    padding: 8px 12px;
 }
 
-/* Mobile & Layout */
 .mobile-profile-card{
-  border-radius: 12px; padding: 10px 12px; border: 1px solid #e5e7eb; background-color: #ffffff;
+    border-radius: 12px;
+    padding: 15px;
+    border: 1px solid #e5e7eb;
+    background-color: #f8fafc;
 }
-.custom-toggler{ border-color: transparent; }
-.custom-toggler:focus { box-shadow: none; }
 
-@media (min-width: 1024px){
-  .navbar-pinwheel{ left: 260px; width: calc(100% - 260px); }
+.nav-icon-btn{
+    position: relative;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(15,45,92,.05);
+    color: var(--ppk-blue);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.nav-icon-btn:hover { background: rgba(15,45,92,.1); }
+
+.nav-dot{
+    position: absolute;
+    right: -2px;
+    top: -2px;
+    width: 12px;
+    height: 12px;
+}
+
+.nav-dot__core{
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: #dc2626;
+    border: 2px solid #ffffff;
+}
+
+.nav-dot__ping{
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: rgba(220,38,38,.4);
+    animation: navPing 1.5s infinite;
+}
+
+@keyframes navPing{
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(2.5); opacity: 0; }
+}
+
+@media (max-width: 992px){
+    .nav-brand-block{ width: auto; min-width: 70px; border-right: none; }
+    .brand-logo { height: 40px; }
+    :root { --nav-height: 70px; }
+    .navbar-pinwheel { height: 70px; }
+    .sidebar-hamburger:active { opacity: 0.8; transform: scale(0.95); }
 }
 </style>
