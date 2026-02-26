@@ -7,12 +7,19 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class AssetCategoryController extends Controller
 {
     public function index()
     {
         $categories = AssetCategory::orderBy('name')->paginate(12);
+
+        Log::info('[AssetCategory::index] listing', [
+            'total'    => $categories->total(),
+            'actor_id' => request()->user()?->id,
+        ]);
+
         return view('assets.categories.index', compact('categories'));
     }
 
@@ -30,26 +37,54 @@ class AssetCategoryController extends Controller
             'color'       => 'nullable|string|max:20',
             'is_active'   => 'boolean',
         ]);
-        if ($validatorBase->fails()) {
-            return back()->withErrors($validatorBase)->withInput()->with('toast', \App\Support\Toast::error('ข้อมูลไม่ถูกต้อง: name', 2600));
-        }
-        $base = $validatorBase->validated();
 
+        if ($validatorBase->fails()) {
+            Log::warning('[AssetCategory::store] validation failed (base)', [
+                'errors'   => $validatorBase->errors()->toArray(),
+                'input'    => $request->except(['_token']),
+                'actor_id' => $request->user()?->id,
+            ]);
+
+            return back()
+                ->withErrors($validatorBase)
+                ->withInput()
+                ->with('toast', \App\Support\Toast::error('ข้อมูลไม่ถูกต้อง: name', 2600));
+        }
+
+        $base = $validatorBase->validated();
         $slug = Str::slug($request->input('slug') ?: $base['name']);
+
         $validatorSlug = Validator::make(
             ['slug' => $slug],
-            ['slug' => ['required','string','max:120', Rule::unique('asset_categories','slug')]]
+            ['slug' => ['required', 'string', 'max:120', Rule::unique('asset_categories', 'slug')]]
         );
+
         if ($validatorSlug->fails()) {
-            return back()->withErrors($validatorSlug)->withInput()->with('toast', \App\Support\Toast::error('Slug ไม่ถูกต้อง หรือซ้ำ', 2600));
+            Log::warning('[AssetCategory::store] slug validation failed', [
+                'slug'     => $slug,
+                'actor_id' => $request->user()?->id,
+            ]);
+
+            return back()
+                ->withErrors($validatorSlug)
+                ->withInput()
+                ->with('toast', \App\Support\Toast::error('Slug ไม่ถูกต้อง หรือซ้ำ', 2600));
         }
+
         $validatorSlug->validated();
+        $data     = array_merge($base, ['slug' => $slug]);
+        $category = AssetCategory::create($data);
 
-        $data = array_merge($base, ['slug' => $slug]);
+        Log::info('[AssetCategory::store] created', [
+            'category_id' => $category->id,
+            'name'        => $category->name,
+            'slug'        => $category->slug,
+            'is_active'   => $category->is_active,
+            'actor_id'    => $request->user()?->id,
+        ]);
 
-        AssetCategory::create($data);
-
-        return redirect()->route('asset-categories.index')
+        return redirect()
+            ->route('asset-categories.index')
             ->with('toast', \App\Support\Toast::success('เพิ่มหมวดหมู่เรียบร้อย'));
     }
 
@@ -61,38 +96,78 @@ class AssetCategoryController extends Controller
     public function update(Request $request, AssetCategory $asset_category)
     {
         $validatorBase = Validator::make($request->all(), [
-            'name'        => 'required|string|max:100|unique:asset_categories,name,'.$asset_category->id,
+            'name'        => 'required|string|max:100|unique:asset_categories,name,' . $asset_category->id,
             'description' => 'nullable|string|max:1000',
             'color'       => 'nullable|string|max:20',
             'is_active'   => 'boolean',
         ]);
-        if ($validatorBase->fails()) {
-            return back()->withErrors($validatorBase)->withInput()->with('toast', \App\Support\Toast::error('ข้อมูลไม่ถูกต้อง', 2600));
-        }
-        $base = $validatorBase->validated();
 
+        if ($validatorBase->fails()) {
+            Log::warning('[AssetCategory::update] validation failed (base)', [
+                'category_id' => $asset_category->id,
+                'errors'      => $validatorBase->errors()->toArray(),
+                'actor_id'    => $request->user()?->id,
+            ]);
+
+            return back()
+                ->withErrors($validatorBase)
+                ->withInput()
+                ->with('toast', \App\Support\Toast::error('ข้อมูลไม่ถูกต้อง', 2600));
+        }
+
+        $base      = $validatorBase->validated();
         $slugInput = $request->input('slug');
-        $slug = Str::slug($slugInput ?: $base['name']);
+        $slug      = Str::slug($slugInput ?: $base['name']);
+
         $validatorSlug = Validator::make(
             ['slug' => $slug],
-            ['slug' => ['required','string','max:120', Rule::unique('asset_categories','slug')->ignore($asset_category->id)]]
+            ['slug' => ['required', 'string', 'max:120', Rule::unique('asset_categories', 'slug')->ignore($asset_category->id)]]
         );
+
         if ($validatorSlug->fails()) {
-            return back()->withErrors($validatorSlug)->withInput()->with('toast', \App\Support\Toast::error('Slug ไม่ถูกต้อง หรือซ้ำ', 2600));
+            Log::warning('[AssetCategory::update] slug validation failed', [
+                'category_id' => $asset_category->id,
+                'slug'        => $slug,
+                'actor_id'    => $request->user()?->id,
+            ]);
+
+            return back()
+                ->withErrors($validatorSlug)
+                ->withInput()
+                ->with('toast', \App\Support\Toast::error('Slug ไม่ถูกต้อง หรือซ้ำ', 2600));
         }
+
         $validatorSlug->validated();
 
-        $data = array_merge($base, ['slug' => $slug]);
-
+        $before = $asset_category->only(['name', 'slug', 'color', 'is_active', 'description']);
+        $data   = array_merge($base, ['slug' => $slug]);
         $asset_category->update($data);
 
-        return redirect()->route('asset-categories.index')
+        Log::info('[AssetCategory::update] updated', [
+            'category_id' => $asset_category->id,
+            'before'      => $before,
+            'after'       => $asset_category->only(['name', 'slug', 'color', 'is_active', 'description']),
+            'actor_id'    => $request->user()?->id,
+        ]);
+
+        return redirect()
+            ->route('asset-categories.index')
             ->with('toast', \App\Support\Toast::success('อัปเดตหมวดหมู่แล้ว'));
     }
 
     public function destroy(AssetCategory $asset_category)
     {
-    $asset_category->delete();
-    return back()->with('toast', \App\Support\Toast::success('ลบหมวดหมู่เรียบร้อย'));
+        $categoryId   = $asset_category->id;
+        $categoryName = $asset_category->name;
+
+        $asset_category->delete();
+
+        Log::info('[AssetCategory::destroy] deleted', [
+            'category_id' => $categoryId,
+            'name'        => $categoryName,
+            'actor_id'    => request()->user()?->id,
+        ]);
+
+        return back()->with('toast', \App\Support\Toast::success('ลบหมวดหมู่เรียบร้อย'));
     }
 }

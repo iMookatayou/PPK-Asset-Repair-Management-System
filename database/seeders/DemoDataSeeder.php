@@ -5,10 +5,12 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use Carbon\Carbon;
+
 use App\Models\User;
 use App\Models\MaintenanceRequest as MR;
-use Carbon\Carbon;
-use Illuminate\Support\Str;
 
 class DemoDataSeeder extends Seeder
 {
@@ -16,52 +18,40 @@ class DemoDataSeeder extends Seeder
     {
         DB::connection()->disableQueryLog();
 
+        // ================== CONFIG ==================
         $assetCount   = (int) env('DEMO_ASSET_COUNT', 120);
         $techCount    = (int) env('DEMO_TECH_COUNT', 6);
         $staffCount   = (int) env('DEMO_MEMBER_COUNT', 18);
         $requestCount = (int) env('DEMO_SEED_COUNT', 300);
         $chunkSize    = (int) env('DEMO_CHUNK', 500);
 
-        $deptCodes     = ['IT','ER','OPD','WARD','ADMIN','LAB'];
-        $departmentIds = [];
-
-        if (Schema::hasTable('departments')) {
-            $hasCode   = Schema::hasColumn('departments', 'code');
-            $hasNameTh = Schema::hasColumn('departments', 'name_th');
-            $hasNameEn = Schema::hasColumn('departments', 'name_en');
-
-            if ($hasCode && $hasNameTh && !DB::table('departments')->exists()) {
-                $now = now();
-                DB::table('departments')->insert([
-                    ['code'=>'IT','name_th'=>'ฝ่าย IT & Support','name_en'=>'IT & Support','created_at'=>$now,'updated_at'=>$now],
-                    ['code'=>'ER','name_th'=>'ห้องฉุกเฉิน','name_en'=>'Emergency Room','created_at'=>$now,'updated_at'=>$now],
-                    ['code'=>'OPD','name_th'=>'ผู้ป่วยนอก','name_en'=>'OPD','created_at'=>$now,'updated_at'=>$now],
-                    ['code'=>'WARD','name_th'=>'วอร์ดผู้ป่วยใน','name_en'=>'Ward','created_at'=>$now,'updated_at'=>$now],
-                    ['code'=>'ADMIN','name_th'=>'ฝ่ายธุรการ','name_en'=>'Administration','created_at'=>$now,'updated_at'=>$now],
-                    ['code'=>'LAB','name_th'=>'ห้องปฏิบัติการ','name_en'=>'Laboratory','created_at'=>$now,'updated_at'=>$now],
-                ]);
-            }
-
-            if ($hasCode) {
-                $codes = DB::table('departments')->pluck('code')->filter()->values()->all();
-                if ($codes) $deptCodes = $codes;
-            }
-
-            if (Schema::hasColumn('departments', 'id')) {
-                $departmentIds = DB::table('departments')->pluck('id')->all();
-            }
-        }
-
         $adminCitizenId = env('DEMO_ADMIN_CITIZEN_ID', '1000000000001');
-        $adminEmail     = 'admin@example.com';
+        $adminEmail     = env('DEMO_ADMIN_EMAIL', 'admin@example.com');
+        $adminPassword  = env('DEMO_ADMIN_PASSWORD', 'Admin123!');
 
-        User::firstOrCreate(
+        $this->headline('DemoDataSeeder RUNNING');
+        $this->kv('ASSETS', (string)$assetCount);
+        $this->kv('TECHS', (string)$techCount);
+        $this->kv('STAFFS', (string)$staffCount);
+        $this->kv('REQUESTS', (string)$requestCount);
+        $this->kv('CHUNK', (string)$chunkSize);
+        $this->lineBreak();
+
+        // ================== 1) Departments ==================
+        [$deptCodes, $departmentIds] = $this->seedDepartments();
+        $this->ok('Departments ready', [
+            'codes' => implode(',', $deptCodes),
+            'count' => (string) count($departmentIds),
+        ]);
+
+        // ================== 2) Admin ==================
+        $admin = User::firstOrCreate(
             ['citizen_id' => $adminCitizenId],
             [
                 'name'              => 'System Admin',
                 'citizen_id'        => $adminCitizenId,
                 'email'             => $adminEmail,
-                'password'          => bcrypt('Admin123!'),
+                'password'          => Hash::make($adminPassword),
                 'role'              => 'admin',
                 'department'        => in_array('IT', $deptCodes, true) ? 'IT' : ($deptCodes[0] ?? null),
                 'email_verified_at' => now(),
@@ -69,28 +59,32 @@ class DemoDataSeeder extends Seeder
             ]
         );
 
-        $techDefault = in_array('IT', $deptCodes, true) ? 'IT' : ($deptCodes[0] ?? null);
+        $this->ok('Admin ready', [
+            'citizen_id' => (string) $admin->citizen_id,
+            'email'      => (string) ($admin->email ?? '-'),
+        ]);
 
+        // reset faker unique counter
         fake()->unique(true);
+
+        // ================== 3) Technicians + Staffs ==================
+        $techDefault = in_array('IT', $deptCodes, true) ? 'IT' : ($deptCodes[0] ?? null);
 
         $technicians = User::factory()
             ->count($techCount)
             ->state(fn () => [
                 'role'       => 'technician',
                 'department' => $techDefault,
-
                 'citizen_id' => fake()->unique()->numerify('#############'),
                 'email'      => fake()->unique()->safeEmail(),
             ])
             ->create();
 
-        // พนักงาน/ผู้แจ้งภายใน (ปล่อยเป็น member ได้ ไม่กระทบ teamRoles)
         $staffs = User::factory()
             ->count($staffCount)
             ->state(fn () => [
                 'role'       => 'member',
                 'department' => fake()->randomElement($deptCodes),
-
                 'citizen_id' => fake()->unique()->numerify('#############'),
                 'email'      => fake()->unique()->safeEmail(),
             ])
@@ -99,156 +93,82 @@ class DemoDataSeeder extends Seeder
         $techIds  = $technicians->pluck('id')->all();
         $staffIds = $staffs->pluck('id')->all();
 
-        $categoryIds = [];
-        if (Schema::hasTable('asset_categories')) {
-            $hasSlug = Schema::hasColumn('asset_categories', 'slug');
+        $this->ok('Users seeded', [
+            'technicians' => (string) count($techIds),
+            'staffs'      => (string) count($staffIds),
+        ]);
 
-            if (!DB::table('asset_categories')->exists()) {
-                $catNames = ['คอมพิวเตอร์','เครื่องพิมพ์','เครื่องปรับอากาศ','โต๊ะทำงาน','หลอดไฟ','เตียงคนไข้'];
-                $rows     = [];
-                $now      = now();
+        // ================== 4) Asset Categories ==================
+        $categoryIds = $this->seedAssetCategories();
+        $this->ok('Asset categories ready', ['count' => (string) count($categoryIds)]);
 
-                $existingSlugs = $hasSlug ? DB::table('asset_categories')->pluck('slug')->filter()->all() : [];
-                $slugSet = array_fill_keys($existingSlugs, true);
-
-                $makeSlug = function (string $name) use (&$slugSet) {
-                    $base = Str::slug($name, '-');
-                    if ($base === '' || $base === null) {
-                        $base = trim(preg_replace('/[^a-z0-9]+/i', '-', mb_strtolower($name)), '-');
-                    }
-                    if ($base === '' || $base === null) {
-                        $base = 'cat-'.substr(md5($name.microtime(true)), 0, 6);
-                    }
-                    $slug = $base;
-                    $i    = 2;
-                    while (isset($slugSet[$slug])) {
-                        $slug = $base.'-'.$i;
-                        $i++;
-                    }
-                    $slugSet[$slug] = true;
-                    return $slug;
-                };
-
-                foreach ($catNames as $name) {
-                    $row = ['name'=>$name,'created_at'=>$now,'updated_at'=>$now];
-                    if ($hasSlug) $row['slug'] = $makeSlug($name);
-                    $rows[] = $row;
-                }
-
-                DB::table('asset_categories')->insert($rows);
-            }
-
-            $categoryIds = DB::table('asset_categories')->pluck('id')->all();
-        }
-
-        if (Schema::hasTable('assets') && !DB::table('assets')->exists()) {
-            $types     = ['เครื่องใช้ไฟฟ้า','อุปกรณ์สำนักงาน','คอมพิวเตอร์','เครื่องมือแพทย์'];
-            $brands    = ['HP','Dell','Acer','Lenovo','Brother','Mitsubishi','Daikin'];
-            $locations = ['ER','OPD','Ward','Admin','IT Room','Lab'];
-
-            $hasType         = Schema::hasColumn('assets', 'type');
-            $hasBrand        = Schema::hasColumn('assets', 'brand');
-            $hasModel        = Schema::hasColumn('assets', 'model');
-            $hasSerial       = Schema::hasColumn('assets', 'serial_number');
-            $hasLocation     = Schema::hasColumn('assets', 'location');
-            $hasDeptId       = Schema::hasColumn('assets', 'department_id');
-            $hasCategoryId   = Schema::hasColumn('assets', 'category_id');
-            $hasPurchaseDate = Schema::hasColumn('assets', 'purchase_date');
-            $hasWarranty     = Schema::hasColumn('assets', 'warranty_expire');
-            $hasStatus       = Schema::hasColumn('assets', 'status');
-            $hasAssetCode    = Schema::hasColumn('assets', 'asset_code');
-            $hasName         = Schema::hasColumn('assets', 'name');
-
-            $assetRows = [];
-            $nowTs     = now();
-            $usedCodes = [];
-            $usedSNs   = [];
-
-            for ($i = 1; $i <= $assetCount; $i++) {
-                do { $code = 'ASSET-'.random_int(10000, 99999); } while (isset($usedCodes[$code]));
-                $usedCodes[$code] = true;
-
-                do { $sn = 'SN'.random_int(10000000, 99999999); } while (isset($usedSNs[$sn]));
-                $usedSNs[$sn] = true;
-
-                $purchaseAt = Carbon::now()->subMonths(random_int(6, 48))->startOfDay();
-                $warrantyAt = (clone $purchaseAt)->addMonths(random_int(12, 48));
-
-                $row = ['created_at'=>$nowTs,'updated_at'=>$nowTs];
-
-                if ($hasAssetCode)    $row['asset_code']      = $code;
-                if ($hasName)         $row['name']            = fake()->words(2, true);
-                if ($hasType)         $row['type']            = $types[array_rand($types)];
-                if ($hasBrand)        $row['brand']           = $brands[array_rand($brands)];
-                if ($hasModel)        $row['model']           = strtoupper(fake()->bothify('??-###'));
-                if ($hasSerial)       $row['serial_number']   = $sn;
-                if ($hasLocation)     $row['location']        = $locations[array_rand($locations)];
-                if ($hasDeptId && $departmentIds)   $row['department_id'] = $departmentIds[array_rand($departmentIds)];
-                if ($hasCategoryId && $categoryIds) $row['category_id']   = $categoryIds[array_rand($categoryIds)];
-                if ($hasPurchaseDate) $row['purchase_date']   = $purchaseAt;
-                if ($hasWarranty)     $row['warranty_expire'] = $warrantyAt;
-
-                if ($hasStatus) {
-                    $roll          = mt_rand(1, 100);
-                    $row['status'] = $roll <= 75 ? 'active' : ($roll <= 95 ? 'in_repair' : 'disposed');
-                }
-
-                $assetRows[] = $row;
-
-                if (count($assetRows) >= $chunkSize) {
-                    DB::table('assets')->insert($assetRows);
-                    $assetRows = [];
-                }
-            }
-
-            if ($assetRows) DB::table('assets')->insert($assetRows);
-        }
+        // ================== 5) Assets ==================
+        $assetsInserted = $this->seedAssetsIfEmpty(
+            assetCount: $assetCount,
+            chunkSize: $chunkSize,
+            departmentIds: $departmentIds,
+            categoryIds: $categoryIds
+        );
 
         $assetIds = Schema::hasTable('assets') ? DB::table('assets')->pluck('id')->all() : [];
+        $this->ok('Assets ready', [
+            'inserted' => (string) $assetsInserted,
+            'total'    => (string) count($assetIds),
+        ]);
+
+        // ================== 6) Maintenance Requests + Assignments + Operation Logs ==================
+        if (!Schema::hasTable('maintenance_requests')) {
+            $this->warn('maintenance_requests table not found, skip maintenance seeding.');
+            $this->done('DemoDataSeeder DONE (partial)');
+            return;
+        }
+
+        $this->infoBlock('Seeding maintenance_requests / maintenance_assignments / maintenance_operation_logs ...');
 
         $mrTable = 'maintenance_requests';
 
-        $hasAssetId           = Schema::hasColumn($mrTable, 'asset_id');
-        $hasReporterId        = Schema::hasColumn($mrTable, 'reporter_id');
-        $hasTechnicianId      = Schema::hasColumn($mrTable, 'technician_id');
+        // detect columns (schema-safe)
+        $has = fn(string $col) => Schema::hasColumn($mrTable, $col);
 
-        $hasRequestNo         = Schema::hasColumn($mrTable, 'request_no');
-        $hasDeptMR            = Schema::hasColumn($mrTable, 'department_id');
+        $hasAssetId      = $has('asset_id');
+        $hasReporterId   = $has('reporter_id');
+        $hasTechnicianId = $has('technician_id');
 
-        $hasTitle             = Schema::hasColumn($mrTable, 'title');
-        $hasDescription       = Schema::hasColumn($mrTable, 'description');
-        $hasPriority          = Schema::hasColumn($mrTable, 'priority');
-        $hasStatusCol         = Schema::hasColumn($mrTable, 'status');
+        $hasRequestNo    = $has('request_no');
+        $hasDeptMR       = $has('department_id');
 
-        $hasReporterName      = Schema::hasColumn($mrTable, 'reporter_name');
-        $hasReporterPhone     = Schema::hasColumn($mrTable, 'reporter_phone');
-        $hasReporterEmail     = Schema::hasColumn($mrTable, 'reporter_email');
-        $hasReporterPosition  = Schema::hasColumn($mrTable, 'reporter_position');
-        $hasReporterIp        = Schema::hasColumn($mrTable, 'reporter_ip');
-        $hasReporterPort      = Schema::hasColumn($mrTable, 'reporter_port');
-        $hasReporterApp       = Schema::hasColumn($mrTable, 'reporter_app');
-        $hasLegacyPayload     = Schema::hasColumn($mrTable, 'legacy_payload');
+        $hasTitle        = $has('title');
+        $hasDescription  = $has('description');
+        $hasPriority     = $has('priority');
+        $hasStatusCol    = $has('status');
 
-        $hasLocationText      = Schema::hasColumn($mrTable, 'location_text');
+        $hasReporterName     = $has('reporter_name');
+        $hasReporterPhone    = $has('reporter_phone');
+        $hasReporterEmail    = $has('reporter_email');
+        $hasReporterPosition = $has('reporter_position');
 
-        $hasRequestDate       = Schema::hasColumn($mrTable, 'request_date');
-        $hasAssignedDate      = Schema::hasColumn($mrTable, 'assigned_date');
-        $hasCompletedDate     = Schema::hasColumn($mrTable, 'completed_date');
-        $hasAcceptedAt        = Schema::hasColumn($mrTable, 'accepted_at');
-        $hasStartedAt         = Schema::hasColumn($mrTable, 'started_at');
-        $hasOnHoldAt          = Schema::hasColumn($mrTable, 'on_hold_at');
-        $hasResolvedAt        = Schema::hasColumn($mrTable, 'resolved_at');
-        $hasClosedAt          = Schema::hasColumn($mrTable, 'closed_at');
+        $hasLegacyPayload = $has('legacy_payload'); // model casts array
+        $hasLocationText  = $has('location_text');
 
-        $hasRemark            = Schema::hasColumn($mrTable, 'remark');
-        $hasResolutionNote    = Schema::hasColumn($mrTable, 'resolution_note');
-        $hasCost              = Schema::hasColumn($mrTable, 'cost');
-        $hasSource            = Schema::hasColumn($mrTable, 'source');
-        $hasExtra             = Schema::hasColumn($mrTable, 'extra');
+        $hasRequestDate   = $has('request_date');
+        $hasAssignedDate  = $has('assigned_date');
+        $hasCompletedDate = $has('completed_date');
+        $hasAcceptedAt    = $has('accepted_at');
+        $hasStartedAt     = $has('started_at');
+        $hasOnHoldAt      = $has('on_hold_at');
+        $hasResolvedAt    = $has('resolved_at');
+        $hasClosedAt      = $has('closed_at');
 
-        $hasCreatedAt         = Schema::hasColumn($mrTable, 'created_at');
-        $hasUpdatedAt         = Schema::hasColumn($mrTable, 'updated_at');
+        $hasRemark         = $has('remark');
+        $hasResolutionNote = $has('resolution_note');
+        $hasCost           = $has('cost');
+        $hasSource         = $has('source');
+        $hasExtra          = $has('extra');
 
+        $hasCreatedAt      = $has('created_at');
+        $hasUpdatedAt      = $has('updated_at');
+
+        // statuses/priorities from your model
         $statuses = [
             MR::STATUS_PENDING,
             MR::STATUS_ACKNOWLEDGED,
@@ -269,7 +189,6 @@ class DemoDataSeeder extends Seeder
 
         $now = Carbon::now();
 
-        // timeline (ง่าย + ตรงกับ controller)
         $makeTimeline = function (string $status, Carbon $base) {
             $assigned = $accepted = $started = $onHold = $resolved = $closed = $completedDate = null;
 
@@ -298,10 +217,10 @@ class DemoDataSeeder extends Seeder
             return [$assigned, $accepted, $started, $onHold, $resolved, $closed, $completedDate];
         };
 
+        // request_no generator (กันชน)
         $existingSet  = [];
         $yearCounters = [];
-
-        if (Schema::hasTable($mrTable) && $hasRequestNo) {
+        if ($hasRequestNo) {
             $existing = DB::table($mrTable)->pluck('request_no')->filter()->all();
             foreach ($existing as $no) {
                 $existingSet[$no] = true;
@@ -314,9 +233,7 @@ class DemoDataSeeder extends Seeder
                 }
             }
         }
-
         $usedInRun = [];
-
         $makeRequestNo = function (Carbon $date) use (&$yearCounters, &$existingSet, &$usedInRun) {
             $beYear = $date->year + 543;
             $yy     = substr((string) $beYear, -2);
@@ -330,60 +247,66 @@ class DemoDataSeeder extends Seeder
                 $candidate = $yy.$type.sprintf('%05d', $lastSeq);
             } while (isset($existingSet[$candidate]) || isset($usedInRun[$candidate]));
 
-            $yearCounters[$key] = $lastSeq;
-            $existingSet[$candidate] = true;
-            $usedInRun[$candidate]   = true;
+            $yearCounters[$key]       = $lastSeq;
+            $existingSet[$candidate]  = true;
+            $usedInRun[$candidate]    = true;
 
             return $candidate;
         };
 
+        // --- Insert MR in a transaction ---
+        $insertedMR = 0;
+
         DB::transaction(function () use (
-            $requestCount, $assetIds, $staffIds, $techIds, $priorities, $statuses, $now, $chunkSize, $departmentIds,
+            $mrTable,
+            $requestCount, $chunkSize, $now,
+            $assetIds, $staffIds, $techIds, $departmentIds,
+            $statuses, $priorities,
             $makeTimeline, $makeRequestNo,
+
             $hasAssetId, $hasReporterId, $hasTechnicianId,
             $hasRequestNo, $hasDeptMR,
             $hasTitle, $hasDescription, $hasPriority, $hasStatusCol,
-            $hasReporterName, $hasReporterPhone, $hasReporterEmail, $hasReporterPosition, $hasReporterIp, $hasReporterPort, $hasReporterApp, $hasLegacyPayload,
-            $hasLocationText,
+            $hasReporterName, $hasReporterPhone, $hasReporterEmail, $hasReporterPosition,
+            $hasLegacyPayload, $hasLocationText,
             $hasRequestDate, $hasAssignedDate, $hasCompletedDate, $hasAcceptedAt, $hasStartedAt, $hasOnHoldAt, $hasResolvedAt, $hasClosedAt,
             $hasRemark, $hasResolutionNote, $hasCost, $hasSource, $hasExtra,
-            $hasCreatedAt, $hasUpdatedAt
+            $hasCreatedAt, $hasUpdatedAt,
+
+            &$insertedMR
         ) {
             $insertCols = [];
 
-            if ($hasAcceptedAt)      $insertCols[] = 'accepted_at';
-            if ($hasAssetId)         $insertCols[] = 'asset_id';
-            if ($hasAssignedDate)    $insertCols[] = 'assigned_date';
-            if ($hasClosedAt)        $insertCols[] = 'closed_at';
-            if ($hasCompletedDate)   $insertCols[] = 'completed_date';
-            if ($hasCost)            $insertCols[] = 'cost';
-            if ($hasCreatedAt)       $insertCols[] = 'created_at';
-            if ($hasDeptMR)          $insertCols[] = 'department_id';
-            if ($hasDescription)     $insertCols[] = 'description';
-            if ($hasExtra)           $insertCols[] = 'extra';
-            if ($hasLegacyPayload)   $insertCols[] = 'legacy_payload';
-            if ($hasLocationText)    $insertCols[] = 'location_text';
-            if ($hasOnHoldAt)        $insertCols[] = 'on_hold_at';
-            if ($hasPriority)        $insertCols[] = 'priority';
-            if ($hasRemark)          $insertCols[] = 'remark';
-            if ($hasReporterApp)     $insertCols[] = 'reporter_app';
-            if ($hasReporterEmail)   $insertCols[] = 'reporter_email';
-            if ($hasReporterId)      $insertCols[] = 'reporter_id';
-            if ($hasReporterIp)      $insertCols[] = 'reporter_ip';
-            if ($hasReporterName)    $insertCols[] = 'reporter_name';
-            if ($hasReporterPhone)   $insertCols[] = 'reporter_phone';
-            if ($hasReporterPort)    $insertCols[] = 'reporter_port';
-            if ($hasReporterPosition)$insertCols[] = 'reporter_position';
-            if ($hasRequestDate)     $insertCols[] = 'request_date';
-            if ($hasRequestNo)       $insertCols[] = 'request_no';
-            if ($hasResolutionNote)  $insertCols[] = 'resolution_note';
-            if ($hasResolvedAt)      $insertCols[] = 'resolved_at';
-            if ($hasSource)          $insertCols[] = 'source';
-            if ($hasStartedAt)       $insertCols[] = 'started_at';
-            if ($hasStatusCol)       $insertCols[] = 'status';
-            if ($hasTechnicianId)    $insertCols[] = 'technician_id';
-            if ($hasTitle)           $insertCols[] = 'title';
-            if ($hasUpdatedAt)       $insertCols[] = 'updated_at';
+            if ($hasAcceptedAt)       $insertCols[] = 'accepted_at';
+            if ($hasAssetId)          $insertCols[] = 'asset_id';
+            if ($hasAssignedDate)     $insertCols[] = 'assigned_date';
+            if ($hasClosedAt)         $insertCols[] = 'closed_at';
+            if ($hasCompletedDate)    $insertCols[] = 'completed_date';
+            if ($hasCost)             $insertCols[] = 'cost';
+            if ($hasCreatedAt)        $insertCols[] = 'created_at';
+            if ($hasDeptMR)           $insertCols[] = 'department_id';
+            if ($hasDescription)      $insertCols[] = 'description';
+            if ($hasExtra)            $insertCols[] = 'extra';
+            if ($hasLegacyPayload)    $insertCols[] = 'legacy_payload';
+            if ($hasLocationText)     $insertCols[] = 'location_text';
+            if ($hasOnHoldAt)         $insertCols[] = 'on_hold_at';
+            if ($hasPriority)         $insertCols[] = 'priority';
+            if ($hasRemark)           $insertCols[] = 'remark';
+            if ($hasReporterEmail)    $insertCols[] = 'reporter_email';
+            if ($hasReporterId)       $insertCols[] = 'reporter_id';
+            if ($hasReporterName)     $insertCols[] = 'reporter_name';
+            if ($hasReporterPhone)    $insertCols[] = 'reporter_phone';
+            if ($hasReporterPosition) $insertCols[] = 'reporter_position';
+            if ($hasRequestDate)      $insertCols[] = 'request_date';
+            if ($hasRequestNo)        $insertCols[] = 'request_no';
+            if ($hasResolutionNote)   $insertCols[] = 'resolution_note';
+            if ($hasResolvedAt)       $insertCols[] = 'resolved_at';
+            if ($hasSource)           $insertCols[] = 'source';
+            if ($hasStartedAt)        $insertCols[] = 'started_at';
+            if ($hasStatusCol)        $insertCols[] = 'status';
+            if ($hasTechnicianId)     $insertCols[] = 'technician_id';
+            if ($hasTitle)            $insertCols[] = 'title';
+            if ($hasUpdatedAt)        $insertCols[] = 'updated_at';
 
             $rows = [];
 
@@ -402,6 +325,7 @@ class DemoDataSeeder extends Seeder
                 $isExternal = random_int(1, 100) <= 10;
                 if ($isExternal) $reporter = null;
 
+                // มีช่างเฉพาะงานที่พ้น acknowledged/pending/cancelled ไปแล้ว
                 $techId = null;
                 if (!in_array($status, ['pending','acknowledged','cancelled'], true)) {
                     $techId = $techIds ? $techIds[array_rand($techIds)] : null;
@@ -444,27 +368,11 @@ class DemoDataSeeder extends Seeder
                     if ($hasReporterPosition) $row['reporter_position'] = fake()->jobTitle();
                 }
 
-                if ($hasReporterIp) {
-                    $row['reporter_ip'] = fake()->randomElement([
-                        '172.16.'.random_int(1, 254).'.'.random_int(1, 254),
-                        '10.'.random_int(0, 255).'.'.random_int(0, 255).'.'.random_int(1, 254),
-                    ]);
-                }
-
-                if ($hasReporterPort) {
-                    $p = (string) fake()->randomElement(['', '80', '443', '5405']);
-                    $row['reporter_port'] = $p === '' ? null : $p;
-                }
-
-                if ($hasReporterApp) {
-                    $row['reporter_app'] = fake()->randomElement(['web','HIS','EXCEL','WORD','Chrome','Edge']);
-                }
-
                 if ($hasLegacyPayload) {
                     $row['legacy_payload'] = json_encode([
-                        'ua' => fake()->randomElement(['Chrome','Edge','Firefox']),
-                        'tz' => 'Asia/Bangkok',
-                        'seed' => true,
+                        'ua'       => fake()->randomElement(['Chrome','Edge','Firefox']),
+                        'tz'       => 'Asia/Bangkok',
+                        'seed'     => true,
                         'external' => $isExternal,
                     ]);
                 }
@@ -510,13 +418,24 @@ class DemoDataSeeder extends Seeder
                 $rows[] = $row;
 
                 if (count($rows) >= $chunkSize) {
-                    DB::table('maintenance_requests')->insert($rows);
+                    DB::table($mrTable)->insert($rows);
+                    $insertedMR += count($rows);
                     $rows = [];
                 }
             }
 
-            if ($rows) DB::table('maintenance_requests')->insert($rows);
+            if ($rows) {
+                DB::table($mrTable)->insert($rows);
+                $insertedMR += count($rows);
+            }
         });
+
+        $this->ok('maintenance_requests seeded', [
+            'inserted' => (string) $insertedMR,
+        ]);
+
+        // ================== 7) Assignments ==================
+        $asgInserted = 0;
 
         if (Schema::hasTable('maintenance_assignments')) {
             $hasAsgRemark = Schema::hasColumn('maintenance_assignments', 'remark');
@@ -531,6 +450,8 @@ class DemoDataSeeder extends Seeder
                 'updated_at',
             ];
             if ($hasAsgRemark) $updateCols[] = 'remark';
+
+            // 7.1 lead assignment from technician_id
             $reqs = DB::table('maintenance_requests')
                 ->select('id','technician_id','status','assigned_date','accepted_at','request_date','created_at')
                 ->whereNotNull('technician_id')
@@ -549,17 +470,17 @@ class DemoDataSeeder extends Seeder
                     'is_lead'                => true,
                     'assigned_at'            => $assignedAt,
 
-                    // ความคืบหน้างาน (ระดับ assignment)
+                    // assignment status
                     'status' => match ($r->status) {
                         'resolved','closed' => 'done',
                         'cancelled'         => 'cancelled',
                         default             => 'in_progress',
                     },
 
-                    // response (ระดับช่าง)
+                    // response status
                     'response_status' => match ($r->status) {
                         'cancelled' => 'pending',
-                        default     => 'accepted', // demo: ถ้ามี technician_id ถือว่ารับเรื่องแล้ว
+                        default     => 'accepted',
                     },
                     'responded_at' => match ($r->status) {
                         'cancelled' => null,
@@ -570,9 +491,7 @@ class DemoDataSeeder extends Seeder
                     'updated_at' => $nowTs,
                 ];
 
-                if ($hasAsgRemark) {
-                    $row['remark'] = null;
-                }
+                if ($hasAsgRemark) $row['remark'] = null;
 
                 $asgRows[] = $row;
 
@@ -582,6 +501,7 @@ class DemoDataSeeder extends Seeder
                         ['maintenance_request_id','user_id'],
                         $updateCols
                     );
+                    $asgInserted += count($asgRows);
                     $asgRows = [];
                 }
             }
@@ -592,17 +512,19 @@ class DemoDataSeeder extends Seeder
                     ['maintenance_request_id','user_id'],
                     $updateCols
                 );
+                $asgInserted += count($asgRows);
             }
 
+            // 7.2 acknowledged sample for MyJob (acknowledged/rejected)
             $ackReqs = DB::table('maintenance_requests')
                 ->select('id','status','assigned_date','accepted_at','request_date','created_at')
-                ->where('status', 'acknowledged')
+                ->where('status', MR::STATUS_ACKNOWLEDGED)
                 ->inRandomOrder()
                 ->limit((int) max(10, floor($requestCount * 0.15)))
                 ->get();
 
             $ackRows = [];
-            $rejectEvery = 4; // ทุก ๆ 4 งาน acknowledged จะมี 1 งาน "ไม่รับเรื่อง"
+            $rejectEvery = 4;
             $idx = 0;
 
             foreach ($ackReqs as $r) {
@@ -621,15 +543,13 @@ class DemoDataSeeder extends Seeder
                     'is_lead'                => false,
                     'assigned_at'            => $assignedAt,
 
-                    // ถ้าไม่รับเรื่อง ให้ status cancelled เพื่อไม่ไปอยู่ active
-                    'status'                 => $isReject ? 'cancelled' : 'in_progress',
+                    'status'          => $isReject ? 'cancelled' : 'assigned',
 
-                    // จุดสำคัญ: response_status สำหรับ MyJob
-                    'response_status'        => $isReject ? 'rejected' : 'acknowledged',
-                    'responded_at'           => $assignedAt,
+                    'response_status' => $isReject ? 'rejected' : 'acknowledged',
+                    'responded_at'    => $assignedAt,
 
-                    'created_at'             => $nowTs,
-                    'updated_at'             => $nowTs,
+                    'created_at'      => $nowTs,
+                    'updated_at'      => $nowTs,
                 ];
 
                 if ($hasAsgRemark) {
@@ -646,6 +566,7 @@ class DemoDataSeeder extends Seeder
                         ['maintenance_request_id','user_id'],
                         $updateCols
                     );
+                    $asgInserted += count($ackRows);
                     $ackRows = [];
                 }
             }
@@ -656,8 +577,17 @@ class DemoDataSeeder extends Seeder
                     ['maintenance_request_id','user_id'],
                     $updateCols
                 );
+                $asgInserted += count($ackRows);
             }
+
+            $this->ok('maintenance_assignments upserted', [
+                'rows' => (string) $asgInserted,
+            ]);
+        } else {
+            $this->warn('maintenance_assignments table not found, skip assignments.');
         }
+
+        $opUpserted = 0;
 
         if (Schema::hasTable('maintenance_operation_logs')) {
             $hasPropertyCode = Schema::hasColumn('maintenance_operation_logs', 'property_code');
@@ -675,7 +605,7 @@ class DemoDataSeeder extends Seeder
                     'mr.created_at',
                     'a.asset_code as asset_code'
                 )
-                ->whereIn('mr.status', ['resolved','closed'])
+                ->whereIn('mr.status', [MR::STATUS_RESOLVED, MR::STATUS_CLOSED])
                 ->inRandomOrder()
                 ->limit((int) floor($requestCount * 0.6))
                 ->get();
@@ -710,9 +640,241 @@ class DemoDataSeeder extends Seeder
                 DB::table('maintenance_operation_logs')->upsert(
                     $opRows,
                     ['maintenance_request_id'],
-                    ['user_id','operation_date','operation_method','property_code','require_precheck','remark','issue_software','issue_hardware','updated_at']
+                    [
+                        'user_id',
+                        'operation_date',
+                        'operation_method',
+                        'property_code',
+                        'require_precheck',
+                        'remark',
+                        'issue_software',
+                        'issue_hardware',
+                        'updated_at',
+                    ]
                 );
+                $opUpserted = count($opRows);
+            }
+
+            $this->ok('maintenance_operation_logs upserted', [
+                'rows' => (string) $opUpserted,
+            ]);
+        } else {
+            $this->warn('maintenance_operation_logs table not found, skip operation logs.');
+        }
+
+        $this->done('DemoDataSeeder DONE');
+    }
+
+
+    private function headline(string $text): void
+    {
+        $this->command?->info(str_repeat('=', 72));
+        $this->command?->info("▶  {$text}");
+        $this->command?->info(str_repeat('=', 72));
+    }
+
+    private function infoBlock(string $text): void
+    {
+        $this->command?->info("ℹ️  {$text}");
+    }
+
+    private function ok(string $title, array $meta = []): void
+    {
+        $suffix = $meta ? ' | ' . $this->formatMeta($meta) : '';
+        $this->command?->info("✅ {$title}{$suffix}");
+    }
+
+    private function warn(string $text): void
+    {
+        $this->command?->warn("⚠️  {$text}");
+    }
+
+    private function done(string $text): void
+    {
+        $this->command?->info("🏁 {$text}");
+        $this->command?->info(str_repeat('-', 72));
+    }
+
+    private function kv(string $k, string $v): void
+    {
+        $this->command?->line(" - {$k}: {$v}");
+    }
+
+    private function lineBreak(): void
+    {
+        $this->command?->line('');
+    }
+
+    private function formatMeta(array $meta): string
+    {
+        $parts = [];
+        foreach ($meta as $k => $v) {
+            $parts[] = "{$k}={$v}";
+        }
+        return implode(', ', $parts);
+    }
+
+    // ================== seed pieces ==================
+
+    private function seedDepartments(): array
+    {
+        $deptCodes = ['IT','ER','OPD','WARD','ADMIN','LAB'];
+        $departmentIds = [];
+
+        if (!Schema::hasTable('departments')) {
+            return [$deptCodes, $departmentIds];
+        }
+
+        $hasCode   = Schema::hasColumn('departments', 'code');
+        $hasNameTh = Schema::hasColumn('departments', 'name_th');
+        $hasNameEn = Schema::hasColumn('departments', 'name_en');
+
+        if ($hasCode && $hasNameTh && !DB::table('departments')->exists()) {
+            $now = now();
+            DB::table('departments')->insert([
+                ['code'=>'IT','name_th'=>'ฝ่าย IT & Support','name_en'=>'IT & Support','created_at'=>$now,'updated_at'=>$now],
+                ['code'=>'ER','name_th'=>'ห้องฉุกเฉิน','name_en'=>'Emergency Room','created_at'=>$now,'updated_at'=>$now],
+                ['code'=>'OPD','name_th'=>'ผู้ป่วยนอก','name_en'=>'OPD','created_at'=>$now,'updated_at'=>$now],
+                ['code'=>'WARD','name_th'=>'วอร์ดผู้ป่วยใน','name_en'=>'Ward','created_at'=>$now,'updated_at'=>$now],
+                ['code'=>'ADMIN','name_th'=>'ฝ่ายธุรการ','name_en'=>'Administration','created_at'=>$now,'updated_at'=>$now],
+                ['code'=>'LAB','name_th'=>'ห้องปฏิบัติการ','name_en'=>'Laboratory','created_at'=>$now,'updated_at'=>$now],
+            ]);
+        }
+
+        if ($hasCode) {
+            $codes = DB::table('departments')->pluck('code')->filter()->values()->all();
+            if ($codes) $deptCodes = $codes;
+        }
+
+        if (Schema::hasColumn('departments', 'id')) {
+            $departmentIds = DB::table('departments')->pluck('id')->all();
+        }
+
+        return [$deptCodes, $departmentIds];
+    }
+
+    private function seedAssetCategories(): array
+    {
+        if (!Schema::hasTable('asset_categories')) {
+            return [];
+        }
+
+        $hasSlug = Schema::hasColumn('asset_categories', 'slug');
+
+        if (!DB::table('asset_categories')->exists()) {
+            $catNames = ['คอมพิวเตอร์','เครื่องพิมพ์','เครื่องปรับอากาศ','โต๊ะทำงาน','หลอดไฟ','เตียงคนไข้'];
+            $rows     = [];
+            $now      = now();
+
+            $existingSlugs = $hasSlug ? DB::table('asset_categories')->pluck('slug')->filter()->all() : [];
+            $slugSet = array_fill_keys($existingSlugs, true);
+
+            $makeSlug = function (string $name) use (&$slugSet) {
+                $base = Str::slug($name, '-');
+                if ($base === '' || $base === null) {
+                    $base = trim(preg_replace('/[^a-z0-9]+/i', '-', mb_strtolower($name)), '-');
+                }
+                if ($base === '' || $base === null) {
+                    $base = 'cat-'.substr(md5($name.microtime(true)), 0, 6);
+                }
+                $slug = $base;
+                $i    = 2;
+                while (isset($slugSet[$slug])) {
+                    $slug = $base.'-'.$i;
+                    $i++;
+                }
+                $slugSet[$slug] = true;
+                return $slug;
+            };
+
+            foreach ($catNames as $name) {
+                $row = ['name'=>$name,'created_at'=>$now,'updated_at'=>$now];
+                if ($hasSlug) $row['slug'] = $makeSlug($name);
+                $rows[] = $row;
+            }
+
+            DB::table('asset_categories')->insert($rows);
+        }
+
+        return DB::table('asset_categories')->pluck('id')->all();
+    }
+
+    private function seedAssetsIfEmpty(int $assetCount, int $chunkSize, array $departmentIds, array $categoryIds): int
+    {
+        if (!Schema::hasTable('assets')) {
+            return 0;
+        }
+
+        if (DB::table('assets')->exists()) {
+            return 0;
+        }
+
+        $types     = ['เครื่องใช้ไฟฟ้า','อุปกรณ์สำนักงาน','คอมพิวเตอร์','เครื่องมือแพทย์'];
+        $brands    = ['HP','Dell','Acer','Lenovo','Brother','Mitsubishi','Daikin'];
+        $locations = ['ER','OPD','Ward','Admin','IT Room','Lab'];
+
+        $hasType         = Schema::hasColumn('assets', 'type');
+        $hasBrand        = Schema::hasColumn('assets', 'brand');
+        $hasModel        = Schema::hasColumn('assets', 'model');
+        $hasSerial       = Schema::hasColumn('assets', 'serial_number');
+        $hasLocation     = Schema::hasColumn('assets', 'location');
+        $hasDeptId       = Schema::hasColumn('assets', 'department_id');
+        $hasCategoryId   = Schema::hasColumn('assets', 'category_id');
+        $hasPurchaseDate = Schema::hasColumn('assets', 'purchase_date');
+        $hasWarranty     = Schema::hasColumn('assets', 'warranty_expire');
+        $hasStatus       = Schema::hasColumn('assets', 'status');
+        $hasAssetCode    = Schema::hasColumn('assets', 'asset_code');
+        $hasName         = Schema::hasColumn('assets', 'name');
+
+        $assetRows = [];
+        $nowTs     = now();
+        $usedCodes = [];
+        $usedSNs   = [];
+        $inserted  = 0;
+
+        for ($i = 1; $i <= $assetCount; $i++) {
+            do { $code = 'ASSET-'.random_int(10000, 99999); } while (isset($usedCodes[$code]));
+            $usedCodes[$code] = true;
+
+            do { $sn = 'SN'.random_int(10000000, 99999999); } while (isset($usedSNs[$sn]));
+            $usedSNs[$sn] = true;
+
+            $purchaseAt = Carbon::now()->subMonths(random_int(6, 48))->startOfDay();
+            $warrantyAt = (clone $purchaseAt)->addMonths(random_int(12, 48));
+
+            $row = ['created_at'=>$nowTs,'updated_at'=>$nowTs];
+
+            if ($hasAssetCode)    $row['asset_code']      = $code;
+            if ($hasName)         $row['name']            = fake()->words(2, true);
+            if ($hasType)         $row['type']            = $types[array_rand($types)];
+            if ($hasBrand)        $row['brand']           = $brands[array_rand($brands)];
+            if ($hasModel)        $row['model']           = strtoupper(fake()->bothify('??-###'));
+            if ($hasSerial)       $row['serial_number']   = $sn;
+            if ($hasLocation)     $row['location']        = $locations[array_rand($locations)];
+            if ($hasDeptId && $departmentIds)   $row['department_id'] = $departmentIds[array_rand($departmentIds)];
+            if ($hasCategoryId && $categoryIds) $row['category_id']   = $categoryIds[array_rand($categoryIds)];
+            if ($hasPurchaseDate) $row['purchase_date']   = $purchaseAt;
+            if ($hasWarranty)     $row['warranty_expire'] = $warrantyAt;
+
+            if ($hasStatus) {
+                $roll          = mt_rand(1, 100);
+                $row['status'] = $roll <= 75 ? 'active' : ($roll <= 95 ? 'in_repair' : 'disposed');
+            }
+
+            $assetRows[] = $row;
+
+            if (count($assetRows) >= $chunkSize) {
+                DB::table('assets')->insert($assetRows);
+                $inserted += count($assetRows);
+                $assetRows = [];
             }
         }
+
+        if ($assetRows) {
+            DB::table('assets')->insert($assetRows);
+            $inserted += count($assetRows);
+        }
+
+        return $inserted;
     }
 }

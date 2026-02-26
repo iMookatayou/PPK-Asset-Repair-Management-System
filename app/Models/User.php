@@ -6,6 +6,7 @@ use App\Models\Department;
 use App\Models\MaintenanceLog;
 use App\Models\MaintenanceRequest;
 use App\Models\MaintenanceRating;
+use App\Models\MaintenanceAssignment;
 use App\Models\Role;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -17,35 +18,31 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
-    /* -------------------------------------------------------------
-     |  Role Constants
-     |--------------------------------------------------------------*/
-
+    // การกำหนดค่า Role พื้นฐาน
     public const ROLE_ADMIN       = 'admin';
     public const ROLE_SUPERVISOR  = 'supervisor';
     public const ROLE_IT_SUPPORT  = 'it_support';
     public const ROLE_NETWORK     = 'network';
-    public const ROLE_DEVELOPER   = 'developer';
+    public const ROLE_DEVELOPER   = 'programmer';
     public const ROLE_MEMBER      = 'member';
     public const ROLE_COMPUTER_OFFICER = self::ROLE_MEMBER;
     public const ROLE_TECHNICIAN  = 'technician';
 
     protected $fillable = [
         'name',
-        'citizen_id',          // ✅ เพิ่มฟิลด์เลขบัตรประชาชน
+        'citizen_id',
         'email',
         'password',
         'department',
         'role',
         'profile_photo_path',
         'profile_photo_thumb',
+        'notification_sound',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
-        // ถ้าอยากไม่ให้ citizen_id โผล่ใน API response ก็เพิ่มตรงนี้ได้
-        // 'citizen_id',
     ];
 
     protected $appends = [
@@ -63,17 +60,13 @@ class User extends Authenticatable
         ];
     }
 
-    /* -------------------------------------------------------------
-     |  Assignment Relations (NEW SYSTEM)
-     |--------------------------------------------------------------*/
-
-    // assignment ทุกงานที่ user คนนี้ถูกมอบหมาย
+    // งานที่ User คนนี้ถูกมอบหมาย (ผ่านตาราง Assignment)
     public function maintenanceAssignments()
     {
         return $this->hasMany(MaintenanceAssignment::class, 'user_id');
     }
 
-    // ดึง "งานทั้งหมดที่คนนี้ต้องทำ" – ชื่อใหม่ที่เราออกแบบ
+    // ดึงงานซ่อมทั้งหมดที่คนนี้ต้องทำผ่าน Pivot
     public function assignedMaintenanceRequests()
     {
         return $this->belongsToMany(MaintenanceRequest::class, 'maintenance_assignments')
@@ -81,18 +74,11 @@ class User extends Authenticatable
                     ->withTimestamps();
     }
 
-    /**
-     * alias สำหรับโค้ดเก่า:
-     * เดิมเคยใช้ assignedRequests() → ตอนนี้ให้ชี้มาที่ของใหม่
-     */
+    // Alias สำหรับเรียกใช้โค้ดเดิม
     public function assignedRequests()
     {
         return $this->assignedMaintenanceRequests();
     }
-
-    /* -------------------------------------------------------------
-     |  Role Helpers
-     |--------------------------------------------------------------*/
 
     public function isAdmin(): bool
     {
@@ -112,7 +98,7 @@ class User extends Authenticatable
         ], true);
     }
 
-    // คนที่ “ทำงานได้” (ทุก role ยกเว้น member)
+    // ตรวจสอบว่าเป็นกลุ่มช่างหรือทีมทำงานหรือไม่
     public function isTechnician(): bool
     {
         return in_array($this->role, self::workerRoles(), true);
@@ -137,7 +123,7 @@ class User extends Authenticatable
             ->all();
     }
 
-    // กลุ่มที่ถือว่าคือ “ทีมช่าง / ทีมปฏิบัติการ”
+    // นิยามกลุ่มที่เป็นทีมปฏิบัติการ (Workers)
     public static function workerRoles(): array
     {
         return [
@@ -148,14 +134,11 @@ class User extends Authenticatable
         ];
     }
 
+    // กลุ่มทีมบริหารและทีมปฏิบัติการรวมกัน
     public static function teamRoles(): array
     {
-        return array_merge([self::ROLE_SUPERVISOR], self::workerRoles());
+        return array_merge([self::ROLE_ADMIN, self::ROLE_SUPERVISOR], self::workerRoles());
     }
-
-    /* -------------------------------------------------------------
-     |  Role Labels + RoleRef
-     |--------------------------------------------------------------*/
 
     public static function roleLabels(): array
     {
@@ -176,10 +159,6 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Role::class, 'role', 'code');
     }
-
-    /* -------------------------------------------------------------
-     |  Scopes
-     |--------------------------------------------------------------*/
 
     public function scopeRole($q, string $role)
     {
@@ -207,23 +186,19 @@ class User extends Authenticatable
         return $q->whereIn('role', self::workerRoles());
     }
 
-    /* -------------------------------------------------------------
-     |  Other Relations
-     |--------------------------------------------------------------*/
-
-    // ผู้แจ้งงาน
+    // รายการใบแจ้งซ่อมที่ User คนนี้เป็นผู้แจ้ง
     public function reportedRequests()
     {
         return $this->hasMany(MaintenanceRequest::class, 'reporter_id');
     }
 
-    // Log การทำงานของ user
+    // ประวัติการบันทึก Log ของ User
     public function logs()
     {
         return $this->hasMany(MaintenanceLog::class, 'user_id');
     }
 
-    // แผนกอ้างอิง
+    // ข้อมูลแผนก
     public function departmentRef()
     {
         return $this->belongsTo(Department::class, 'department', 'code');
@@ -231,18 +206,16 @@ class User extends Authenticatable
 
     public function getDepartmentNameAttribute(): ?string
     {
-        return $this->departmentRef?->name;
+        return $this->departmentRef?->name_th ?? $this->departmentRef?->name;
     }
 
-    /* -------------------------------------------------------------
-     |  Ratings (คะแนนหลังซ่อม)
-     |--------------------------------------------------------------*/
-
+    // การให้คะแนนโดย User คนนี้
     public function givenRatings()
     {
         return $this->hasMany(MaintenanceRating::class, 'rater_id');
     }
 
+    // คะแนนเฉลี่ยที่ช่างได้รับ
     public function getRatingAverageAttribute(): ?float
     {
         if (!$this->technicianRatings()->exists()) {
@@ -251,14 +224,11 @@ class User extends Authenticatable
         return round((float) $this->technicianRatings()->avg('score'), 2);
     }
 
+    // จำนวนครั้งที่ถูกให้คะแนน
     public function getRatingCountAttribute(): int
     {
         return (int) $this->technicianRatings()->count();
     }
-
-    /* -------------------------------------------------------------
-     |  Avatar URL Logic
-     |--------------------------------------------------------------*/
 
     public function getAvatarUrlAttribute(): string
     {
@@ -284,6 +254,7 @@ class User extends Authenticatable
         return $this->uiAvatarUrl(128);
     }
 
+    // สร้างรูปโปรไฟล์จำลองกรณีไม่มีการอัปโหลดรูป
     private function uiAvatarUrl(int $size = 256): string
     {
         $name = urlencode($this->name ?: 'User');
@@ -294,6 +265,7 @@ class User extends Authenticatable
         return "https://ui-avatars.com/api/?name={$name}&background={$bg}&color=fff&size={$size}&bold=true";
     }
 
+    // คะแนนที่ User คนนี้ได้รับในฐานะช่าง
     public function technicianRatings()
     {
         return $this->hasMany(\App\Models\MaintenanceRating::class, 'technician_id');

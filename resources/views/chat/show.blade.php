@@ -1,4 +1,5 @@
 @extends('layouts.app')
+
 @section('title', $thread->title)
 
 @php
@@ -6,13 +7,17 @@
   $lastAt = $messages->last()?->created_at ?? $thread->created_at;
 
   $me = auth()->user();
-  // ✅ แก้ตรงนี้: ใครก็ตามที่ role ไม่ใช่ member ให้จัดการ lock/unlock ได้
   $canManageLock = $me && ($me->role !== 'member');
 @endphp
 
 @section('page-header')
-  <style>:root{ --app-top: 64px; }</style>
+  <style>
+    :root {
+      --app-top: 64px; /* กำหนดความสูงของ header */
+    }
+  </style>
 
+  {{-- Header แบบ Sticky --}}
   <div class="sticky z-30 border-b border-slate-200 bg-white/90 backdrop-blur"
        style="top: var(--app-top, 0px)">
     <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
@@ -61,7 +66,6 @@
               Refresh
             </button>
 
-            {{-- Lock / Unlock button (ตาม role) --}}
             @if($canManageLock)
               <button
                 id="btnToggleLock"
@@ -88,8 +92,13 @@
 @endsection
 
 @section('content')
-<div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-  <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+{{--
+  ✅ ปรับแก้: เพิ่ม w-full ที่ container หลัก
+  เพื่อให้มั่นใจว่ามันจะกว้างเต็มพื้นที่ max-w-5xl เสมอ ไม่หดเข้าตรงกลาง
+--}}
+<div class="mx-auto w-full max-w-5xl px-4 pt-6 sm:px-6 lg:px-8">
+  {{-- ✅ ปรับแก้: เพิ่ม w-full ที่ตัว Card ด้วย --}}
+  <div class="w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
 
     <div class="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-2">
       <div class="flex items-center gap-2 text-xs text-slate-600">
@@ -108,9 +117,10 @@
     <div class="p-0">
       <div id="chatBox"
            class="overflow-y-auto bg-white p-4"
-           style="max-height: calc(100vh - var(--app-top, 0px) - 220px); min-height: 40vh;">
+           style="max-height: calc(100vh - var(--app-top, 0px) - 240px); min-height: 40vh;">
         @if($messages->isEmpty())
-          <div class="grid place-items-center py-12">
+          {{-- Empty State --}}
+          <div class="grid h-full place-items-center py-12">
             <div class="text-center">
               <div class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-slate-100">
                 <svg viewBox="0 0 24 24" class="h-6 w-6 text-slate-500"><path d="M21 15a4 4 0 0 1-4 4H7l-4 4V5a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v10Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -120,6 +130,7 @@
             </div>
           </div>
         @else
+          {{-- Message List --}}
           <div class="space-y-3">
             @foreach($messages as $m)
               <div class="flex gap-2">
@@ -205,9 +216,14 @@
       const res = await fetch(`{{ route('chat.messages',$thread) }}?after_id=${lastId}`, { headers:{ 'Accept':'application/json' }});
       if(!res.ok) return;
       const json = await res.json();
-      const data = json.data ?? json; // เผื่อกรณี API ส่ง {data: [...]}
+      const data = json.data ?? json;
       if(Array.isArray(data) && data.length){
+        // ถ้าเป็นข้อความแรก ให้ลบ empty state ออกก่อน
+        const emptyState = box.querySelector('.grid.place-items-center');
+        if(emptyState) emptyState.remove();
+
         data.forEach(m => { appendMessage(m); lastId = Math.max(lastId, m.id); });
+
         if (autoScroll) {
           box.scrollTop = box.scrollHeight;
         } else if (btnScrollBottom) {
@@ -236,7 +252,7 @@
   }
 
   window.addEventListener('pageshow', () => {
-    box.style.maxHeight = `calc(100vh - (getComputedStyle(document.documentElement).getPropertyValue('--app-top') || '0px') - 220px)`;
+    box.style.maxHeight = `calc(100vh - (getComputedStyle(document.documentElement).getPropertyValue('--app-top') || '0px') - 240px)`;
     box.scrollTop = box.scrollHeight;
     polling = setInterval(poll, 2000);
   });
@@ -255,7 +271,7 @@
     });
   }
 
-  // === Lock / Unlock (ใช้ web route) ===
+  // === Lock / Unlock ===
   const btnToggleLock = document.getElementById('btnToggleLock');
   if (btnToggleLock) {
     const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');

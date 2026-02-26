@@ -7,15 +7,13 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Support\Toast;
 
 class AssetController extends Controller
 {
-    /**
-     * JSON options (unicode + slashes + pretty)
-     */
     private function jsonOptions(Request $request): int
     {
         return JSON_UNESCAPED_UNICODE
@@ -23,9 +21,6 @@ class AssetController extends Controller
             | ($request->boolean('pretty') ? JSON_PRETTY_PRINT : 0);
     }
 
-    /**
-     * API: GET /assets (json)
-     */
     public function index(Request $request)
     {
         $q          = trim($request->string('q')->toString());
@@ -38,7 +33,6 @@ class AssetController extends Controller
         $perPageInput = (int) $request->integer('per_page', 20);
         $perPage      = max(1, min($perPageInput, 100));
 
-        // map คีย์ที่ frontend ใช้ -> คอลัมน์จริงใน DB
         $sortMap = [
             'id'              => 'id',
             'asset_code'      => 'asset_code',
@@ -49,23 +43,18 @@ class AssetController extends Controller
             'created_at'      => 'created_at',
         ];
 
-        // ใช้ helper จำ sort ต่อ user (ใช้ key ฝั่ง UI เช่น id, asset_code, name)
         [$sortKey, $sortDir] = $this->resolveAssetSort($request, array_keys($sortMap));
         $sortBy = $sortMap[$sortKey] ?? 'id';
 
         $baseQuery = Asset::query()
             ->with(['categoryRef', 'department'])
-            ->search($q) // <<< ต้นเหตุหลักมักอยู่ใน scopeSearch
+            ->search($q)
             ->status($status)
             ->when($type !== '', fn($s) => $s->where('type', $type))
             ->when($request->filled('category_id'), fn($s) => $s->where('category_id', $categoryId))
             ->departmentId($deptId)
             ->when($location !== '', fn($s) => $s->where('location', $location));
 
-        /**
-         * ✅ OPTIONAL: ถ้ายังไม่แก้ Model::search
-         * จัดอันดับให้ asset_code ที่ "ตรง/ขึ้นต้น" มาก่อน (เฉพาะตอนมี q)
-         */
         if ($q !== '') {
             $qEsc = str_replace("'", "''", $q);
             $baseQuery->orderByRaw("
@@ -87,6 +76,15 @@ class AssetController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
+        Log::info('[Asset::index] API listing', [
+            'q'          => $q,
+            'status'     => $status,
+            'category_id'=> $categoryId,
+            'dept_id'    => $deptId,
+            'total'      => $filteredTotal,
+            'actor_id'   => $request->user()?->id,
+        ]);
+
         $payload = [
             'data' => $assets->items(),
             'meta' => [
@@ -105,9 +103,6 @@ class AssetController extends Controller
         return response()->json($payload, 200, [], $this->jsonOptions($request));
     }
 
-    /**
-     * API: POST /assets (json)
-     */
     public function store(Request $request)
     {
         $rules = [
@@ -130,19 +125,22 @@ class AssetController extends Controller
         if ($validator->fails()) {
             $errors = $validator->errors();
             $fieldsHuman = [
-                'asset_code' => 'รหัสครุภัณฑ์',
-                'name' => 'ชื่อครุภัณฑ์',
-                'serial_number' => 'Serial',
-                'category_id' => 'หมวดหมู่',
-                'department_id' => 'หน่วยงาน',
+                'asset_code'      => 'รหัสครุภัณฑ์',
+                'name'            => 'ชื่อครุภัณฑ์',
+                'serial_number'   => 'Serial',
+                'category_id'     => 'หมวดหมู่',
+                'department_id'   => 'หน่วยงาน',
                 'warranty_expire' => 'หมดประกัน',
             ];
-
             $bad = collect(array_keys($errors->toArray()))
                 ->map(fn($f) => $fieldsHuman[$f] ?? $f)
                 ->implode(', ');
-
             $msg = $bad ? ('ข้อมูลไม่ถูกต้อง: ' . $bad) : 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง';
+
+            Log::warning('[Asset::store] validation failed', [
+                'errors'   => $errors->toArray(),
+                'actor_id' => $request->user()?->id,
+            ]);
 
             if (!$request->expectsJson()) {
                 return redirect()->back()
@@ -157,8 +155,15 @@ class AssetController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY, [], $this->jsonOptions($request));
         }
 
-        $data = $validator->validated();
+        $data  = $validator->validated();
         $asset = Asset::create($data)->load(['categoryRef', 'department']);
+
+        Log::info('[Asset::store] API created', [
+            'asset_id'   => $asset->id,
+            'asset_code' => $asset->asset_code,
+            'name'       => $asset->name,
+            'actor_id'   => $request->user()?->id,
+        ]);
 
         return response()->json([
             'message' => 'created',
@@ -167,12 +172,15 @@ class AssetController extends Controller
         ], Response::HTTP_CREATED, [], $this->jsonOptions($request));
     }
 
-    /**
-     * API: GET /assets/{asset} (json)
-     */
     public function show(Asset $asset)
     {
         $asset->load(['categoryRef', 'department']);
+
+        Log::info('[Asset::show] API viewed', [
+            'asset_id'   => $asset->id,
+            'asset_code' => $asset->asset_code,
+            'actor_id'   => request()->user()?->id,
+        ]);
 
         return response()->json([
             'data'  => $asset,
@@ -180,9 +188,6 @@ class AssetController extends Controller
         ], 200, [], $this->jsonOptions(request()));
     }
 
-    /**
-     * API: PUT/PATCH /assets/{asset} (json)
-     */
     public function update(Request $request, Asset $asset)
     {
         $rules = [
@@ -205,19 +210,23 @@ class AssetController extends Controller
         if ($validator->fails()) {
             $errors = $validator->errors();
             $fieldsHuman = [
-                'asset_code' => 'รหัสครุภัณฑ์',
-                'name' => 'ชื่อครุภัณฑ์',
-                'serial_number' => 'Serial',
-                'category_id' => 'หมวดหมู่',
-                'department_id' => 'หน่วยงาน',
+                'asset_code'      => 'รหัสครุภัณฑ์',
+                'name'            => 'ชื่อครุภัณฑ์',
+                'serial_number'   => 'Serial',
+                'category_id'     => 'หมวดหมู่',
+                'department_id'   => 'หน่วยงาน',
                 'warranty_expire' => 'หมดประกัน',
             ];
-
             $bad = collect(array_keys($errors->toArray()))
                 ->map(fn($f) => $fieldsHuman[$f] ?? $f)
                 ->implode(', ');
-
             $msg = $bad ? ('ข้อมูลไม่ถูกต้อง: ' . $bad) : 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง';
+
+            Log::warning('[Asset::update] validation failed', [
+                'asset_id' => $asset->id,
+                'errors'   => $errors->toArray(),
+                'actor_id' => $request->user()?->id,
+            ]);
 
             if (!$request->expectsJson()) {
                 return redirect()->back()
@@ -233,7 +242,17 @@ class AssetController extends Controller
         }
 
         $data = $validator->validated();
+
+        $before = $asset->only(['asset_code', 'name', 'status', 'department_id', 'category_id']);
         $asset->update($data);
+
+        Log::info('[Asset::update] API updated', [
+            'asset_id'   => $asset->id,
+            'asset_code' => $asset->asset_code,
+            'before'     => $before,
+            'after'      => $asset->only(['asset_code', 'name', 'status', 'department_id', 'category_id']),
+            'actor_id'   => $request->user()?->id,
+        ]);
 
         return response()->json([
             'message' => 'updated',
@@ -242,12 +261,18 @@ class AssetController extends Controller
         ], Response::HTTP_OK, [], $this->jsonOptions($request));
     }
 
-    /**
-     * API: DELETE /assets/{asset} (json)
-     */
     public function destroy(Asset $asset)
     {
+        $assetCode = $asset->asset_code;
+        $assetId   = $asset->id;
+
         $asset->delete();
+
+        Log::info('[Asset::destroy] API deleted', [
+            'asset_id'   => $assetId,
+            'asset_code' => $assetCode,
+            'actor_id'   => request()->user()?->id,
+        ]);
 
         return response()->json([
             'message' => 'deleted',
@@ -255,9 +280,6 @@ class AssetController extends Controller
         ], Response::HTTP_OK, [], $this->jsonOptions(request()));
     }
 
-    /**
-     * WEB: GET /assets (blade)
-     */
     public function indexPage(Request $request)
     {
         $q          = trim($request->string('q')->toString());
@@ -267,32 +289,26 @@ class AssetController extends Controller
         $type       = $request->string('type')->toString();
         $location   = $request->string('location')->toString();
 
-        // map ชื่อ sort ที่ใช้ใน UI -> คอลัมน์จริง
         $sortMap = [
             'id'         => 'id',
             'asset_code' => 'asset_code',
             'name'       => 'name',
             'status'     => 'status',
-            'category'   => 'category', // พิเศษ ใช้ orderByRaw
+            'category'   => 'category',
         ];
 
-        // ใช้ helper จำ sort ต่อ user
         [$sortBy, $sortDir] = $this->resolveAssetSort($request, array_keys($sortMap));
         $sortCol = $sortMap[$sortBy] ?? 'id';
 
         $assetsQ = Asset::query()
             ->with(['categoryRef', 'department'])
-            ->search($q)  // <<< ตัวหลัก
+            ->search($q)
             ->status($status)
             ->when($request->filled('category_id'), fn($s) => $s->where('category_id', $categoryId))
             ->departmentId($deptId)
             ->when($type !== '', fn($s) => $s->where('type', $type))
             ->when($location !== '', fn($s) => $s->where('location', $location));
 
-        /**
-         * ✅ OPTIONAL: ถ้ายังไม่แก้ Model::search
-         * จัดอันดับให้ asset_code ที่ "ตรง/ขึ้นต้น" มาก่อน (เฉพาะตอนมี q)
-         */
         if ($q !== '') {
             $qEsc = str_replace("'", "''", $q);
             $assetsQ->orderByRaw("
@@ -315,10 +331,8 @@ class AssetController extends Controller
             $assetsQ->orderBy($sortCol, $sortDir);
         }
 
-        $assets = $assetsQ->paginate(20)->withQueryString();
-
+        $assets      = $assetsQ->paginate(20)->withQueryString();
         $categories  = \App\Models\AssetCategory::orderBy('name')->get(['id', 'name']);
-
         $departments = \App\Models\Department::query()
             ->select(['id', 'code', 'name_th', 'name_en'])
             ->orderByRaw('COALESCE(name_th, name_en, code) asc')
@@ -329,17 +343,9 @@ class AssetController extends Controller
             ]);
 
         return view('assets.index', compact(
-            'assets',
-            'categories',
-            'departments',
-            'sortBy',
-            'sortDir',
-            'q',
-            'status',
-            'categoryId',
-            'deptId',
-            'type',
-            'location',
+            'assets', 'categories', 'departments',
+            'sortBy', 'sortDir', 'q', 'status',
+            'categoryId', 'deptId', 'type', 'location',
         ));
     }
 
@@ -350,7 +356,7 @@ class AssetController extends Controller
             ->orderByRaw('COALESCE(name_th, name_en, code) asc')
             ->get();
 
-        $categories  = \App\Models\AssetCategory::orderBy('name')->get(['id', 'name']);
+        $categories = \App\Models\AssetCategory::orderBy('name')->get(['id', 'name']);
 
         if ($departments->isEmpty()) {
             session()->flash('toast', Toast::info('ยังไม่มีข้อมูลหน่วยงาน กรุณา seed หรือเพิ่มใหม่ก่อน', 3200));
@@ -382,11 +388,11 @@ class AssetController extends Controller
         if ($validator->fails()) {
             $errors = $validator->errors();
             $fieldsHuman = [
-                'asset_code' => 'รหัสครุภัณฑ์',
-                'name' => 'ชื่อครุภัณฑ์',
-                'serial_number' => 'Serial',
-                'category_id' => 'หมวดหมู่',
-                'department_id' => 'หน่วยงาน',
+                'asset_code'      => 'รหัสครุภัณฑ์',
+                'name'            => 'ชื่อครุภัณฑ์',
+                'serial_number'   => 'Serial',
+                'category_id'     => 'หมวดหมู่',
+                'department_id'   => 'หน่วยงาน',
                 'warranty_expire' => 'หมดประกัน',
             ];
             $bad = collect(array_keys($errors->toArray()))
@@ -394,14 +400,29 @@ class AssetController extends Controller
                 ->implode(', ');
             $msg = $bad ? ('ข้อมูลไม่ถูกต้อง: ' . $bad) : 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง';
 
+            Log::warning('[Asset::storePage] validation failed', [
+                'errors'   => $errors->toArray(),
+                'input'    => $request->except(['_token']),
+                'actor_id' => $request->user()?->id,
+            ]);
+
             return redirect()->back()
                 ->withErrors($validator)
                 ->withInput()
                 ->with('toast', Toast::error($msg, 2600));
         }
 
-        $data = $validator->validated();
+        $data  = $validator->validated();
         $asset = Asset::create($data);
+
+        Log::info('[Asset::storePage] created', [
+            'asset_id'   => $asset->id,
+            'asset_code' => $asset->asset_code,
+            'name'       => $asset->name,
+            'dept_id'    => $asset->department_id,
+            'category_id'=> $asset->category_id,
+            'actor_id'   => $request->user()?->id,
+        ]);
 
         return redirect()
             ->route('assets.show', $asset)
@@ -419,20 +440,29 @@ class AssetController extends Controller
         $logs = $asset->requestLogs()
             ->select('maintenance_logs.*')
             ->orderBy(
-                Schema::hasColumn('maintenance_logs', 'created_at') ? 'maintenance_logs.created_at' : 'maintenance_logs.id',
+                Schema::hasColumn('maintenance_logs', 'created_at')
+                    ? 'maintenance_logs.created_at'
+                    : 'maintenance_logs.id',
                 'desc'
             )
             ->limit(10)
             ->get();
 
         $attQuery = $asset->requestAttachments()->select('attachments.*');
-
         $attQuery->orderBy(
-            Schema::hasColumn('attachments', 'created_at') ? 'attachments.created_at' : 'attachments.id',
+            Schema::hasColumn('attachments', 'created_at')
+                ? 'attachments.created_at'
+                : 'attachments.id',
             'desc'
         );
-
         $attachments = $attQuery->get();
+
+        Log::info('[Asset::showPage] viewed', [
+            'asset_id'   => $asset->id,
+            'asset_code' => $asset->asset_code,
+            'mr_count'   => $asset->maintenance_requests_count,
+            'actor_id'   => request()->user()?->id,
+        ]);
 
         if (session('status') && !session()->has('toast')) {
             session()->flash('toast', Toast::success(session('status')));
@@ -450,7 +480,7 @@ class AssetController extends Controller
             ->orderByRaw('COALESCE(name_th, name_en, code) asc')
             ->get();
 
-        $categories  = \App\Models\AssetCategory::orderBy('name')->get(['id', 'name']);
+        $categories = \App\Models\AssetCategory::orderBy('name')->get(['id', 'name']);
 
         if ($departments->isEmpty()) {
             session()->flash('toast', Toast::info('ยังไม่มีข้อมูลหน่วยงาน กรุณา seed หรือเพิ่มใหม่ก่อน', 3200));
@@ -482,11 +512,11 @@ class AssetController extends Controller
         if ($validator->fails()) {
             $errors = $validator->errors();
             $fieldsHuman = [
-                'asset_code' => 'รหัสครุภัณฑ์',
-                'name' => 'ชื่อครุภัณฑ์',
-                'serial_number' => 'Serial',
-                'category_id' => 'หมวดหมู่',
-                'department_id' => 'หน่วยงาน',
+                'asset_code'      => 'รหัสครุภัณฑ์',
+                'name'            => 'ชื่อครุภัณฑ์',
+                'serial_number'   => 'Serial',
+                'category_id'     => 'หมวดหมู่',
+                'department_id'   => 'หน่วยงาน',
                 'warranty_expire' => 'หมดประกัน',
             ];
             $bad = collect(array_keys($errors->toArray()))
@@ -494,14 +524,30 @@ class AssetController extends Controller
                 ->implode(', ');
             $msg = $bad ? ('ข้อมูลไม่ถูกต้อง: ' . $bad) : 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง';
 
+            Log::warning('[Asset::updatePage] validation failed', [
+                'asset_id' => $asset->id,
+                'errors'   => $errors->toArray(),
+                'actor_id' => $request->user()?->id,
+            ]);
+
             return redirect()->back()
                 ->withErrors($validator)
                 ->withInput()
                 ->with('toast', Toast::error($msg, 2600));
         }
 
-        $data = $validator->validated();
+        $data   = $validator->validated();
+        $before = $asset->only(['asset_code', 'name', 'status', 'department_id', 'category_id', 'location']);
+
         $asset->update($data);
+
+        Log::info('[Asset::updatePage] updated', [
+            'asset_id'   => $asset->id,
+            'asset_code' => $asset->asset_code,
+            'before'     => $before,
+            'after'      => $asset->only(['asset_code', 'name', 'status', 'department_id', 'category_id', 'location']),
+            'actor_id'   => $request->user()?->id,
+        ]);
 
         return redirect()
             ->route('assets.show', $asset)
@@ -510,7 +556,18 @@ class AssetController extends Controller
 
     public function destroyPage(Asset $asset)
     {
+        $assetCode = $asset->asset_code;
+        $assetId   = $asset->id;
+        $assetName = $asset->name;
+
         $asset->delete();
+
+        Log::info('[Asset::destroyPage] deleted', [
+            'asset_id'   => $assetId,
+            'asset_code' => $assetCode,
+            'name'       => $assetName,
+            'actor_id'   => request()->user()?->id,
+        ]);
 
         return redirect()
             ->route('assets.index')
@@ -524,6 +581,12 @@ class AssetController extends Controller
                 'maintenanceRequests as maintenance_requests_count',
                 'requestAttachments as attachments_count',
             ]);
+
+        Log::info('[Asset::printPage] print PDF', [
+            'asset_id'   => $asset->id,
+            'asset_code' => $asset->asset_code,
+            'actor_id'   => $request->user()?->id,
+        ]);
 
         $hospital = [
             'name_th'  => 'โรงพยาบาลพระปกเกล้า',
@@ -540,9 +603,6 @@ class AssetController extends Controller
         return $pdf->stream('asset-' . $asset->asset_code . '.pdf');
     }
 
-    /**
-     * จำค่า sort_by / sort_dir ของหน้า Asset ต่อ user ด้วย session
-     */
     protected function resolveAssetSort(Request $request, array $allowedKeys): array
     {
         $user   = $request->user();

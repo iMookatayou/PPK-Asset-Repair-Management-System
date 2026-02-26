@@ -3,7 +3,7 @@
   $req = $req ?? null;
 
   $assets = is_iterable($assets ?? null) ? collect($assets) : collect();
-  $depts  = is_iterable($depts  ?? null) ? collect($depts)  : collect();
+  $depts  = is_iterable($depts ?? null) ? collect($depts) : collect();
 
   $user   = auth()->user();
   $isEdit = (bool) optional($req)->exists;
@@ -36,7 +36,6 @@
 
         return $default;
     };
-
 @endphp
 
 <div class="mx-auto max-w-screen-2xl px-3 sm:px-6 lg:px-8">
@@ -56,9 +55,7 @@
         </div>
 
         <label class="block text-sm font-medium text-slate-700">ทรัพย์สิน</label>
-        <select name="asset_id"
-                class="ts-basic mt-2 w-full"
-                data-placeholder="— เลือกทรัพย์สิน —">
+        <select name="asset_id" class="ts-basic mt-2 w-full" data-placeholder="— เลือกทรัพย์สิน —">
           <option value="">— ไม่ระบุ —</option>
           @foreach($assets as $a)
             @php $label = trim(($a->asset_code ? $a->asset_code.' - ' : '').($a->name ?? '')); @endphp
@@ -69,9 +66,7 @@
         </select>
 
         <label class="block text-sm font-medium text-slate-700 mt-4">หน่วยงาน</label>
-        <select name="department_id"
-                class="ts-basic mt-2 w-full"
-                data-placeholder="— เลือกหน่วยงาน —">
+        <select name="department_id" class="ts-basic mt-2 w-full" data-placeholder="— เลือกหน่วยงาน —">
           <option value="">— ไม่ระบุ —</option>
           @foreach($depts as $d)
             @php
@@ -85,11 +80,7 @@
         </select>
 
         <label class="block text-sm font-medium text-slate-700 mt-4">สถานที่ / ตำแหน่งงาน</label>
-        <input type="text"
-               name="location_text"
-               value="{{ $v('location_text') }}"
-               autocomplete="off"
-               class="{{ $input }}">
+        <input type="text" name="location_text" value="{{ $v('location_text') }}" autocomplete="off" class="{{ $input }}">
       </section>
 
       <section>
@@ -105,12 +96,7 @@
         <label class="block text-sm font-medium text-slate-700">
           หัวข้อ <span class="text-rose-600">*</span>
         </label>
-        <input type="text"
-               name="title"
-               value="{{ $v('title') }}"
-               autocomplete="off"
-               class="{{ $input }}"
-               required>
+        <input type="text" name="title" value="{{ $v('title') }}" autocomplete="off" class="{{ $input }}" required>
 
         <label class="block text-sm font-medium text-slate-700 mt-4">รายละเอียด / อาการเสีย</label>
         <textarea name="description" rows="6" class="{{ $textarea }}">{{ $v('description') }}</textarea>
@@ -187,41 +173,186 @@
           <div class="{{ $accentWrap }}">
             <span class="{{ $accentBar }}"></span>
             <div class="{{ $titleCls }}">ไฟล์แนบ</div>
-            <div class="{{ $subCls }}">รูป / เอกสารประกอบ</div>
+            <div class="{{ $subCls }}">แนบไฟล์ / ถ่ายรูปจากมือถือ</div>
           </div>
         </div>
 
-        @if(!$isEdit)
-          <div class="rounded-md border {{ $line }} bg-slate-50 px-3 py-2 text-sm text-slate-700">
-            แนบไฟล์ได้หลังจาก “สร้างคำขอ” แล้ว (ในหน้าแก้ไข/รายละเอียด)
-          </div>
-        @else
-          @php $attachments = is_iterable($attachments ?? null) ? $attachments : []; @endphp
+        @php $attachments = is_iterable($attachments ?? null) ? $attachments : []; @endphp
 
-          @if(!empty($attachments) && count($attachments))
-            <div class="mb-4">
-              <div class="text-xs font-medium text-slate-600">ไฟล์ที่มีอยู่แล้ว</div>
-              <div class="mt-2 divide-y divide-slate-200 rounded-md border {{ $line }}">
-                @foreach($attachments as $att)
-                  <label class="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                    <span class="truncate text-slate-700">{{ $att->original_name }}</span>
-                    <span class="inline-flex items-center gap-2 text-rose-600">
-                      <input type="checkbox" name="remove_attachments[]" value="{{ $att->id }}">
-                      ลบ
-                    </span>
-                  </label>
-                @endforeach
-              </div>
+        @if($isEdit && !empty($attachments) && count($attachments))
+          <div class="mb-4">
+            <div class="text-xs font-medium text-slate-600">ไฟล์ที่มีอยู่แล้ว</div>
+            <div class="mt-2 divide-y divide-slate-200 rounded-md border {{ $line }}">
+              @foreach($attachments as $att)
+                <label class="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                  <span class="truncate text-slate-700">{{ $att->original_name }}</span>
+                  <span class="inline-flex items-center gap-2 text-rose-600">
+                    <input type="checkbox" name="remove_attachments[]" value="{{ $att->id }}">
+                    ลบ
+                  </span>
+                </label>
+              @endforeach
             </div>
-          @endif
-
-          <input type="file"
-                 name="files[]"
-                 multiple
-                 accept="image/*,application/pdf"
-                 class="block w-full rounded-md border {{ $line }} bg-white px-3 py-2 text-sm">
-          <p class="mt-1 text-xs text-slate-500">รองรับรูปภาพ และ PDF</p>
+          </div>
         @endif
+
+        <input id="mr_files_any"
+               type="file"
+               name="files[]"
+               multiple
+               accept="image/*,application/pdf"
+               class="hidden">
+
+        <input id="mr_files_camera"
+               type="file"
+               name="files[]"
+               accept="image/*"
+               capture="environment"
+               class="hidden">
+
+        <div class="flex items-center gap-2">
+          {{-- ปุ่มแนบไฟล์ --}}
+          <button type="button"
+                  id="mr_files_any_btn"
+                  class="inline-flex items-center justify-center h-11 px-4 rounded-md border {{ $line }} bg-white
+                         text-sm font-medium text-slate-700 hover:bg-slate-50
+                         focus:outline-none focus:ring-2 focus:ring-emerald-100">
+            <svg class="h-4 w-4 mr-2 text-slate-600" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M21 11.5l-8.5 8.5a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.7-8.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            แนบไฟล์
+          </button>
+
+          {{-- ปุ่มกล้อง --}}
+          <button type="button"
+                  id="mr_files_camera_btn"
+                  class="inline-flex items-center justify-center h-11 w-11 rounded-md border {{ $line }} bg-white
+                         hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  aria-label="ถ่ายรูป">
+            <svg class="h-5 w-5 text-emerald-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+          </button>
+
+          <div class="min-w-0">
+            <div class="text-xs text-slate-600">รองรับรูปภาพ และ PDF (แนบไฟล์) / ถ่ายรูป (กล้อง)</div>
+          </div>
+        </div>
+
+        {{-- Preview list --}}
+        <div id="mr_files_preview" class="mt-3 hidden">
+          <div class="text-xs font-medium text-slate-600">ไฟล์ที่เลือก</div>
+          <div id="mr_files_list" class="mt-2 divide-y divide-slate-200 rounded-md border {{ $line }} bg-white"></div>
+        </div>
+
+        <p class="mt-2 text-xs text-slate-500">สูงสุด 10 ไฟล์ (ตาม validation ฝั่งเซิร์ฟเวอร์)</p>
+
+        @error('files')
+          <p class="mt-2 text-xs text-rose-700">{{ $message }}</p>
+        @enderror
+        @error('files.*')
+          <p class="mt-2 text-xs text-rose-700">{{ $message }}</p>
+        @enderror
+
+        <script>
+          (function () {
+            const anyInput = document.getElementById('mr_files_any');
+            const camInput = document.getElementById('mr_files_camera');
+            const anyBtn = document.getElementById('mr_files_any_btn');
+            const camBtn = document.getElementById('mr_files_camera_btn');
+            const preview = document.getElementById('mr_files_preview');
+            const list = document.getElementById('mr_files_list');
+
+            if (!anyInput || !camInput || !anyBtn || !camBtn || !preview || !list) return;
+
+            let filesBag = [];
+
+            const keyOf = (f) => `${f.name}|${f.size}|${f.type}|${f.lastModified || 0}`;
+
+            const syncToInputs = () => {
+              // สร้าง FileList ใหม่ให้ anyInput เพื่อ submit ทีเดียว (รวมทั้งจากกล้องด้วย)
+              const dt = new DataTransfer();
+              filesBag.forEach(f => dt.items.add(f));
+              anyInput.files = dt.files;
+            };
+
+            const render = () => {
+              list.innerHTML = '';
+              if (!filesBag.length) {
+                preview.classList.add('hidden');
+                return;
+              }
+              preview.classList.remove('hidden');
+
+              filesBag.forEach((f, idx) => {
+                const row = document.createElement('div');
+                row.className = 'px-3 py-2 text-sm flex items-center justify-between gap-3';
+
+                const left = document.createElement('div');
+                left.className = 'min-w-0';
+
+                const name = document.createElement('div');
+                name.className = 'truncate text-slate-700';
+                name.textContent = f.name;
+
+                const meta = document.createElement('div');
+                meta.className = 'text-xs text-slate-500';
+                meta.textContent = (f.type || 'file') + ' • ' + Math.round(f.size / 1024) + ' KB';
+
+                left.appendChild(name);
+                left.appendChild(meta);
+
+                const del = document.createElement('button');
+                del.type = 'button';
+                del.className = 'shrink-0 text-rose-600 hover:text-rose-700 text-xs font-medium';
+                del.textContent = 'ลบ';
+                del.addEventListener('click', () => {
+                  filesBag.splice(idx, 1);
+                  syncToInputs();
+                  render();
+                });
+
+                row.appendChild(left);
+                row.appendChild(del);
+                list.appendChild(row);
+              });
+            };
+
+            const addFiles = (files) => {
+              const arr = Array.from(files || []);
+              if (!arr.length) return;
+
+              const map = new Map(filesBag.map(f => [keyOf(f), f]));
+              arr.forEach(f => map.set(keyOf(f), f));
+
+              filesBag = Array.from(map.values()).slice(0, 10); // กันเกิน 10
+              syncToInputs();
+              render();
+            };
+
+            anyBtn.addEventListener('click', () => {
+              anyInput.click();
+            });
+
+            camBtn.addEventListener('click', () => {
+              camInput.click();
+            });
+
+            anyInput.addEventListener('change', () => {
+              addFiles(anyInput.files);
+              // reset ค่า เพื่อเลือกไฟล์เดิมซ้ำได้
+              anyInput.value = '';
+            });
+
+            camInput.addEventListener('change', () => {
+              addFiles(camInput.files);
+              camInput.value = '';
+            });
+
+            // ถ้ามีไฟล์จาก old() (กรณี validation fail) เราไม่สามารถ restore file ได้ด้วยเบราว์เซอร์
+          })();
+        </script>
       </section>
     </div>
 

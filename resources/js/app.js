@@ -1,7 +1,11 @@
 import '../css/app.css'
 import Alpine from 'alpinejs'
-import './sidebar-intro';
+import './nav-intro';
 import './bootstrap';
+import './repair/my-jobs';
+import '../css/repair/my-jobs.css';
+import './repair/dashboard';
+import '../css/repair/dashboard.css';
 
 // Initialize Alpine.js globally for Blade components using x-data/x-show
 window.Alpine = Alpine

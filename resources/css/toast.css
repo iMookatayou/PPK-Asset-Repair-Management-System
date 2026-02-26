@@ -1,0 +1,51 @@
+/* ===== UI Toast (ไม่ชน bootstrap) ===== */
+.ui-toast-overlay{
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 99999; /* ชนะ navbar/sidebar */
+  width: min(560px, calc(100vw - 24px));
+  pointer-events: none;
+}
+
+.ui-toast-card{
+  pointer-events: auto;
+  background: #fff;
+  border: 1px solid #E6ECF5;
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 10px 24px rgba(15,23,42,.08);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 10px;
+  position: relative;
+}
+
+.ui-toast-msg{
+  font-size: 13px;
+  font-weight: 800;
+  color:#0f172a;
+}
+
+.ui-toast-x{
+  border:0;
+  background: transparent;
+  font-size: 20px;
+  font-weight: 900;
+  color:#64748b;
+  cursor:pointer;
+  line-height: 1;
+}
+
+.ui-toast-card.ui-success{ border-left: 5px solid rgba(34,197,94,.85); }
+.ui-toast-card.ui-warning{ border-left: 5px solid rgba(245,158,11,.85); }
+.ui-toast-card.ui-error  { border-left: 5px solid rgba(239,68,68,.85); }
+.ui-toast-card.ui-info   { border-left: 5px solid rgba(43,108,235,.85); }
+
+.ui-toast-out{
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: all .18s ease;
+}

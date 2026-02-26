@@ -1,11 +1,10 @@
 @extends('layouts.app')
-@section('title','ทรัพย์สิน')
+@section('title','Assets')
 
 @section('content')
 @php
   use Illuminate\Support\Str;
 
-  // ===== Sorting เฉพาะคอลัมน์เลขลำดับ =====
   $sortBy  = $sortBy  ?? request('sort_by', 'id');
   $sortDir = $sortDir ?? request('sort_dir', 'desc');
 
@@ -22,7 +21,6 @@
     $iconClass  = 'h-3.5 w-3.5';
 
     if ($isActive) {
-        // 🔵 สี active = น้ำเงินธีมคุณ
         $labelClass .= 'text-[#0F2D5C]';
         $iconClass  .= ' text-[#0F2D5C]';
     } else {
@@ -30,8 +28,6 @@
         $iconClass  .= ' text-zinc-300 group-hover:text-zinc-400';
     }
 
-    // asc = เลขน้อย → มาก (ลูกศรขึ้น)
-    // desc = เลขมาก → น้อย (ลูกศรลง)
     $iconPathAsc  = 'M12 7l-4 6h8l-4-6z';
     $iconPathDesc = 'M12 17l4-6H8l4 6z';
     $iconPath     = ($isActive && $sortDir === 'asc')
@@ -39,10 +35,8 @@
         : $iconPathDesc;
 
     return <<<HTML
-<a href="{$url}" class="inline-flex items-center justify-center gap-1.5 group select-none">
-  <span class="{$labelClass}">
-    เลขลำดับ
-  </span>
+<a href="{$url}" class="inline-flex items-center justify-center gap-1.5 group select-none" onclick="showLoader()">
+  <span class="{$labelClass}">เลขลำดับ</span>
   <span class="inline-flex items-center">
     <svg viewBox="0 0 24 24" class="{$iconClass}">
       <path d="{$iconPath}" fill="currentColor" />
@@ -92,12 +86,10 @@ HTML;
   $hasFilter = $hasQ || $hasStatus || $hasCategory || $hasDept || $hasType || $hasLocation;
 @endphp
 
-<div class="pt-6 md:pt-8 lg:pt-10"></div>
-
 <div class="w-full flex flex-col">
 
   {{-- Sticky Header + Filters --}}
-  <div class="sticky top-[6rem] z-20 bg-white/90 backdrop-blur border-b border-slate-200">
+  <div class="sticky top-16 z-20 bg-white/90 backdrop-blur border-b border-slate-200">
     <div class="px-4 md:px-6 lg:px-8 py-4">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -205,10 +197,15 @@ HTML;
     </div>
   </div>
 
-  <div class="px-4 md:px-6 lg:px-8 py-2 bg-slate-50 border-b border-slate-200">
-    <div class="text-[12px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+  <div class="px-4 md:px-6 lg:px-8 py-2 border-b border-slate-200 bg-white">
+   <div class="flex items-center justify-between">
+    <div class="text-[13px] font-semibold text-slate-800">
       รายการทรัพย์สิน
     </div>
+    <div class="text-[12px] text-slate-500">
+      ทั้งหมด {{ $assets->total() }} รายการ
+    </div>
+   </div>
   </div>
 
   {{-- Table Desktop --}}
@@ -230,7 +227,7 @@ HTML;
 
       <tbody class="bg-white">
       @forelse($assets as $a)
-        <tr class="hover:bg-slate-50/60 border-b border-slate-100 last:border-0">
+        <tr class="hover:bg-slate-50/60 border-b border-slate-100">
           <td class="p-3 text-center align-middle whitespace-nowrap font-semibold text-slate-900">{{ $a->id }}</td>
           <td class="p-3 text-center align-middle whitespace-nowrap font-semibold text-slate-900">{{ $a->asset_code }}</td>
 

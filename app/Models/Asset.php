@@ -93,7 +93,6 @@ class Asset extends Model
                 $w->where('id', (int) $term)
                 ->orWhere('asset_code', 'like', "%{$term}%");
             })
-            // ให้ id ตรงเป๊ะขึ้นก่อน
             ->orderByRaw(
                 "CASE
                     WHEN id = ? THEN 0
@@ -105,7 +104,6 @@ class Asset extends Model
             ->orderBy('id', 'desc');
         }
 
-        // 🔍 กรณีเป็น text → search ปกติ
         return $q->where(function ($w) use ($term) {
                 $w->where('asset_code', 'like', "%{$term}%")
                 ->orWhere('name', 'like', "%{$term}%")
@@ -125,9 +123,11 @@ class Asset extends Model
         return $status !== '' ? $q->where('status', $status) : $q;
     }
 
-    public function scopeCategory($q, ?string $category)
+    // ✅ แก้ไข: เดิมว่างเปล่า ตอนนี้ filter category_id ได้แล้ว
+    public function scopeCategory($q, mixed $categoryId)
     {
-        return $q;
+        if (empty($categoryId) || (int) $categoryId <= 0) return $q;
+        return $q->where('category_id', (int) $categoryId);
     }
 
     public function scopeLocation($q, ?string $location)

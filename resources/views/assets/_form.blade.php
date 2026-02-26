@@ -4,11 +4,13 @@
 
   $line = 'border-slate-200';
 
-  $input = "mt-2 w-full h-11 rounded-md border $line bg-white px-3 py-2 text-sm
+  $input = "mt-2 w-full h-11 rounded-md border $line bg-white px-3 py-2 text-sm text-slate-900
+            placeholder:text-slate-400
             focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
 
-  $textarea = "mt-2 w-full rounded-md border $line bg-white px-3 py-2 text-sm
-              focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
+  $textarea = "mt-2 w-full rounded-md border $line bg-white px-3 py-2 text-sm text-slate-900
+               placeholder:text-slate-400
+               focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
 
   $headCls   = "flex items-start gap-3 pb-3 min-h-[56px]";
   $noCls     = "w-8 h-8 shrink-0 rounded-full border border-emerald-600 bg-emerald-600
@@ -18,14 +20,16 @@
   $accentWrap= "min-w-0 relative pl-3 pt-[1px]";
   $accentBar = "absolute left-0 top-[2px] w-[3px] h-9 rounded-full bg-emerald-600/90";
 
+  $labelCls  = "block text-sm font-semibold text-slate-700";
+  $hintCls   = "ml-2 text-xs text-slate-500 font-medium";
+
   $v = fn($key, $default='') => old($key, data_get($asset, $key, $default));
+
 @endphp
 
-{{-- GRID 1: (1) ข้อมูลหลัก | (2) หมวดหมู่ & หน่วยงาน --}}
-<div class="relative grid grid-cols-1 lg:grid-cols-2 gap-10">
+<div class="relative grid grid-cols-1 lg:grid-cols-2 gap-8 pt-0">
   <div class="hidden lg:block absolute inset-y-0 left-1/2 w-px bg-slate-200"></div>
 
-  {{-- SECTION 1 --}}
   <section>
     <div class="{{ $headCls }}">
       <div class="{{ $noCls }}">1</div>
@@ -36,23 +40,22 @@
       </div>
     </div>
 
-    <label class="block text-sm font-medium text-slate-700">
+    <label class="{{ $labelCls }}">
       รหัสครุภัณฑ์ <span class="text-rose-600">*</span>
     </label>
     <input type="text" name="asset_code" value="{{ $v('asset_code') }}" class="{{ $input }}" required>
 
-    <label class="block text-sm font-medium text-slate-700 mt-4">
+    <label class="{{ $labelCls }} mt-5">
       ชื่อครุภัณฑ์ <span class="text-rose-600">*</span>
     </label>
     <input type="text" name="name" value="{{ $v('name') }}" class="{{ $input }}" required>
 
-    <label class="block text-sm font-medium text-slate-700 mt-4">
-      ประเภท (Type) <span class="ml-1 text-xs text-slate-500">(ไม่บังคับ)</span>
+    <label class="{{ $labelCls }} mt-5">
+      ประเภท (Type) <span class="{{ $hintCls }}">(ไม่บังคับ)</span>
     </label>
     <input type="text" name="type" value="{{ $v('type') }}" class="{{ $input }}">
   </section>
 
-  {{-- SECTION 2 --}}
   <section>
     <div class="{{ $headCls }}">
       <div class="{{ $noCls }}">2</div>
@@ -63,19 +66,20 @@
       </div>
     </div>
 
-    <label class="block text-sm font-medium text-slate-700">หมวดหมู่</label>
-    {{-- ถ้าจะใช้ component ของคุณ เปลี่ยนเป็น <x-searchable-select ...> ได้ --}}
-    <select id="category_id" name="category_id" class="ts-basic mt-2 w-full @error('category_id') ts-error @enderror">
+    <label class="{{ $labelCls }}">หมวดหมู่</label>
+    <select id="category_id" name="category_id"
+            class="ts-basic mt-2 w-full @error('category_id') ts-error @enderror">
       <option value="">— เลือกหมวดหมู่ —</option>
       @foreach(($categories ?? collect()) as $cat)
         @php $label = $cat->name ?? $cat->name_th ?? $cat->name_en ?? '—'; @endphp
         <option value="{{ $cat->id }}" @selected((string)$v('category_id') === (string)$cat->id)>{{ $label }}</option>
       @endforeach
     </select>
-    @error('category_id') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+    @error('category_id') <p class="mt-2 text-sm text-rose-600">{{ $message }}</p> @enderror
 
-    <label class="block text-sm font-medium text-slate-700 mt-4">หน่วยงาน</label>
-    <select id="department_id" name="department_id" class="ts-basic mt-2 w-full @error('department_id') ts-error @enderror">
+    <label class="{{ $labelCls }} mt-5">หน่วยงาน</label>
+    <select id="department_id" name="department_id"
+            class="ts-basic mt-2 w-full @error('department_id') ts-error @enderror">
       <option value="">— เลือกหน่วยงาน —</option>
       @foreach(($departments ?? collect()) as $d)
         @php
@@ -86,17 +90,15 @@
         <option value="{{ $d->id }}" @selected((string)$v('department_id') === (string)$d->id)>{{ $label ?: '—' }}</option>
       @endforeach
     </select>
-    @error('department_id') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+    @error('department_id') <p class="mt-2 text-sm text-rose-600">{{ $message }}</p> @enderror
   </section>
 </div>
 
-<div class="border-t {{ $line }} mt-10"></div>
+<div class="border-t {{ $line }} my-8"></div>
 
-{{-- GRID 2: (3) ข้อมูลเพิ่มเติม | (4) สถานะ --}}
-<div class="relative grid grid-cols-1 lg:grid-cols-2 gap-10 mt-10">
+<div class="relative grid grid-cols-1 lg:grid-cols-2 gap-8 pt-0">
   <div class="hidden lg:block absolute inset-y-0 left-1/2 w-px bg-slate-200"></div>
 
-  {{-- SECTION 3 --}}
   <section>
     <div class="{{ $headCls }}">
       <div class="{{ $noCls }}">3</div>
@@ -107,44 +109,43 @@
       </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
       <div>
-        <label class="block text-sm font-medium text-slate-700">วันที่ซื้อ</label>
+        <label class="{{ $labelCls }}">วันที่ซื้อ</label>
         <input type="date" name="purchase_date"
                value="{{ $v('purchase_date', optional($asset->purchase_date ?? null)?->format('Y-m-d')) }}"
                class="{{ $input }}">
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-slate-700">หมดประกัน</label>
+        <label class="{{ $labelCls }}">หมดประกัน</label>
         <input type="date" name="warranty_expire"
                value="{{ $v('warranty_expire', optional($asset->warranty_expire ?? null)?->format('Y-m-d')) }}"
                class="{{ $input }}">
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-slate-700">ยี่ห้อ</label>
+        <label class="{{ $labelCls }}">ยี่ห้อ</label>
         <input type="text" name="brand" value="{{ $v('brand') }}" class="{{ $input }}">
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-slate-700">รุ่น</label>
+        <label class="{{ $labelCls }}">รุ่น</label>
         <input type="text" name="model" value="{{ $v('model') }}" class="{{ $input }}">
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-slate-700">Serial</label>
+        <label class="{{ $labelCls }}">Serial</label>
         <input type="text" name="serial_number" value="{{ $v('serial_number') }}" class="{{ $input }}">
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-slate-700">ที่ตั้ง</label>
+        <label class="{{ $labelCls }}">ที่ตั้ง</label>
         <input type="text" name="location" value="{{ $v('location') }}" class="{{ $input }}">
       </div>
     </div>
   </section>
 
-  {{-- SECTION 4 --}}
   <section>
     <div class="{{ $headCls }}">
       <div class="{{ $noCls }}">4</div>
@@ -156,20 +157,20 @@
     </div>
 
     @php
-      // ให้ตรงกับของเดิมคุณ
       $statuses = ['active' => 'ใช้งาน', 'in_repair' => 'ซ่อม', 'disposed' => 'จำหน่าย'];
       $status = $v('status', $asset->status ?? 'active');
     @endphp
 
-    <label class="block text-sm font-medium text-slate-700">สถานะ</label>
-    <select id="status" name="status" class="ts-basic mt-2 w-full @error('status') ts-error @enderror">
+    <label class="{{ $labelCls }}">สถานะ</label>
+    <select id="status" name="status"
+            class="ts-basic mt-2 w-full @error('status') ts-error @enderror">
       @foreach($statuses as $k => $label)
         <option value="{{ $k }}" @selected($status === $k)>{{ $label }}</option>
       @endforeach
     </select>
-    @error('status') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+    @error('status') <p class="mt-2 text-sm text-rose-600">{{ $message }}</p> @enderror
 
-    <label class="block text-sm font-medium text-slate-700 mt-4">หมายเหตุ</label>
+    <label class="{{ $labelCls }} mt-5">หมายเหตุ</label>
     <textarea name="note" rows="6" class="{{ $textarea }}">{{ $v('note') }}</textarea>
   </section>
 </div>

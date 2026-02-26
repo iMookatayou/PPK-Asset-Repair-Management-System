@@ -4,8 +4,10 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
-    public function up(): void {
+return new class extends Migration
+{
+    public function up(): void
+    {
         Schema::create('maintenance_logs', function (Blueprint $table) {
             $table->id();
 
@@ -23,15 +25,20 @@ return new class extends Migration {
             $table->string('action', 100);
             $table->text('note')->nullable();
 
+            $table->string('from_status', 50)->nullable();
+            $table->string('to_status', 50)->nullable();
+
             $table->timestamps();
 
-            $table->index(['request_id', 'created_at']);
-            $table->index(['action']);
-            $table->index('user_id'); // แนะนำ
+            // ===== Index ให้ตรง schema dump =====
+            $table->index(['request_id', 'created_at']); // maintenance_logs_request_id_created_at_index
+            $table->index('action');                     // maintenance_logs_action_index
+            $table->index('user_id');                    // maintenance_logs_user_id_index
         });
-
     }
-    public function down(): void {
+
+    public function down(): void
+    {
         Schema::dropIfExists('maintenance_logs');
     }
 };

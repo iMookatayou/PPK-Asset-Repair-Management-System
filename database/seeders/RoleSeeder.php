@@ -35,7 +35,7 @@ class RoleSeeder extends Seeder
                 'sort_order' => 40,
             ],
             [
-                'code'       => 'developer',
+                'code'       => 'programmer',
                 'name_th'    => 'นักพัฒนา',
                 'name_en'    => 'Developer',
                 'sort_order' => 50,

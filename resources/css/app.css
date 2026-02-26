@@ -1,10 +1,18 @@
+@import "./repair/my-jobs.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* @import "./intro-frame-reveal.css"; */
+body{
+  display: block !important;
+  min-height: 0 !important;
+}
 
-/* Hide elements until Alpine initializes to prevent flash/always-open panels */
+#layout.layout{
+  flex: initial !important;
+}
+
 [x-cloak] { display: none !important; }
 @plugin "daisyui";
 
@@ -17,9 +25,6 @@
   color: #0E2B51;
 }
 
-/* ===== Sidebar Logo Intro Animation ===== */
-
-/* Respect reduce motion */
 @media (prefers-reduced-motion: reduce) {
   .sidebar-logo-img {
     animation: none !important;
@@ -34,7 +39,6 @@
   will-change: transform, opacity, filter;
 }
 
-/* เล่น intro เมื่อมีคลาสนี้ */
 html.sidebar-intro .sidebar-logo-img,
 body.sidebar-intro .sidebar-logo-img {
   animation:
@@ -55,4 +59,5 @@ body.sidebar-intro .sidebar-logo-img {
   82%  { transform: rotate(-5deg); }
   100% { transform: rotate(0deg); }
 }
+
 

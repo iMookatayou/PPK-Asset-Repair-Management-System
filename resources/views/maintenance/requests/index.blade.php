@@ -9,8 +9,8 @@
   $q        = $q        ?? request('q');
   $status   = $status   ?? request('status');
   $priority = $priority ?? request('priority');
+  $typeId   = $typeId   ?? request('type_id');
 
-  // ✅ keep asset_id ทั้งหน้า
   $assetId  = request('asset_id');
 
   // sort from controller (fallback from request)
@@ -18,6 +18,7 @@
   $sortDir = $sortDir ?? request('sort_dir', 'desc');
 
   $statusLabel = fn(?string $s) => [
+    'acknowledged' => 'รับทราบแล้ว',
     'pending'     => 'รอดำเนินการ',
     'accepted'    => 'รับงานแล้ว',
     'in_progress' => 'กำลังดำเนินการ',
@@ -28,6 +29,7 @@
   ][strtolower((string)$s)] ?? Str::of((string)$s)->replace('_',' ')->title();
 
   $statusTextClass = fn(?string $s) => match(strtolower((string)$s)) {
+    'acknowledged' => 'text-blue-700',
     'pending'     => 'text-amber-700',
     'accepted'    => 'text-indigo-700',
     'in_progress' => 'text-sky-700',
@@ -54,6 +56,7 @@
   ][strtolower((string)$p)] ?? '-';
 
   $statusOptions = [
+    'acknowledged' => 'รับทราบแล้ว',
     'pending'     => 'รอดำเนินการ',
     'accepted'    => 'รับงานแล้ว',
     'in_progress' => 'กำลังดำเนินการ',
@@ -69,14 +72,13 @@
     'high'   => 'สูง',
     'urgent' => 'เร่งด่วน',
   ];
-@endphp
 
-<div class="pt-6 md:pt-8 lg:pt-10"></div>
+  $types = is_iterable($types ?? null) ? collect($types) : collect();
+@endphp
 
 <div class="w-full flex flex-col">
 
-  {{-- ✅ Sticky Header + Filters --}}
-  <div class="sticky top-[6rem] z-20 bg-white/90 backdrop-blur border-b border-slate-200">
+  <div class="sticky top-16 z-20 bg-white/90 backdrop-blur border-b border-slate-200">
     <div class="px-4 md:px-6 lg:px-8 py-4">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -103,12 +105,11 @@
         <input type="hidden" name="sort_by"  value="{{ $sortBy }}">
         <input type="hidden" name="sort_dir" value="{{ $sortDir }}">
 
-        {{-- ✅ keep asset_id ทุกครั้งที่ submit --}}
         @if($assetId)
           <input type="hidden" name="asset_id" value="{{ $assetId }}">
         @endif
 
-        <div class="md:col-span-5 min-w-0">
+        <div class="md:col-span-4 min-w-0">
           <label for="q" class="mb-1 block text-[12px] text-slate-600">คำค้นหา</label>
           <div class="relative">
             <input id="q" type="text" name="q" value="{{ $q }}"
@@ -133,7 +134,7 @@
           </select>
         </div>
 
-        <div class="md:col-span-3">
+        <div class="md:col-span-2">
           <label for="priority" class="mb-1 block text-[12px] text-slate-600">ความสำคัญ</label>
           <select id="priority" name="priority"
                   class="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0F2D5C]/35 focus:border-[#0F2D5C]/35">
@@ -144,7 +145,20 @@
           </select>
         </div>
 
-        <div class="md:col-span-2 flex items-end justify-end gap-2">
+        {{-- ✅ NEW: filter type --}}
+        <div class="md:col-span-3">
+          <label for="type_id" class="mb-1 block text-[12px] text-slate-600">ประเภทงาน</label>
+          <select id="type_id" name="type_id"
+                  class="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0F2D5C]/35 focus:border-[#0F2D5C]/35">
+            <option value="">ทั้งหมด</option>
+            <option value="__null__" @selected((string)$typeId === '__null__')>ยังไม่ระบุประเภท</option>
+            @foreach ($types as $t)
+              <option value="{{ $t->id }}" @selected((string)$typeId === (string)$t->id)>{{ $t->name }}</option>
+            @endforeach
+          </select>
+        </div>
+
+        <div class="md:col-span-1 flex items-end justify-end gap-2">
           {{-- ✅ ล้างตัวกรอง แต่คง asset_id --}}
           <a href="{{ route('maintenance.requests.index', $assetId ? ['asset_id' => $assetId] : []) }}"
              onclick="showLoader()"
@@ -193,11 +207,11 @@
               $isActive = ($sortBy === 'request_no');
               $nextDir  = ($isActive && $sortDir === 'asc') ? 'desc' : 'asc';
 
-              // ✅ force keep asset_id ในการ sort
               $sortUrl  = request()->fullUrlWithQuery([
                 'sort_by'  => 'request_no',
                 'sort_dir' => $nextDir,
                 'asset_id' => $assetId,
+                'type_id'  => $typeId, // ✅ keep type
               ]);
 
               $labelCls = $isActive ? 'text-[#0F2D5C]' : 'text-slate-600 group-hover:text-slate-900';
@@ -218,6 +232,7 @@
           </th>
 
           <th class="p-3 text-center font-semibold w-[30%] border-b border-slate-200">เรื่อง</th>
+          <th class="p-3 text-center font-semibold w-[12%] border-b border-slate-200">ประเภท</th>
           <th class="p-3 text-center font-semibold w-[18%] border-b border-slate-200">ผู้แจ้ง</th>
           <th class="p-3 text-center font-semibold w-[14%] border-b border-slate-200">หน่วยงาน</th>
           <th class="p-3 text-center font-semibold w-[10%] whitespace-nowrap border-b border-slate-200">ความสำคัญ</th>
@@ -229,11 +244,14 @@
       <tbody class="bg-white">
       @forelse($list as $row)
         <tr class="align-top border-b border-slate-100 hover:bg-slate-50/60">
+
+          {{-- ✅ Center --}}
           <td class="p-3 align-middle whitespace-nowrap text-center font-semibold text-slate-900">
             {{ $row->request_no ?: ('#'.$row->id) }}
           </td>
 
-          <td class="p-3">
+          {{-- ✅ Center --}}
+          <td class="p-3 align-middle text-center">
             <a href="{{ route('maintenance.requests.show', $row) }}"
                class="block max-w-full truncate font-semibold text-slate-900 hover:underline"
                onclick="showLoader()">
@@ -244,14 +262,21 @@
                 {{ Str::limit($row->description, 140) }}
               </p>
             @endif
-            @if(!empty($row->category))
-              <p class="mt-2 text-[11px] text-slate-500">
-                หมวดหมู่: <span class="font-medium text-slate-700">{{ $row->category }}</span>
-              </p>
+          </td>
+
+          {{-- ✅ NEW: type (เอาแค่ข้อความ ไม่ทำ pill/วงรี) --}}
+          <td class="p-3 align-middle text-center">
+            @php
+              $tname = $row->type->name ?? null;
+            @endphp
+            @if($tname)
+              <span class="text-[12px] font-semibold text-slate-700">{{ $tname }}</span>
+            @else
+              <span class="text-[12px] text-slate-400">ยังไม่ระบุ</span>
             @endif
           </td>
 
-          <td class="p-3 align-middle">
+          <td class="p-3 align-middle text-center">
             @php
               $reporterName  = $row->reporter_name ?? $row->reporter?->name;
               $reporterEmail = $row->reporter_email ?? $row->reporter?->email;
@@ -280,18 +305,21 @@
             {{ $deptName }}
           </td>
 
+          {{-- ✅ Center --}}
           <td class="p-3 align-middle whitespace-nowrap text-center">
             <span class="text-[12px] font-semibold {{ $priorityTextClass($row->priority ?? null) }}">
               {{ $priorityLabel($row->priority ?? null) }}
             </span>
           </td>
 
+          {{-- ✅ Center --}}
           <td class="p-3 align-middle whitespace-nowrap text-center">
             <span class="text-[12px] font-semibold {{ $statusTextClass($row->status ?? null) }}">
               {{ $statusLabel($row->status ?? null) }}
             </span>
           </td>
 
+          {{-- ✅ Center --}}
           <td class="p-3 text-center whitespace-nowrap align-middle">
             <div class="h-full flex justify-center items-center gap-2">
               <a href="{{ route('maintenance.requests.show', $row) }}"
@@ -331,13 +359,14 @@
             (($q ?? null) && $q !== '') ||
             (($status ?? null) && $status !== '') ||
             (($priority ?? null) && $priority !== '') ||
-            (($assetId ?? null) && $assetId !== ''); // ✅ นับ asset_id เป็น filter ด้วย
+            (($typeId ?? null) && $typeId !== '') ||
+            (($assetId ?? null) && $assetId !== '');
         @endphp
         <tr>
-          <td colspan="7" class="py-16 text-center text-slate-600">
+          <td colspan="8" class="py-16 text-center text-slate-600">
             <div class="flex flex-col items-center gap-2">
               <svg class="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 01-2-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
               </svg>
               @if($hasFilter)
                 <p class="text-[13px]">ไม่พบคำขอบำรุงรักษาตามเงื่อนไขที่เลือก</p>

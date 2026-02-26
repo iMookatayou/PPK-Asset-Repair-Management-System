@@ -9,16 +9,13 @@ use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log; // เพิ่มการเรียกใช้ Log
 
 class MaintenanceRatingController extends Controller
 {
     protected int $ratingDeadlineDays = 7;
 
-    /**
-     * หน้า "ให้คะแนนงาน" แยกเป็น:
-     * - pendingRequests: งานที่ปิดแล้ว แต่ user คนนี้ยังไม่ให้คะแนน และยังอยู่ในช่วงเวลาให้คะแนน
-     * - ratedRequests: งานที่ user คนนี้ให้คะแนนแล้ว
-     */
+    // หน้า "ให้คะแนนงาน"
     public function evaluateList()
     {
         /** @var User $user */
@@ -31,7 +28,7 @@ class MaintenanceRatingController extends Controller
                 MaintenanceRequest::STATUS_CLOSED,
             ]);
 
-        // งานที่ยังไม่ให้คะแนน (ของ user คนนี้จริง ๆ)
+        // งานที่ยังไม่ให้คะแนน
         $pendingRequests = (clone $baseQuery)
             ->with(['technician:id,name', 'assignments.user:id,name,role'])
             ->whereDoesntHave('ratings', function ($q) use ($user) {
@@ -41,7 +38,7 @@ class MaintenanceRatingController extends Controller
             ->filter(fn (MaintenanceRequest $req) => $this->withinRatingWindow($req))
             ->values();
 
-        // งานที่ให้คะแนนแล้ว (ของ user คนนี้จริง ๆ)
+        // งานที่ให้คะแนนแล้ว
         $ratedRequests = (clone $baseQuery)
             ->with([
                 'technician:id,name',
@@ -55,64 +52,73 @@ class MaintenanceRatingController extends Controller
             ->latest('closed_at')
             ->get();
 
+        Log::info("User ID {$user->id} viewed their evaluation list."); // บันทึก Log การเข้าดูรายการ
+
         return view('maintenance.rating.evaluate', [
             'pendingRequests' => $pendingRequests,
             'ratedRequests'   => $ratedRequests,
         ]);
     }
 
-    /**
-     * Dashboard คะแนนของช่าง (avg, count)
-     * ต้องมี relation ใน User: technicianRatings() -> hasMany(MaintenanceRating::class, 'technician_id')
-     */
-    public function technicianDashboard()
+    // Dashboard คะแนนของช่าง (รองรับ Sorting)
+    public function technicianDashboard(Request $request)
     {
-        $technicians = User::query()
+        $sort = $request->get('sort', 'score_desc'); // รับค่าการเรียงลำดับจาก Request
+
+        $query = User::query()
             ->where('role', 'technician')
             ->withAvg('technicianRatings', 'score')
-            ->withCount('technicianRatings')
-            ->get(['id', 'name']);
+            ->withCount('technicianRatings');
+
+        // การเรียงลำดับข้อมูลตามเงื่อนไข (Professional Sorting)
+        $query = match ($sort) {
+            'score_asc'  => $query->orderBy('technician_ratings_avg_score', 'asc'),
+            'count_desc' => $query->orderBy('technician_ratings_count', 'desc'),
+            'count_asc'  => $query->orderBy('technician_ratings_count', 'asc'),
+            default      => $query->orderByDesc('technician_ratings_avg_score'), // score_desc (ค่าเริ่มต้น)
+        };
+
+        $technicians = $query->get(['id', 'name']);
+
+        Log::info("Technician Dashboard viewed. Sorting by: {$sort}"); // บันทึก Log การเข้าดู Dashboard พร้อมค่าการเรียง
 
         return view('maintenance.rating.technicians-dashboard', [
             'technicians' => $technicians,
+            'selectedSort' => $sort, // ส่งค่าที่เลือกกลับไปที่ View เพื่อทำ Active State ใน Select
             'chartLabels' => $technicians->pluck('name'),
             'chartAvg'    => $technicians->pluck('technician_ratings_avg_score'),
             'chartCount'  => $technicians->pluck('technician_ratings_count'),
         ]);
     }
 
-    /**
-     * ฟอร์มให้คะแนน
-     */
+    // ฟอร์มให้คะแนน
     public function create(MaintenanceRequest $maintenanceRequest)
     {
         /** @var User $user */
         $user = Auth::user();
 
+        // ส่งตัวแปร $maintenanceRequest เข้าไปเช็คสิทธิ์แทน
         if ($redirect = $this->guardRatingAccess($maintenanceRequest, $user)) {
             return $redirect;
         }
 
-        // เลือกช่างจาก assignments (แหล่งความจริง) และกรองเฉพาะ role=technician
         $technicianId = $this->resolveTechnicianIdForRating($maintenanceRequest);
 
+        // ตอนส่งไปที่หน้า View ยังคงส่งไปในชื่อ 'req' เหมือนเดิม จะได้ไม่ต้องแก้โค้ดหน้าบ้าน
         return view('maintenance.rating.form', [
             'req'          => $maintenanceRequest,
             'technicianId' => $technicianId,
         ]);
     }
 
-    /**
-     * บันทึกคะแนน
-     * - ใช้ updateOrCreate กัน race condition + กดซ้ำแล้วค่าหาย
-     * - ยืนยันช่างจาก assignments (ไม่รับ technician_id จาก request เพื่อกันปลอม)
-     */
+    // บันทึกคะแนน
     public function store(Request $request, MaintenanceRequest $maintenanceRequest)
     {
         /** @var User $user */
         $user = Auth::user();
 
         if ($redirect = $this->guardRatingAccess($maintenanceRequest, $user)) {
+            Log::warning("Unauthorized or invalid rating attempt by User ID {$user->id} for Request ID {$maintenanceRequest->id}"); // บันทึก Log กรณีเข้าถึงไม่ถูกต้อง
             return $redirect;
         }
 
@@ -120,6 +126,7 @@ class MaintenanceRatingController extends Controller
 
         $technicianId = $this->resolveTechnicianIdForRating($maintenanceRequest);
         if (! $technicianId) {
+            Log::error("Failed to store rating: No technician assigned for Request ID {$maintenanceRequest->id}"); // บันทึก Log กรณีไม่พบช่าง
             return redirect()
                 ->route('maintenance.requests.show', $maintenanceRequest)
                 ->with('toast', [
@@ -140,6 +147,8 @@ class MaintenanceRatingController extends Controller
             ]
         );
 
+        Log::info("Rating stored: User ID {$user->id} rated Technician ID {$technicianId} with score {$data['score']}"); // บันทึก Log เมื่อบันทึกคะแนนสำเร็จ
+
         return redirect()
             ->route('maintenance.requests.show', $maintenanceRequest)
             ->with('toast', [
@@ -148,14 +157,7 @@ class MaintenanceRatingController extends Controller
             ]);
     }
 
-    /**
-     * กันสิทธิ์/เงื่อนไขการให้คะแนนให้ครบ:
-     * - ต้องเป็นคนแจ้งงาน
-     * - ต้องเป็นงานสถานะ resolved/closed
-     * - ต้องยังอยู่ในช่วง 7 วัน
-     * - ต้องยังไม่เคยให้คะแนน (เช็คด้วย query ชัวร์)
-     * - ต้องมีช่างจาก assignments (ไม่งั้นไม่ให้รีวิว)
-     */
+    // ตรวจสอบสิทธิ์
     protected function guardRatingAccess(MaintenanceRequest $maintenanceRequest, User $user): ?RedirectResponse
     {
         if ((int) $maintenanceRequest->reporter_id !== (int) $user->id) {
@@ -204,9 +206,7 @@ class MaintenanceRatingController extends Controller
         return null;
     }
 
-    /**
-     * validate + rule เพิ่ม: ถ้าให้ 1–2 ดาว ต้องมี comment
-     */
+    // การตรวจสอบความถูกต้องของข้อมูล (Validation)
     protected function validateRating(Request $request): array
     {
         $validator = Validator::make($request->all(), [
@@ -227,6 +227,7 @@ class MaintenanceRatingController extends Controller
         return $validator->validate();
     }
 
+    // ตรวจสอบระยะเวลาให้คะแนน
     protected function withinRatingWindow(MaintenanceRequest $maintenanceRequest): bool
     {
         $base = $maintenanceRequest->closed_at
@@ -238,10 +239,14 @@ class MaintenanceRatingController extends Controller
         return $base->isPast() && now()->diffInDays($base) <= $this->ratingDeadlineDays;
     }
 
+    // ค้นหา ID ของช่างที่รับผิดชอบงาน
     protected function resolveTechnicianIdForRating(MaintenanceRequest $maintenanceRequest): ?int
     {
         $assignment = $maintenanceRequest->assignments()
-            ->whereHas('user', fn($q) => $q->where('role', 'technician'))
+            // อนุญาตให้ทั้ง technician และ admin สามารถรับการประเมินได้
+            ->whereHas('user', function($q) {
+                $q->whereIn('role', ['technician', 'admin']);
+            })
             ->orderByDesc('is_lead')
             ->orderByRaw("CASE WHEN status = 'done' THEN 1 ELSE 0 END DESC")
             ->orderByDesc('assigned_at')
