@@ -1,5 +1,9 @@
 @csrf
 
+@php
+  $category = $category ?? new \App\Models\AssetCategory();
+@endphp
+
 <div class="maint-form space-y-6">
 
   {{-- ชื่อหมวดหมู่ --}}

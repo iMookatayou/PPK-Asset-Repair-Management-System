@@ -17,19 +17,23 @@
     (($filters['s'] ?? '') !== '') ||
     (($filters['role'] ?? '') !== '') ||
     (($filters['department'] ?? '') !== '');
+
+  // ฟังก์ชันสร้างตัวอักษรย่อ 2 ตัว (เหมือนหน้า Profile)
+  $getInitials = function($name) {
+      $name = trim((string)$name);
+      $parts = preg_split('/\s+/u', $name) ?: [];
+      $first = mb_substr($parts[0] ?? 'U', 0, 1);
+      $second = mb_substr($parts[1] ?? '', 0, 1);
+      return strtoupper($first . $second);
+  };
 @endphp
 
 @section('content')
 
-{{-- ✅ เว้นระยะจาก Navbar แบบ “วัดจริง” กันโดนกิน --}}
-<div id="auTopSpacer" style="height: var(--au-nav-h, 96px);"></div>
-
 <div class="w-full flex flex-col">
 
-  {{-- ===== Sticky Header + Filters (เหมือน Maintenance) ===== --}}
-  <div id="stickyHeaderAU"
-       class="sticky z-30 bg-white border-b border-slate-200"
-       style="top: var(--au-nav-h, 96px);">
+  {{-- ===== Sticky Header + Filters ===== --}}
+  <div class="sticky top-16 z-30 bg-white border-b border-slate-200">
     <div class="px-4 md:px-6 lg:px-8 py-4">
 
       <div class="flex flex-wrap items-start justify-between gap-4">
@@ -41,7 +45,7 @@
         <a href="{{ route('admin.users.create') }}"
            onclick="showLoader()"
            class="inline-flex items-center gap-2 rounded-md bg-emerald-700 px-4 py-2 text-[13px] font-medium text-white
-                  hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-600/40">
+                  hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-600/40 transition-colors">
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/>
           </svg>
@@ -124,7 +128,7 @@
     </div>
   </div>
 
-  {{-- ===== Table (ไม่ครอบพื้นหลัง) ===== --}}
+  {{-- ===== Table ===== --}}
   <div class="overflow-x-auto">
     <table class="min-w-full text-[13px]">
       <thead class="bg-white">
@@ -141,16 +145,26 @@
       <tbody>
       @forelse ($list as $u)
         @php
-          $depName = $u->departmentRef->name ?? $u->department ?? '-';
+          $depName = optional($u->departmentRef)->display_name ?? optional($u->departmentRef)->name_th ?? $u->department ?? '-';
           $roleTxt = $u->role_label ?? ($roleLabels[$u->role] ?? ucfirst($u->role));
+          $avatarMain  = data_get($u, 'avatar_url');
+          $avatarThumb = data_get($u, 'avatar_thumb_url');
         @endphp
 
-        <tr class="border-b border-slate-100 hover:bg-slate-50/60">
+        <tr class="border-b border-slate-100 hover:bg-slate-50/60 transition-colors">
           <td class="p-3 align-middle">
             <div class="flex items-center gap-3">
-              <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-600 text-xs font-semibold text-white">
-                {{ strtoupper(mb_substr($u->name,0,1)) }}
+              {{-- Avatar Section: แก้ไขเป็น ทรงกลม (rounded-full) --}}
+              <div class="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-slate-100 shadow-sm bg-emerald-600">
+                @if($avatarThumb || $avatarMain)
+                  <img src="{{ $avatarThumb ?: $avatarMain }}" alt="{{ $u->name }}" class="h-full w-full object-cover">
+                @else
+                  <div class="flex h-full w-full items-center justify-center text-[12px] font-bold text-white uppercase">
+                    {{ $getInitials($u->name) }}
+                  </div>
+                @endif
               </div>
+
               <div class="min-w-0">
                 <div class="truncate max-w-[220px] font-semibold text-slate-900">{{ $u->name }}</div>
                 <div class="text-[11px] text-slate-500">#{{ $u->id }}</div>
@@ -158,12 +172,12 @@
             </div>
           </td>
 
-          <td class="p-3 align-middle">
-            <div class="truncate max-w-[360px] text-slate-800">{{ $u->email }}</div>
+          <td class="p-3 align-middle text-slate-800">
+            <div class="truncate max-w-[360px]">{{ $u->email }}</div>
           </td>
 
           <td class="p-3 align-middle hidden lg:table-cell">
-            <div class="truncate max-w-[280px] text-slate-700">{{ $depName ?: '-' }}</div>
+            <div class="truncate max-w-[280px] text-slate-700">{{ $depName }}</div>
           </td>
 
           <td class="p-3 align-middle hidden md:table-cell text-center">
@@ -179,7 +193,7 @@
               <a href="{{ route('admin.users.edit', $u) }}"
                  onclick="showLoader()"
                  class="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 bg-white px-3 py-2 text-[12px] font-semibold text-emerald-700
-                        hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600/30 min-w-[92px] justify-center">
+                        hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600/30 min-w-[92px] justify-center transition-colors">
                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/>
                 </svg>
@@ -189,7 +203,7 @@
               @if($u->id !== auth()->id())
                 <button type="button"
                         class="inline-flex items-center gap-1.5 rounded-md border border-rose-300 bg-white px-3 py-2 text-[12px] font-semibold text-rose-600
-                               hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-500/30 min-w-[76px] justify-center"
+                               hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-500/30 min-w-[76px] justify-center transition-colors"
                         onclick="return window.confirmDeleteUser('{{ route('admin.users.destroy', $u) }}');">
                   <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
@@ -209,12 +223,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                       d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
               </svg>
-
-              @if($hasFilter)
-                <p class="text-[13px]">ไม่พบผู้ใช้ตามเงื่อนไขที่เลือก</p>
-              @else
-                <p class="text-[13px]">ตอนนี้ยังไม่มีผู้ใช้ในระบบ</p>
-              @endif
+              <p class="text-[13px]">{{ $hasFilter ? 'ไม่พบผู้ใช้ตามเงื่อนไขที่เลือก' : 'ตอนนี้ยังไม่มีผู้ใช้ในระบบ' }}</p>
             </div>
           </td>
         </tr>
@@ -252,35 +261,6 @@
   function showLoader(){ document.getElementById('loaderOverlay')?.classList.add('show') }
   function hideLoader(){ document.getElementById('loaderOverlay')?.classList.remove('show') }
 
-  function detectNavbarHeight(){
-    // จับ “ตัวบนสุดที่เป็น fixed/sticky” เพื่อให้ offset เป๊ะ
-    const all = Array.from(document.querySelectorAll('header, nav, [role="banner"], #navbar, #topNav, .navbar'));
-    let best = null;
-    let bestH = 0;
-
-    all.forEach(el => {
-      const cs = window.getComputedStyle(el);
-      if (cs.position !== 'fixed' && cs.position !== 'sticky') return;
-      const r = el.getBoundingClientRect();
-      if (r.height > bestH) { bestH = r.height; best = el; }
-    });
-
-    if (!bestH) {
-      // fallback: เอาสูงสุดของ candidates
-      all.forEach(el => {
-        const r = el.getBoundingClientRect();
-        if (r.height > bestH) bestH = r.height;
-      });
-    }
-
-    return Math.round(bestH || 96);
-  }
-
-  function syncNavOffset(){
-    const navH = detectNavbarHeight();
-    document.documentElement.style.setProperty('--au-nav-h', `${navH}px`);
-  }
-
   window.confirmDeleteUser = function(url){
     if(!confirm('ยืนยันการลบผู้ใช้นี้?')) return false;
     const f = document.getElementById('delete-user-form');
@@ -290,11 +270,6 @@
     return false;
   };
 
-  document.addEventListener('DOMContentLoaded', () => {
-    hideLoader();
-    syncNavOffset();
-  });
-
-  window.addEventListener('resize', syncNavOffset);
+  document.addEventListener('DOMContentLoaded', hideLoader);
 </script>
 @endsection

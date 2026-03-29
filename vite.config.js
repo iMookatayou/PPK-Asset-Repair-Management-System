@@ -29,7 +29,14 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       laravel({
-        input: ['resources/css/app.css', 'resources/js/app.js'],
+        input: [
+          'resources/css/app.css',
+          'resources/js/app.js',
+          // Page-specific bundles
+          'resources/js/repair/dashboard.js',
+          'resources/js/settings/sla/dashboard.js',
+          'resources/js/maintenance/rating/technicians-dashboard.js',
+        ],
         refresh: true,
       }),
     ],

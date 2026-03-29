@@ -1,314 +1,512 @@
 @extends('layouts.app')
 
-@section('title', 'รายงานผลการประเมินช่างบริการ')
+@section('title', 'Technician Ratings')
 
 @php
     $avg = round($technicians->avg('technician_ratings_avg_score'), 2);
     $sumReviews = $technicians->sum('technician_ratings_count');
     $totalTech = $technicians->count();
-    $percent = ($avg > 0) ? ($avg / 5) * 100 : 0;
 
-    $chartTechs  = $technicians->sortByDesc('technician_ratings_avg_score')->take(6);
-    $chartLabels = $chartTechs->pluck('name');
-    $chartScores = $chartTechs->pluck('technician_ratings_avg_score')->map(fn($v)=>round($v,2));
+    $chartLabels = $technicians->pluck('name');
+    $chartScores = $technicians->pluck('technician_ratings_avg_score')->map(fn($v) => round($v, 2));
+
+    $levelLabel = fn($score) => $score >= 4.5 ? 'ดีมาก' : ($score >= 4.0 ? 'ดี' : ($score >= 3.0 ? 'ปานกลาง' : 'ควรปรับปรุง'));
+
+    $levelTextClass = fn($score) => match(true) {
+        $score >= 4.0 => 'text-emerald-700',
+        $score >= 3.0 => 'text-amber-700',
+        default       => 'text-rose-700',
+    };
+
+    $getInitials = function($name) {
+        $name = trim((string)$name);
+        $parts = preg_split('/\s+/u', $name) ?: [];
+        $first = mb_substr($parts[0] ?? 'U', 0, 1);
+        $second = mb_substr($parts[1] ?? '', 0, 1);
+        return strtoupper($first . $second);
+    };
 @endphp
 
-{{-- ✅ กล่องได้แค่นี่: Sticky Header เท่านั้น --}}
-@section('page-header')
-  <div class="px-4 sm:px-6 lg:px-10 2xl:px-20 pt-3">
-    <div class="overflow-hidden bg-white/90 backdrop-blur-sm border border-slate-200 rounded-2xl shadow-sm">
-      <div class="flex flex-wrap items-start justify-between gap-4 px-4 sm:px-6 py-4">
-
-        <div class="flex items-start gap-3 flex-1 min-w-0">
-          <div class="hidden sm:flex">
-            <div class="h-11 w-11 rounded-xl bg-slate-800 text-slate-50 grid place-items-center">
-              <svg xmlns="http://www.w3.org/2000/svg"
-                   class="h-5 w-5"
-                   viewBox="0 0 24 24"
-                   fill="none"
-                   stroke="currentColor"
-                   stroke-width="1.8"
-                   stroke-linecap="round"
-                   stroke-linejoin="round">
-                <path d="M3 5a4 4 0 0 1 6.5-2.9L7 4.6 9.4 7l2.5-2.5A4 4 0 1 1 13 11L9 15H7v-2L11 9a2 2 0 1 0-2.8-2.8L6 8.4 3.6 6z" />
-                <circle cx="18" cy="18" r="3" />
-              </svg>
-            </div>
-          </div>
-
-          <div class="flex-1 min-w-0">
-            <div class="inline-flex items-center gap-2 rounded-full bg-slate-900/5 px-4 py-1 text-[11px] font-semibold text-slate-800">
-              รายงานผลการประเมินช่างผู้ให้บริการซ่อมบำรุงครุภัณฑ์
-            </div>
-
-            <h1 class="mt-2 text-lg md:text-xl font-semibold text-slate-900 leading-snug">
-              รายงานผลการประเมินช่างผู้ให้บริการซ่อมบำรุง
-            </h1>
-
-            <p class="mt-1 text-xs text-slate-700">
-              สรุปผลคะแนนเฉลี่ย จำนวนครั้งประเมิน และระดับผลการประเมินของช่างผู้ให้บริการ
-            </p>
-          </div>
-        </div>
-
-        <div class="text-[11px] sm:text-xs text-slate-700 text-right">
-          หน่วยงานที่รับผิดชอบ : กลุ่มงานเทคโนโลยีสารสนเทศ
-        </div>
-
-      </div>
-
-      <div class="border-t border-slate-200 bg-slate-50/70 px-4 sm:px-6 py-1.5">
-        <span class="text-[11px] text-slate-800">
-          ข้อมูลประเมินจากระบบงานซ่อมบำรุง ใช้เพื่อการบริหารจัดการภายในหน่วยงาน
-        </span>
-      </div>
-    </div>
-  </div>
-@endsection
-
-
 @section('content')
-<div class="px-4 sm:px-6 lg:px-10 2xl:px-20 pt-2 pb-10">
+<div class="w-full flex flex-col">
 
-  {{-- ✅ ทั้งหน้ารวมเป็น “ส่วนเดียว” ไม่มีการ์ด/กล่อง --}}
-  <section class="space-y-8">
-
-    {{-- แถบควบคุม + สรุปภาพรวม (อยู่ส่วนเดียวกัน) --}}
-    <div class="space-y-5">
-
-      {{-- ค้นหา + เรียง --}}
-      <div class="grid gap-4 lg:gap-6 md:grid-cols-3 md:items-end">
-        <div class="md:col-span-2">
-          <label class="block text-xs font-medium text-slate-800 mb-1.5">
-            ค้นหาชื่อช่างผู้ให้บริการ
-          </label>
-          <div class="relative">
-            <input type="text"
-                   class="w-full border border-slate-300 text-sm px-3 py-2.5 pr-9 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-700 bg-white"
-                   placeholder="กรอกชื่อช่างที่ต้องการค้นหา">
-            <span class="absolute inset-y-0 right-3 flex items-center text-slate-400 text-xs">
-              <i class="fa-solid fa-magnifying-glass"></i>
-            </span>
-          </div>
-          <p class="mt-2 text-[11px] text-slate-600">
-            * ฟังก์ชันนี้สามารถเชื่อมต่อ Controller ภายหลังเพื่อใช้งานจริง
-          </p>
-        </div>
-
-        <div>
-          <label class="block text-xs font-medium text-slate-800 mb-1.5">
-            รูปแบบการเรียงลำดับข้อมูล
-          </label>
-          <select class="w-full border border-slate-300 text-sm px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-700">
-            <option>คะแนนเฉลี่ยมาก → น้อย</option>
-            <option>คะแนนเฉลี่ยน้อย → มาก</option>
-            <option>จำนวนครั้งมาก → น้อย</option>
-            <option>จำนวนครั้งน้อย → มาก</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="h-px bg-slate-200"></div>
-
-      {{-- สรุปตัวเลขภาพรวม (ไม่มีการ์ด) --}}
-      <div>
-        <h2 class="text-sm font-semibold text-slate-900">
-          สรุปภาพรวมผลการประเมินช่างผู้ให้บริการ
-        </h2>
-
-        <div class="mt-3 grid md:grid-cols-3 gap-4">
-          <div>
-            <p class="text-[11px] text-slate-700">จำนวนช่างที่มีข้อมูลประเมิน</p>
-            <p class="mt-1 text-3xl font-semibold text-slate-900">{{ $totalTech }}</p>
-          </div>
-
-          <div>
-            <p class="text-[11px] text-slate-700">คะแนนเฉลี่ยรวม</p>
-            <div class="flex items-baseline gap-2 mt-1">
-              <p class="text-3xl font-semibold text-slate-900">{{ number_format($avg,2) }}</p>
-              <span class="text-xs text-slate-600">เต็ม 5</span>
+    {{-- Sticky Header --}}
+    <div class="sticky top-16 z-20 bg-white/90 backdrop-blur border-b border-slate-200">
+        <div class="px-4 md:px-6 lg:px-8 py-4">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="flex items-start gap-3 flex-1 min-w-0">
+                    <span class="material-symbols-outlined text-[32px] text-[#0F2D5C] mt-0.5" aria-hidden="true">analytics</span>
+                    <div>
+                        <h1 class="text-[17px] font-semibold text-slate-900 leading-none">Technician Performance Summary</h1>
+                        <p class="mt-1 text-[13px] text-slate-600">
+                            @if(request('from') || request('to')) ข้อมูลช่วง {{ request('from') ?? '...' }} ถึง {{ request('to') ?? 'วันนี้' }} @else สรุปผลการประเมินในรอบปี {{ now()->year }} @endif
+                        </p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px]">
+                    <div class="flex items-center gap-2">
+                        <span class="text-slate-500 font-medium">ช่างทั้งหมด:</span>
+                        <span class="font-semibold text-slate-900">{{ $totalTech }}</span>
+                    </div>
+                    <div class="flex items-center gap-2 pl-3 border-l border-slate-200">
+                        <span class="text-slate-500 font-medium">คะแนนเฉลี่ย:</span>
+                        <span class="font-semibold text-emerald-700">{{ number_format($avg, 2) }}</span>
+                    </div>
+                    <div class="flex items-center gap-2 pl-3 border-l border-slate-200">
+                        <span class="text-slate-500 font-medium">ประเมินรวม:</span>
+                        <span class="font-semibold text-indigo-700">{{ number_format($sumReviews) }}</span>
+                    </div>
+                </div>
             </div>
 
-            <div class="h-2 bg-slate-200 rounded-full mt-2 overflow-hidden">
-              <div class="h-full bg-blue-700 rounded-full" style="width: {{ $percent }}%"></div>
+            {{-- Period Filter Panel --}}
+            <div class="mt-4 p-4 bg-slate-50/80 rounded-xl border border-slate-200">
+                <form method="GET" class="flex flex-wrap items-center gap-4">
+                    {{-- Preserve Sort --}}
+                    <input type="hidden" name="sort" value="{{ request('sort', 'score_desc') }}">
+
+                    <div class="flex items-center gap-2">
+                        <label class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">จาก:</label>
+                        <input type="date" name="from" value="{{ request('from') }}"
+                            class="text-[13px] border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#0F2D5C]/10 bg-white">
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">ถึง:</label>
+                        <input type="date" name="to" value="{{ request('to') }}"
+                            class="text-[13px] border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#0F2D5C]/10 bg-white">
+                    </div>
+                    <button type="submit"
+                        class="px-5 py-1.5 bg-[#0F2D5C] text-white rounded-lg text-[13px] font-bold hover:bg-[#1a3d7c] transition-all shadow-sm">
+                        กรองข้อมูล
+                    </button>
+
+                    <div class="h-6 w-[1px] bg-slate-200 mx-2 hidden md:block"></div>
+
+                    <div class="flex items-center gap-3">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tight">ช่วงเวลาลัด:</span>
+                        <a href="{{ url()->current() }}?from={{ now()->subMonths(5)->startOfMonth()->format('Y-m-d') }}&sort={{ request('sort', 'score_desc') }}"
+                            class="text-[12px] font-bold text-[#0F2D5C] hover:underline">6 เดือน</a>
+                        <a href="{{ url()->current() }}?from={{ now()->subMonths(11)->startOfMonth()->format('Y-m-d') }}&sort={{ request('sort', 'score_desc') }}"
+                            class="text-[12px] font-bold text-[#0F2D5C] hover:underline">12 เดือน</a>
+                        <a href="{{ url()->current() }}?sort={{ request('sort', 'score_desc') }}"
+                            class="text-[12px] font-bold text-[#0F2D5C] hover:underline">ปีนี้</a>
+                    </div>
+                </form>
             </div>
-          </div>
 
-          <div>
-            <p class="text-[11px] text-slate-700">จำนวนครั้งการประเมินรวม</p>
-            <p class="mt-1 text-3xl font-semibold text-slate-900">{{ number_format($sumReviews) }}</p>
-          </div>
+            <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-12 md:items-end">
+                <div class="md:col-span-8 min-w-0">
+                    <label for="techSearch" class="mb-1 block text-[12px] text-slate-600">ค้นหาพนักงาน</label>
+                    <div class="relative">
+                        <input id="techSearch" type="text" placeholder="กรอกชื่อช่างที่ต้องการค้นหา..."
+                            class="w-full rounded-md border border-slate-200 bg-white pl-10 pr-3 py-2 text-[13px] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0F2D5C]/35 focus:border-[#0F2D5C]/35">
+                        <span class="absolute inset-y-0 left-0 flex w-9 items-center justify-center text-slate-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.3-4.3M17 10a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                        </span>
+                    </div>
+                </div>
+                <div class="md:col-span-4">
+                    <label for="sortSelector" class="mb-1 block text-[12px] text-slate-600">เรียงลำดับข้อมูล</label>
+                    <select id="sortSelector" class="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0F2D5C]/35 focus:border-[#0F2D5C]/35">
+                        <option value="score_desc" {{ request('sort') == 'score_desc' ? 'selected' : '' }}>คะแนนเฉลี่ยสูงสุด</option>
+                        <option value="score_asc"  {{ request('sort') == 'score_asc'  ? 'selected' : '' }}>คะแนนเฉลี่ยเริ่มต้น</option>
+                        <option value="count_desc" {{ request('sort') == 'count_desc' ? 'selected' : '' }}>จำนวนการประเมินสูงสุด</option>
+                        <option value="count_asc"  {{ request('sort') == 'count_asc'  ? 'selected' : '' }}>จำนวนการประเมินเริ่มต้น</option>
+                    </select>
+                </div>
+            </div>
         </div>
-      </div>
-
     </div>
 
-
-    {{-- กราฟ (อยู่ในหน้าแบบโปร่ง ไม่มีการ์ด) --}}
+    {{-- Chart --}}
     @if($technicians->count())
-      <div class="space-y-3">
-        <div class="flex items-center justify-between gap-3">
-          <p class="text-sm font-semibold text-slate-900">
-            คะแนนเฉลี่ยของช่างผู้ให้บริการ (อันดับสูงสุด)
-          </p>
-          <p class="text-[11px] text-slate-600">
-            แสดง 6 อันดับแรก
-          </p>
+    <div class="px-4 md:px-6 lg:px-8 py-6 bg-slate-50/50 border-b border-slate-200">
+        <div class="text-[13px] font-semibold text-slate-800 mb-4">สรุปตะแนนประเมินรายบุคคล
+            @if(request('from') || request('to')) (ช่วงที่คุณเลือก) @else (รายปี {{ now()->year }}) @endif
         </div>
-
         <div style="height:280px">
-          <canvas id="techRatingChart"></canvas>
+            <canvas id="techRatingChart"
+                data-labels='@json($chartLabels)'
+                data-values='@json($chartScores)'
+            ></canvas>
         </div>
-
-        <div class="h-px bg-slate-200"></div>
-      </div>
+    </div>
     @endif
 
-
-    {{-- ตารางรายละเอียด --}}
-    <div class="space-y-3">
-      <div class="flex items-end justify-between gap-3">
-        <div>
-          <h2 class="text-sm font-semibold text-slate-900">
-            รายละเอียดผลการประเมินช่างผู้ให้บริการ (รายบุคคล)
-          </h2>
-          <p class="mt-1 text-xs text-slate-600">
-            จำนวนช่างทั้งหมด {{ $totalTech }} ราย
-          </p>
+    {{-- Table header --}}
+    <div class="px-4 md:px-6 lg:px-8 py-2 border-b border-slate-200 bg-white">
+        <div class="flex items-center justify-between">
+            <div class="text-[13px] font-semibold text-slate-800">รายละเอียดคะแนนรายบุคคล</div>
+            <div class="text-[12px] text-slate-500">แสดงผล {{ $totalTech }} รายการ</div>
         </div>
-
-        {{-- legend แบบเรียบ ๆ ไม่ครอบ --}}
-        <div class="hidden sm:flex items-center gap-5 text-[11px] text-slate-700">
-            <span class="inline-flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
-                ดีมาก / ดี
-            </span>
-            <span class="inline-flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                ปานกลาง
-            </span>
-            <span class="inline-flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-rose-600"></span>
-                ควรปรับปรุง
-            </span>
-        </div>
-      </div>
-
-      @if($technicians->isEmpty())
-        <div class="py-10 text-center text-sm text-slate-600">
-          ยังไม่มีข้อมูลประเมิน
-        </div>
-      @else
-        <div class="overflow-x-auto border border-slate-300 rounded-lg bg-white">
-          <table class="min-w-full text-sm">
-            <thead>
-              <tr class="bg-slate-50 border-b border-slate-300 text-xs text-slate-900">
-                <th class="px-2 py-2 text-center w-14">ลำดับ</th>
-                <th class="px-3 py-2 text-left">ชื่อ–สกุล</th>
-                <th class="px-3 py-2 text-center w-32">คะแนนเฉลี่ย</th>
-                <th class="px-3 py-2 text-center w-40">รูปแบบดาว</th>
-                <th class="px-3 py-2 text-center w-32">จำนวนครั้ง</th>
-                <th class="px-3 py-2 text-center w-32">ระดับ</th>
-                <th class="px-3 py-2 text-center w-32">ดูข้อมูล</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              @foreach($technicians as $i => $t)
-                @php
-                  $avgScore  = round($t->technician_ratings_avg_score,2);
-                  $roundStar = round($t->technician_ratings_avg_score);
-
-                  $level =
-                      $avgScore >= 4.5 ? 'ดีมาก' :
-                      ($avgScore >= 4.0 ? 'ดี' :
-                      ($avgScore >= 3.0 ? 'ปานกลาง' : 'ควรปรับปรุง'));
-
-                  $levelClass =
-                      $avgScore >= 4.0 ? 'text-emerald-700 font-semibold' :
-                      ($avgScore >= 3.0 ? 'text-amber-700 font-semibold' :
-                      'text-rose-700 font-semibold');
-                @endphp
-
-                <tr class="{{ $loop->odd ? 'bg-white' : 'bg-slate-50' }} hover:bg-slate-100/70 transition">
-                  <td class="px-2 py-2 text-center">{{ $i+1 }}</td>
-                  <td class="px-3 py-2">{{ $t->name }}</td>
-                  <td class="px-3 py-2 text-center">{{ number_format($avgScore,2) }}</td>
-
-                  <td class="px-3 py-2 text-center">
-                    <div class="inline-flex items-center gap-0.5">
-                      @for($s=1;$s<=5;$s++)
-                        @if($s <= $roundStar)
-                          <i class="fa-solid fa-star text-yellow-400 text-xs"></i>
-                        @else
-                          <i class="fa-regular fa-star text-slate-300 text-xs"></i>
-                        @endif
-                      @endfor
-                      <span class="ml-1 text-[11px] text-slate-600">({{ number_format($avgScore,2) }})</span>
-                    </div>
-                  </td>
-
-                  <td class="px-3 py-2 text-center">{{ number_format($t->technician_ratings_count) }}</td>
-
-                  {{-- ✅ ไม่ครอบ ไม่ทำ badge แค่สี/ตัวหนา --}}
-                  <td class="px-3 py-2 text-center text-xs {{ $levelClass }}">{{ $level }}</td>
-
-                  <td class="px-3 py-2 text-center">
-                    <a href="#" class="text-[11px] px-2.5 py-1 border border-slate-400 hover:bg-slate-100 transition">
-                      ดูรายละเอียด
-                    </a>
-                  </td>
-                </tr>
-              @endforeach
-            </tbody>
-
-          </table>
-        </div>
-      @endif
     </div>
 
-  </section>
+    {{-- Table --}}
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-[13px] border-collapse">
+            <thead class="bg-white text-slate-600">
+                <tr>
+                    <th class="p-3 text-center font-semibold w-[8%]  border-b border-slate-200">รูปถ่าย</th>
+                    <th class="p-3 text-center font-semibold w-[6%]  border-b border-slate-200">ลำดับ</th>
+                    <th class="p-3 text-left   font-semibold w-[26%] border-b border-slate-200">ชื่อ–สกุลพนักงาน</th>
+                    <th class="p-3 text-center font-semibold w-[10%] border-b border-slate-200">คะแนนเฉลี่ย</th>
+                    <th class="p-3 text-center font-semibold w-[18%] border-b border-slate-200">รูปแบบดาว</th>
+                    <th class="p-3 text-center font-semibold w-[10%] border-b border-slate-200">จำนวนครั้ง</th>
+                    <th class="p-3 text-center font-semibold w-[10%] border-b border-slate-200">ระดับ</th>
+                    <th class="p-3 text-center font-semibold         border-b border-slate-200">การดำเนินการ</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white">
+                @forelse($technicians as $i => $t)
+                    @php
+                        $avgScore  = round($t->technician_ratings_avg_score, 2);
+                        $roundStar = round($avgScore);
+                        $avatarMain  = data_get($t, 'avatar_url');
+                        $avatarThumb = data_get($t, 'avatar_thumb_url');
+                    @endphp
+                    <tr class="align-top border-b border-slate-100 hover:bg-slate-50/60 transition-colors">
+                        <td class="p-3 align-middle text-center">
+                            <div class="flex justify-center">
+                                @if($avatarThumb || $avatarMain)
+                                    <img src="{{ $avatarThumb ?: $avatarMain }}" alt="{{ $t->name }}"
+                                        class="h-9 w-9 rounded-full object-cover border border-slate-200 shadow-sm">
+                                @else
+                                    <div class="h-9 w-9 rounded-full bg-emerald-600 flex items-center justify-center border border-emerald-700 shadow-sm">
+                                        <span class="text-white text-[13px] font-bold leading-none">{{ $getInitials($t->name) }}</span>
+                                    </div>
+                                @endif
+                            </div>
+                        </td>
+                        <td class="p-3 align-middle text-center text-slate-500 font-medium">{{ $i + 1 }}</td>
+                        <td class="p-3 align-middle">
+                            <span class="font-semibold text-slate-900">{{ $t->name }}</span>
+                        </td>
+                        <td class="p-3 align-middle text-center font-bold text-slate-900">
+                            {{ number_format($avgScore, 2) }}
+                        </td>
+                        <td class="p-3 align-middle text-center">
+                            <div class="flex justify-center items-center gap-0.5">
+                                @for($s = 1; $s <= 5; $s++)
+                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                        class="h-3.5 w-3.5 {{ $s <= $roundStar ? 'text-yellow-400' : 'text-slate-200' }}"
+                                        viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                    </svg>
+                                @endfor
+                            </div>
+                        </td>
+                        <td class="p-3 align-middle text-center text-slate-700">
+                            {{ number_format($t->technician_ratings_count) }}
+                        </td>
+                        <td class="p-3 align-middle text-center">
+                            <span class="font-semibold {{ $levelTextClass($avgScore) }}">
+                                {{ $levelLabel($avgScore) }}
+                            </span>
+                        </td>
+                        <td class="p-3 align-middle text-center">
+                            <a href="{{ route('technicians.rating.summary', $t->id) }}"
+                                class="inline-flex items-center gap-1.5 rounded-md border border-indigo-300 bg-white px-3 py-1.5 font-medium text-indigo-700 hover:bg-indigo-50 transition-colors justify-center min-w-[110px] text-[13px]">
+                                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
+                                </svg>
+                                ดูรายละเอียด
+                            </a>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="8" class="py-16 text-center text-slate-500">ไม่พบข้อมูลคะแนนการประเมินในระบบ</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{{-- ─────────────────────────────────────────
+     RATING DETAIL MODAL
+────────────────────────────────────────── --}}
+<div id="ratingModal"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="ratingModalTitle"
+     class="fixed inset-0 z-[9999] flex items-center justify-center hidden">
+
+    {{-- Backdrop --}}
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onclick="closeRatingModal()"></div>
+
+    {{-- Panel --}}
+    <div class="relative bg-white w-full max-w-lg mx-4 rounded-lg shadow-2xl flex flex-col overflow-hidden"
+         style="max-height: 90vh;">
+
+        {{-- ── Modal Header ── --}}
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white shrink-0">
+            <div class="flex items-center gap-2">
+                <svg class="h-4 w-4 text-[#0F2D5C]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+                <span id="ratingModalTitle" class="text-[14px] font-semibold text-slate-900">ผลการประเมินรายบุคคล</span>
+            </div>
+            <button onclick="closeRatingModal()"
+                    class="flex items-center justify-center h-7 w-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        {{-- ── Modal Body ── --}}
+        <div class="overflow-y-auto flex-1">
+
+            {{-- Skeleton --}}
+            <div id="ratingModalSkeleton" class="px-6 py-5 space-y-4 animate-pulse">
+                <div class="flex items-center gap-4">
+                    <div class="h-12 w-12 rounded-full bg-slate-200 shrink-0"></div>
+                    <div class="flex-1 space-y-2">
+                        <div class="h-4 bg-slate-200 rounded w-2/5"></div>
+                        <div class="h-3 bg-slate-200 rounded w-1/4"></div>
+                    </div>
+                </div>
+                <div class="h-px bg-slate-100"></div>
+                <div class="h-20 bg-slate-100 rounded-md"></div>
+                <div class="space-y-2">
+                    <div class="h-3 bg-slate-100 rounded w-1/4 mb-3"></div>
+                    <div class="h-14 bg-slate-100 rounded-md"></div>
+                    <div class="h-14 bg-slate-100 rounded-md"></div>
+                    <div class="h-14 bg-slate-100 rounded-md"></div>
+                </div>
+            </div>
+
+            {{-- Content --}}
+            <div id="ratingModalContent" class="hidden"></div>
+        </div>
+
+        {{-- ── Modal Footer ── --}}
+        <div class="px-6 py-3 border-t border-slate-200 bg-slate-50 flex justify-end shrink-0">
+            <button onclick="closeRatingModal()"
+                    class="px-4 py-2 rounded-md border border-slate-300 bg-white text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                ปิด
+            </button>
+        </div>
+    </div>
+</div>
+
+{{-- Loader overlay --}}
+<div id="loaderOverlay" class="loader-overlay">
+    <div class="loader-spinner"></div>
 </div>
 @endsection
 
-
 @section('scripts')
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    @vite(['resources/js/maintenance/rating/technicians-dashboard.js'])
+
+<style>
+    .loader-overlay {
+        position: fixed; inset: 0;
+        background: rgba(255,255,255,.6);
+        backdrop-filter: blur(2px);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 99999;
+        visibility: hidden; opacity: 0;
+        transition: opacity .2s, visibility .2s;
+    }
+    .loader-overlay.show { visibility: visible; opacity: 1; }
+    .loader-spinner {
+        width: 38px; height: 38px;
+        border: 4px solid #0F2D5C;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Modal animation */
+    #ratingModal:not(.hidden) > div:last-child {
+        animation: modalIn .18s ease-out;
+    }
+    @keyframes modalIn {
+        from { opacity: 0; transform: translateY(8px) scale(.98); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* Review scroll */
+    .review-list { scrollbar-width: thin; scrollbar-color: #e2e8f0 transparent; }
+    .review-list::-webkit-scrollbar { width: 4px; }
+    .review-list::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 4px; }
+</style>
 
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-  const ctx = document.getElementById('techRatingChart');
-  if (!ctx) return;
+    /* ─── Loader ─── */
+    function showLoader() { document.getElementById('loaderOverlay')?.classList.add('show'); }
+    function hideLoader() { document.getElementById('loaderOverlay')?.classList.remove('show'); }
+    document.addEventListener('DOMContentLoaded', hideLoader);
 
-  const labels = @json($chartLabels);
-  const data   = @json($chartScores);
-
-  new Chart(ctx,{
-    type:'bar',
-    data:{
-      labels,
-      datasets:[{
-        data,
-        backgroundColor:'rgba(37,99,235,0.75)',
-        borderColor:'rgba(30,64,175,1)',
-        borderWidth:1
-      }]
-    },
-    options:{
-      maintainAspectRatio:false,
-      scales:{
-        y:{ beginAtZero:true, max:5, ticks:{ stepSize:1 } }
-      },
-      plugins:{
-        legend:{ display:false },
-        tooltip:{
-          callbacks:{
-            label:ctx=>` ${ctx.parsed.y.toFixed(2)} คะแนน`
-          }
+    /* ─── Sort & Search ─── */
+    document.addEventListener('DOMContentLoaded', function () {
+        const sortSel = document.getElementById('sortSelector');
+        if (sortSel) {
+            sortSel.addEventListener('change', function () {
+                showLoader();
+                const url = new URL(window.location.href);
+                url.searchParams.set('sort', this.value);
+                // Preserve from/to if present
+                const from = document.querySelector('input[name="from"]')?.value;
+                const to = document.querySelector('input[name="to"]')?.value;
+                if (from) url.searchParams.set('from', from);
+                if (to) url.searchParams.set('to', to);
+                window.location.href = url.toString();
+            });
         }
-      }
+
+        document.getElementById('techSearch')?.addEventListener('keyup', function () {
+            const val  = this.value.toUpperCase();
+            const rows = document.querySelector('tbody').rows;
+            for (let i = 0; i < rows.length; i++) {
+                if (rows[i].cells.length < 3) continue;
+                const name = rows[i].cells[2].textContent.toUpperCase();
+                rows[i].style.display = name.includes(val) ? '' : 'none';
+            }
+        });
+
+        // Chart handled by Vite bundle (technicians-dashboard.js)
+    });
+
+    /* ─── Rating Modal ─── */
+    function openRatingModal(userId, url) {
+        const modal   = document.getElementById('ratingModal');
+        const skel    = document.getElementById('ratingModalSkeleton');
+        const content = document.getElementById('ratingModalContent');
+
+        modal.classList.remove('hidden');
+        skel.classList.remove('hidden');
+        content.classList.add('hidden');
+        content.innerHTML = '';
+
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => {
+                if (!r.ok) throw new Error('Network error');
+                return r.json();
+            })
+            .then(data => renderRatingModal(data))
+            .catch(() => {
+                content.innerHTML = `
+                    <div class="px-6 py-10 text-center">
+                        <p class="text-[13px] text-rose-500">ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่อีกครั้ง</p>
+                    </div>`;
+                skel.classList.add('hidden');
+                content.classList.remove('hidden');
+            });
     }
-  });
-});
+
+    function closeRatingModal() {
+        document.getElementById('ratingModal').classList.add('hidden');
+    }
+
+    /* Close on ESC */
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeRatingModal();
+    });
+
+    function starSVG(filled, size = '3.5') {
+        const color = filled ? '#FBBF24' : '#E2E8F0';
+        return `<svg width="${size === '3.5' ? 14 : 16}" height="${size === '3.5' ? 14 : 16}" viewBox="0 0 20 20" fill="${color}" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+        </svg>`;
+    }
+
+    function renderRatingModal(d) {
+        const skel    = document.getElementById('ratingModalSkeleton');
+        const content = document.getElementById('ratingModalContent');
+
+        /* Level badge */
+        const level = d.avg_score >= 4.5 ? 'ดีมาก'
+                    : d.avg_score >= 4.0 ? 'ดี'
+                    : d.avg_score >= 3.0 ? 'ปานกลาง'
+                    : 'ควรปรับปรุง';
+        const levelBg = d.avg_score >= 4.0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : d.avg_score >= 3.0 ? 'bg-amber-50 text-amber-700 border-amber-200'
+                      : 'bg-rose-50 text-rose-700 border-rose-200';
+
+        /* Stars row */
+        const starsLg = Array.from({length: 5}, (_, i) => starSVG(i < Math.round(d.avg_score), '4')).join('');
+
+        /* Reviews */
+        let reviewsHTML = '';
+        if (d.reviews && d.reviews.length) {
+            reviewsHTML = d.reviews.map(r => {
+                const starsSm = Array.from({length: 5}, (_, i) => starSVG(i < r.score, '3')).join('');
+                const comment = r.comment
+                    ? `<p class="text-[12px] text-slate-600 mt-1.5 leading-relaxed">${r.comment}</p>`
+                    : `<p class="text-[12px] text-slate-400 italic mt-1.5">ไม่มีความคิดเห็น</p>`;
+                return `
+                <div class="py-3 border-b border-slate-100 last:border-0">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-1">${starsSm}</div>
+                        <span class="text-[11px] text-slate-400">${r.created_at}</span>
+                    </div>
+                    ${comment}
+                    <p class="text-[11px] text-slate-400 mt-1.5">ประเมินโดย <span class="font-medium text-slate-500">${r.rater}</span></p>
+                </div>`;
+            }).join('');
+        } else {
+            reviewsHTML = `<p class="py-6 text-center text-[13px] text-slate-400">ยังไม่มีการประเมิน</p>`;
+        }
+
+        content.innerHTML = `
+        <div class="px-6 py-5 space-y-5">
+
+            {{-- ── ข้อมูลพนักงาน ── --}}
+            <div class="flex items-center gap-4">
+                <img src="${d.avatar_url}"
+                     alt="${d.name}"
+                     class="h-12 w-12 rounded-full object-cover border border-slate-200 shadow-sm shrink-0">
+                <div>
+                    <div class="font-semibold text-slate-900 text-[14px] leading-tight">${d.name}</div>
+                    <div class="text-[12px] text-slate-500 mt-0.5">${d.role_label}</div>
+                </div>
+            </div>
+
+            <div class="h-px bg-slate-100"></div>
+
+            {{-- ── สรุปคะแนน ── --}}
+            <div class="rounded-md border border-slate-200 bg-slate-50 px-5 py-4">
+                <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-3">สรุปผลการประเมิน</div>
+                <div class="flex items-center gap-6">
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-slate-900 leading-none">${d.avg_score.toFixed(2)}</div>
+                        <div class="text-[10px] text-slate-400 mt-1">จาก 5.00</div>
+                    </div>
+                    <div class="flex-1 space-y-2.5">
+                        <div class="flex items-center gap-1.5">
+                            ${starsLg}
+                        </div>
+                        <div class="flex items-center gap-3 text-[12px]">
+                            <div class="flex items-center gap-1.5 text-slate-500">
+                                <svg class="h-3.5 w-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                </svg>
+                                ประเมินแล้ว <span class="font-semibold text-slate-700">${d.total_count} ครั้ง</span>
+                            </div>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded border text-[11px] font-medium ${levelBg}">${level}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- ── รายการความคิดเห็น ── --}}
+            <div>
+                <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">ความคิดเห็นล่าสุด</div>
+                <div class="review-list max-h-56 overflow-y-auto -mx-1 px-1">
+                    ${reviewsHTML}
+                </div>
+            </div>
+
+        </div>`;
+
+        skel.classList.add('hidden');
+        content.classList.remove('hidden');
+    }
 </script>
 @endsection

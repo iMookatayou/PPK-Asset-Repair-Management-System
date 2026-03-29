@@ -9,9 +9,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class MaintenanceAssignment extends Model
 {
     protected $table = 'maintenance_assignments';
+
+    // status (งานระดับ assignment)
+    public const STATUS_ASSIGNED    = 'assigned';
     public const STATUS_IN_PROGRESS = 'in_progress';
     public const STATUS_DONE        = 'done';
     public const STATUS_CANCELLED   = 'cancelled';
+
+    // response_status (การตอบรับงาน)
     public const RESP_PENDING       = 'pending';
     public const RESP_ACCEPTED      = 'accepted';
     public const RESP_REJECTED      = 'rejected';
@@ -26,16 +31,17 @@ class MaintenanceAssignment extends Model
 
         'response_status',
         'responded_at',
+        'remark',
 
         'status',
     ];
 
     protected $casts = [
-        'assigned_at'      => 'datetime',
-        'responded_at'     => 'datetime',
-        'is_lead'          => 'boolean',
-        'status'           => 'string',
-        'response_status'  => 'string',
+        'assigned_at'     => 'datetime',
+        'responded_at'    => 'datetime',
+        'is_lead'         => 'boolean',
+        'status'          => 'string',
+        'response_status' => 'string',
     ];
 
     public function maintenanceRequest(): BelongsTo
@@ -48,10 +54,6 @@ class MaintenanceAssignment extends Model
         return $this->belongsTo(User::class);
     }
 
-    // -----------------------
-    // Scopes (MyJob)
-    // -----------------------
-
     public function scopeForUser(Builder $q, int $userId): Builder
     {
         return $q->where('user_id', $userId);
@@ -59,9 +61,7 @@ class MaintenanceAssignment extends Model
 
     public function scopeActive(Builder $q): Builder
     {
-        return $q->whereIn('status', [
-            self::STATUS_IN_PROGRESS,
-        ]);
+        return $q->whereIn('status', [self::STATUS_IN_PROGRESS]);
     }
 
     public function scopeInProgress(Builder $q): Builder
@@ -97,11 +97,13 @@ class MaintenanceAssignment extends Model
         ])->save();
     }
 
-    public function markRejected(): bool
+    public function markRejectedWithRemark(?string $remark = null): bool
     {
         return $this->forceFill([
             'response_status' => self::RESP_REJECTED,
             'responded_at'    => now(),
+            'remark'          => $remark,
+            'status'          => self::STATUS_CANCELLED,
         ])->save();
     }
 
@@ -122,5 +124,22 @@ class MaintenanceAssignment extends Model
             self::RESP_ACKNOWLEDGED => 'รับทราบ',
             default                => 'ไม่ทราบสถานะ',
         };
+    }
+
+    /* ================= Work Progress Helpers ================= */
+
+    public function markWorkInProgress(): bool
+    {
+        return $this->forceFill(['status' => self::STATUS_IN_PROGRESS])->save();
+    }
+
+    public function markWorkDone(): bool
+    {
+        return $this->forceFill(['status' => self::STATUS_DONE])->save();
+    }
+
+    public function markWorkCancelled(): bool
+    {
+        return $this->forceFill(['status' => self::STATUS_CANCELLED])->save();
     }
 }

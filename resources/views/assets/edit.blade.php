@@ -4,6 +4,8 @@
   $line = 'border-slate-200';
 @endphp
 
+@section('header-wrap-class','no-gap')
+
 @section('title','Edit Asset')
 
 @section('page-header')
@@ -15,10 +17,17 @@
         <div class="min-w-0">
           <div class="flex items-start gap-3">
             <span class="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-xl text-emerald-700">
-              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M12 20h9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z"
-                      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              {{-- ✅ pencil icon (fix: set stroke on svg so it won’t disappear) --}}
+              <svg class="h-5 w-5"
+                   viewBox="0 0 24 24"
+                   fill="none"
+                   stroke="currentColor"
+                   stroke-width="2"
+                   stroke-linecap="round"
+                   stroke-linejoin="round"
+                   aria-hidden="true">
+                <path d="M12 20h9"/>
+                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z"/>
               </svg>
             </span>
 
@@ -31,7 +40,10 @@
               <div class="mt-1 text-xs sm:text-[13px] text-slate-600 flex flex-wrap gap-x-4 gap-y-1">
                 <span>แก้ไขข้อมูลครุภัณฑ์</span>
                 @if($asset->updated_at)
-                  <span>อัปเดต: <span class="font-medium text-slate-900">{{ $asset->updated_at->format('Y-m-d H:i') }}</span></span>
+                  <span>
+                    อัปเดต:
+                    <span class="font-medium text-slate-900">{{ $asset->updated_at->format('Y-m-d H:i') }}</span>
+                  </span>
                 @endif
                 <span>
                   รหัส: <span class="font-semibold text-slate-900">{{ $asset->asset_code }}</span>
@@ -51,7 +63,7 @@
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            Back
+            กลับ
           </a>
         </div>
 
@@ -61,9 +73,10 @@
 @endsection
 
 @section('content')
-  <div class="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8 pb-8 pt-6">
+  {{-- ✅ ดึงขึ้น: ตัด pt-6 ออก และหักช่องว่างที่ layout ใส่มา --}}
+  <div class="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8 pb-8 pt-0">
 
-    {{-- Error (เหมือน Maintenance) --}}
+    {{-- Error --}}
     @if ($errors->any())
       <div class="mb-6 rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-800">
         <ul class="list-disc pl-5 text-sm space-y-1">

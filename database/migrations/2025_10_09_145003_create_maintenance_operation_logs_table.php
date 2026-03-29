@@ -11,9 +11,7 @@ return new class extends Migration
         Schema::create('maintenance_operation_logs', function (Blueprint $table) {
             $table->id();
 
-            $table->index('user_id');
-
-            // ผูกกับใบงาน (ใช้ชื่อให้เข้ากับ maintenance_assignments)
+            // ผูกกับใบงาน (1 request มีได้ 1 operation log)
             $table->foreignId('maintenance_request_id')
                 ->constrained('maintenance_requests')
                 ->cascadeOnUpdate()
@@ -33,12 +31,12 @@ return new class extends Migration
             $table->enum('operation_method', ['requisition', 'service_fee', 'other'])
                 ->nullable();
 
-            // รพจ. = รหัสครุภัณฑ์ (Property Code) เช่น 68101068718
+            // รหัสครุภัณฑ์ (รพจ.)
             $table->string('property_code', 100)
                 ->nullable()
                 ->comment('รหัสครุภัณฑ์ (รพจ.)');
 
-            // ยืนยันว่าได้แจ้ง/ขออนุญาตผู้ใช้งาน/หน่วยงานก่อนปฏิบัติงาน/ปิดเครื่อง
+            // ต้องมีการแจ้ง/ขออนุญาตก่อนปฏิบัติงาน/ปิดเครื่อง
             $table->boolean('require_precheck')->default(false);
 
             // หมายเหตุ/รายละเอียดเพิ่มเติมในการปฏิบัติงาน
@@ -50,11 +48,12 @@ return new class extends Migration
 
             $table->timestamps();
 
-            // บังคับ 1 ใบงาน → มีได้ 1 รายงานการปฏิบัติงาน
+            // ===== Index/Unique ให้ตรง schema dump =====
             $table->unique('maintenance_request_id', 'uniq_operation_log_request');
 
-            $table->index(['operation_date']);
-            $table->index(['property_code']);
+            $table->index('user_id');               // maintenance_operation_logs_user_id_index
+            $table->index('operation_date');        // maintenance_operation_logs_operation_date_index
+            $table->index('property_code');         // maintenance_operation_logs_property_code_index
         });
     }
 

@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\MaintenanceRatingApiController;
+use App\Http\Controllers\Api\MaintenanceRequestApiController;
 
 // Public health + auth endpoints
 Route::get('/health', [HealthController::class, 'index'])->name('health');
@@ -45,14 +46,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('assets', AssetController::class);
     });
 
-    // Repair requests (ใบงานซ่อม)
+    // Repair requests (ใบงานซ่อม) - REST-ish API
     Route::prefix('repair-requests')->name('repair-requests.')->group(function () {
-        Route::get('/',                  [MaintenanceRequestController::class, 'index'])->name('index');
-        Route::post('/',                 [MaintenanceRequestController::class, 'store'])->name('store');
-        Route::get('/{req}',             [MaintenanceRequestController::class, 'show'])->name('show');
-        Route::put('/{req}',             [MaintenanceRequestController::class, 'update'])->name('update');
-        Route::post('/{req}/transition', [MaintenanceRequestController::class, 'transition'])->name('transition');
-        Route::get('/{req}/logs',        [MaintenanceLogController::class, 'index'])->name('logs');
+        Route::get('/',                   [MaintenanceRequestController::class, 'index'])->name('index');
+        Route::post('/',                  [MaintenanceRequestController::class, 'store'])->name('store');
+        Route::get('/{req}',              [MaintenanceRequestController::class, 'show'])->name('show');
+        Route::put('/{req}',              [MaintenanceRequestController::class, 'update'])->name('update');
+        Route::delete('/{req}',           [MaintenanceRequestController::class, 'destroy'])->name('destroy');
+        Route::post('/{req}/transition',  [MaintenanceRequestController::class, 'transition'])->name('transition');
+        Route::get('/{req}/logs',         [MaintenanceLogController::class, 'index'])->name('logs');
 
         // GET /api/repair-requests/pending/evaluations
         Route::get(
@@ -113,4 +115,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/maintenance/technicians',     [StatsController::class, 'technicianSummary'])->name('maintenance.technicians');
         Route::get('/assets/by-department',        [StatsController::class, 'assetsByDepartment'])->name('assets.by-department');
     });
+
+    Route::get('/repair-requests/my-jobs', [MaintenanceRequestController::class, 'myJobs'])->name('repair-requests.my-jobs');
 });

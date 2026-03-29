@@ -14,7 +14,7 @@ return new class extends Migration
             // เลขบัตรประชาชน 13 หลัก (ใช้เป็นหลักในการ Login)
             $table->string('citizen_id', 13)
                   ->unique()
-                  ->comment('เลขประจำตัวประชาชน 13 หลัก สำหรับใช้ล็อกอิน');
+                  ->comment('เลขประจำตัวประชาชน 13 หลัก');
 
             $table->string('name');
 
@@ -34,12 +34,13 @@ return new class extends Migration
             // เก็บ role เป็น code (ไปแมปกับ roles.code)
             $table->string('role', 50)
                   ->default('member')
-                  ->comment('Role code roles.code เช่น member, admin, supervisor, it_support, network, developer, technician')
                   ->index();
 
             // รูปโปรไฟล์
             $table->string('profile_photo_path', 2048)->nullable();
             $table->string('profile_photo_thumb', 2048)->nullable();
+
+            $table->string('notification_sound')->default('new-request.mp3');
 
             $table->rememberToken();
             $table->timestamps();

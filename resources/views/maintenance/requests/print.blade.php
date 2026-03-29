@@ -212,8 +212,8 @@
     $prioLabel = [
         'low'    => 'ต่ำ',
         'medium' => 'ปานกลาง',
-        'high'   => 'สูง',
-        'urgent' => 'เร่งด่วน',
+        'high'   => 'เร่งด่วน',
+        'urgent' => 'เร่งด่วนมาก',
     ][$prio] ?? ($req->priority ?? '—');
 
     $workers = $req->workers ?? collect();

@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             ChatSeeder::class,
             DemoRatingSeeder::class,
             RoleSeeder::class,
+            MaintenanceRequestTypeSeeder::class,
         ]);
     }
 }

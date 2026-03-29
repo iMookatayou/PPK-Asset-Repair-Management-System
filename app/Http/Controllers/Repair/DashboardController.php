@@ -36,27 +36,27 @@ class DashboardController extends Controller
 
         // ----- Filters -----
         if ($status !== '') {
-            $base->where('mr.status', $status);
+            if ($status === 'completed') {
+                $base->whereIn('mr.status', ['resolved','closed']);
+            } else {
+                $base->where('mr.status', $status);
+            }
             $hasFilter = true;
         }
 
-        if ($from) {
+        $dateCol = $hasReqDate ? 'mr.request_date' : ($hasCreatedAt ? 'mr.created_at' : null);
+
+        if ($from && $dateCol) {
             try {
-                $col = $hasReqDate ? 'mr.request_date' : ($hasCreatedAt ? 'mr.created_at' : null);
-                if ($col) {
-                    $base->whereDate($col, '>=', Carbon::parse($from)->toDateString());
-                    $hasFilter = true;
-                }
+                $base->whereDate($dateCol, '>=', Carbon::parse($from)->toDateString());
+                $hasFilter = true;
             } catch (\Throwable $e) {}
         }
 
-        if ($to) {
+        if ($to && $dateCol) {
             try {
-                $col = $hasReqDate ? 'mr.request_date' : ($hasCreatedAt ? 'mr.created_at' : null);
-                if ($col) {
-                    $base->whereDate($col, '<=', Carbon::parse($to)->toDateString());
-                    $hasFilter = true;
-                }
+                $base->whereDate($dateCol, '<=', Carbon::parse($to)->toDateString());
+                $hasFilter = true;
             } catch (\Throwable $e) {}
         }
 
@@ -64,36 +64,86 @@ class DashboardController extends Controller
         $stats = [
             'total'      => (clone $base)->count(),
             'pending'    => (clone $base)->where('mr.status','pending')->count(),
-            'inProgress' => (clone $base)->where('mr.status','in_progress')->count(),
-            // งานเสร็จ = resolved + closed
+            'processing' => (clone $base)->whereIn('mr.status', ['acknowledged','accepted','in_progress', 'on_hold'])->count(),
             'completed'  => (clone $base)->whereIn('mr.status', ['resolved','closed'])->count(),
+            'cancelled'  => (clone $base)->whereIn('mr.status', ['cancelled','rejected'])->count(),
             'monthCost'  => 0.0,
         ];
 
-        // ----- Monthly trend (6 เดือนล่าสุด) -----
-        if ($hasReqDate || $hasCreatedAt) {
-            $trendCol = $hasReqDate ? 'mr.request_date' : 'mr.created_at';
+        // สำหรับ UI card ที่เขียนว่า "Active"
+        $stats['inProgress'] = $stats['processing'];
 
-            $monthlyTrend = (clone $base)
-                ->where($trendCol, '>=', now()->startOfMonth()->subMonths(5))
-                ->selectRaw("DATE_FORMAT($trendCol, '%Y-%m') as ym, COUNT(*) as cnt")
+        // ----- Monthly trend (Default: 12 months) -----
+        if ($dateCol) {
+            $trendQuery = (clone $base);
+            
+            // If no FROM date is filtered, default to last 12 months
+            if (!$from) {
+                $trendQuery->where($dateCol, '>=', now()->startOfMonth()->subMonths(11));
+            }
+
+            $monthlyTrend = $trendQuery
+                ->selectRaw("DATE_FORMAT($dateCol, '%Y-%m') as ym, COUNT(*) as cnt")
                 ->groupBy('ym')
                 ->orderBy('ym')
                 ->get()
                 ->map(fn($r) => [
-                    'ym'  => $r->ym,
-                    'cnt' => (int) $r->cnt,
+                    'ym'  => (string)$r->ym,
+                    'cnt' => (int)$r->cnt,
                 ])
-                ->take(6)
                 ->values();
         } else {
             $monthlyTrend = collect();
         }
 
-        $totalReq = $stats['total'];
+        // ----- KPI สำหรับการ์ดบนซ้าย (Last month / This month / Completed-this-month) -----
+        $kpi = [
+            'lastMonth'          => 0,
+            'thisMonth'          => 0,
+            'thisMonthCompleted' => 0,
+            'avgResolveHours'    => null,
+        ];
+
+        if ($dateCol) {
+            $startThis = now()->startOfMonth();
+            $startLast = (clone $startThis)->subMonth();
+
+            $kpi['thisMonth'] = (clone $base)
+                ->whereBetween($dateCol, [$startThis, now()->endOfDay()])
+                ->count();
+
+            $kpi['lastMonth'] = (clone $base)
+                ->whereBetween($dateCol, [$startLast, (clone $startThis)->subSecond()])
+                ->count();
+
+            $kpi['thisMonthCompleted'] = (clone $base)
+                ->whereBetween($dateCol, [$startThis, now()->endOfDay()])
+                ->whereIn('mr.status', ['resolved','closed'])
+                ->count();
+        }
+
+        // avgResolveHours (ถ้ามี completed date/at)
+        $compCol = $hasCompletedAt ? 'mr.completed_at' : ($hasCompletedDate ? 'mr.completed_date' : null);
+        if ($dateCol && $compCol) {
+            // ใช้เฉพาะงาน completed
+            $rows = (clone $base)
+                ->whereIn('mr.status', ['resolved','closed'])
+                ->whereNotNull($compCol)
+                ->whereNotNull($dateCol)
+                ->selectRaw("TIMESTAMPDIFF(MINUTE, $dateCol, $compCol) as diff_min")
+                ->limit(3000)
+                ->pluck('diff_min');
+
+            if ($rows->count() > 0) {
+                $avgMin = (int) round($rows->avg());
+                $kpi['avgResolveHours'] = round($avgMin / 60, 1);
+            }
+        }
+
+        $totalReq = (int)($stats['total'] ?? 0);
 
         // ==============================
-        //  By asset type (เอาทั้งหมด)
+        //  By asset type (ทั้งหมด)
         // ==============================
         if ($hasAssets) {
             $qType = (clone $base)
@@ -104,7 +154,6 @@ class DashboardController extends Controller
                     ->selectRaw('COALESCE(NULLIF(a.type,""),"ไม่ระบุ") as type, COUNT(*) as cnt')
                     ->groupBy('type')
                     ->orderByDesc('cnt')
-                    // ❌ ไม่ limit(8) แล้ว
                     ->get();
             } else {
                 $assetTypes = collect([(object) ['type' => 'ไม่ระบุ', 'cnt' => $totalReq]]);
@@ -113,16 +162,13 @@ class DashboardController extends Controller
             $assetTypes = collect([(object) ['type' => 'ไม่ระบุ', 'cnt' => $totalReq]]);
         }
 
-        // ไม่รวม "อื่นๆ" แล้ว เอาทุกแถวที่ query ได้เลย
-        $byAssetType = $assetTypes
-            ->map(fn($r) => [
-                'type' => (string) $r->type,
-                'cnt'  => (int) $r->cnt,
-            ])
-            ->values();
+        $byAssetType = $assetTypes->map(fn($r) => [
+            'type' => (string) $r->type,
+            'cnt'  => (int) $r->cnt,
+        ])->values();
 
         // ==============================
-        //  By department (เอาทั้งหมด)
+        //  By department (ทั้งหมด)
         // ==============================
         if ($hasDeptTbl && ($hasDeptNameTh || $hasDeptNameEn)) {
             $qDept = (clone $base);
@@ -151,7 +197,6 @@ class DashboardController extends Controller
                 ->selectRaw("$coalesce as dept, COUNT(*) as cnt")
                 ->groupBy('dept')
                 ->orderByDesc('cnt')
-                // ❌ ตัด limit(8) ทิ้ง
                 ->get()
                 ->map(fn($r) => [
                     'dept' => (string) $r->dept,
@@ -163,60 +208,6 @@ class DashboardController extends Controller
                 ? collect([['dept' => 'ไม่ระบุ', 'cnt' => $totalReq]])
                 : collect();
         }
-
-        // ----- Recent jobs -----
-        $recentQ = (clone $base);
-
-        if ($hasReqDate) {
-            $recentQ->orderByDesc('mr.request_date');
-        } elseif ($hasCreatedAt) {
-            $recentQ->orderByDesc('mr.created_at');
-        }
-
-        $recentQ->limit(12);
-
-        $selects = ['mr.*'];
-        if ($hasReqDate)       $selects[] = DB::raw('mr.request_date   as req_dt');
-        if ($hasCreatedAt)     $selects[] = DB::raw('mr.created_at     as created_dt');
-        if ($hasCompletedDate) $selects[] = DB::raw('mr.completed_date as comp_dt');
-        if ($hasCompletedAt)   $selects[] = DB::raw('mr.completed_at   as completed_dt');
-
-        if ($hasAssets) {
-            $recentQ->leftJoin('assets as a', 'a.id', '=', 'mr.asset_id');
-            $selects[] = 'a.name as asset_name';
-        }
-
-        $hasUsers = Schema::hasTable('users') && Schema::hasColumn('users','name');
-        if ($hasUsers) {
-            $recentQ->leftJoin('users as r', 'r.id', '=', 'mr.reporter_id')
-                    ->leftJoin('users as t', 't.id', '=', 'mr.technician_id');
-            $selects[] = 'r.name as reporter_name';
-            $selects[] = 't.name as technician_name';
-        }
-
-        $fmt = function ($v) {
-            if ($v === null || $v === '') return '-';
-            try {
-                return Carbon::parse($v)->format('Y-m-d H:i');
-            } catch (\Throwable $e) {
-                return is_string($v) ? $v : '-';
-            }
-        };
-
-        $recent = $recentQ->get($selects)->map(function ($r) use ($fmt) {
-            $reqRaw  = $r->req_dt   ?? $r->created_dt   ?? null;
-            $compRaw = $r->comp_dt  ?? $r->completed_dt ?? null;
-
-            return [
-                'request_date' => $fmt($reqRaw),
-                'asset_id'     => (int) ($r->asset_id ?? 0),
-                'asset_name'   => (string) ($r->asset_name ?? '-'),
-                'reporter'     => (string) ($r->reporter_name ?? '-'),
-                'technician'   => (string) ($r->technician_name ?? '-'),
-                'status'       => (string) ($r->status ?? ''),
-                'completed_at' => $fmt($compRaw),
-            ];
-        });
 
         // ----- Toast เมื่อมีการใช้ตัวกรอง -----
         if ($hasFilter) {
@@ -239,17 +230,39 @@ class DashboardController extends Controller
             }
         }
 
-        // ----- Render view -----
+        // ----- Technician Workload -----
+        $hasTechId = Schema::hasColumn('maintenance_requests', 'technician_id');
+        $hasUsers  = Schema::hasTable('users') && Schema::hasColumn('users', 'name');
+
+        if ($hasTechId && $hasUsers) {
+            $techRows = DB::table('maintenance_requests as mr')
+                ->join('users as t', 't.id', '=', 'mr.technician_id')
+                ->whereNotNull('mr.technician_id')
+                ->whereNotIn('mr.status', ['resolved', 'closed', 'cancelled'])
+                ->selectRaw("t.id as tech_id, COUNT(*) as total")
+                ->groupBy('t.id')
+                ->orderByDesc('total')
+                ->limit(15)
+                ->get();
+
+            $techIds = $techRows->pluck('tech_id')->all();
+            $users   = \App\Models\User::whereIn('id', $techIds)->get()->keyBy('id');
+
+            $techWorkload = $techRows->map(function ($r) use ($users) {
+                $user = $users->get($r->tech_id);
+                return [
+                    'id'     => (int) $r->tech_id,
+                    'name'   => $user ? $user->name : 'Unknown',
+                    'total'  => (int) $r->total,
+                    'avatar' => $user ? $user->avatar_thumb_url : '',
+                ];
+            })->values();
+        } else {
+            $techWorkload = collect();
+        }
+
         return view('repair.dashboard',
-            compact('stats','monthlyTrend','byAssetType','byDept','recent')
-            + [
-                'lottieMap' => [
-                    'success' => asset('lottie/lock_with_green_tick.json'),
-                    'info'    => asset('lottie/lock_with_blue_info.json'),
-                    'warning' => asset('lottie/lock_with_yellow_alert.json'),
-                    'error'   => asset('lottie/lock_with_red_tick.json'),
-                ],
-            ]
+            compact('stats','monthlyTrend','byAssetType','byDept','kpi','techWorkload')
         );
     }
 }

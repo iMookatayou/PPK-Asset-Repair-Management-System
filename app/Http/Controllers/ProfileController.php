@@ -11,9 +11,8 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
+use Intervention\Image\Interfaces\ImageInterface;
 use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Imagick\Driver as ImagickDriver;
-use Intervention\Image\Drivers\Gd\Driver as GdDriver;
 
 class ProfileController extends Controller
 {
@@ -32,6 +31,7 @@ class ProfileController extends Controller
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
         $user = $request->user();
+        Log::info('User update started', ['user_id' => $user->id]);
 
         $data = $request->validated();
 
@@ -41,16 +41,18 @@ class ProfileController extends Controller
         ]);
 
         if ($request->boolean('remove_avatar') && $request->hasFile('avatar')) {
+            Log::warning('User tried to upload and remove avatar at the same time', ['user_id' => $user->id]);
             return back()->with('toast', [
-                'type' => 'warning',
-                'message' => 'เลือกระหว่างอัปโหลดรูปใหม่หรือ “ลบรูปปัจจุบัน” อย่างใดอย่างหนึ่ง',
+                'type'     => 'warning',
+                'message'  => 'เลือกระหว่างอัปโหลดรูปใหม่หรือ "ลบรูปปัจจุบัน" อย่างใดอย่างหนึ่ง',
                 'position' => 'tc',
-                'timeout' => 3800,
-                'size' => 'md',
+                'timeout'  => 3800,
+                'size'     => 'md',
             ]);
         }
 
         $user->fill($data);
+
         if ($user->isDirty('email')) {
             $user->email_verified_at = null;
         }
@@ -64,21 +66,23 @@ class ProfileController extends Controller
 
         $driver = null;
         if (extension_loaded('imagick')) {
-            $driver = new ImagickDriver();
-        } elseif (extension_loaded('gd') && function_exists('imagecreatefromstring') && function_exists('imagecreatetruecolor')) {
-            $driver = new GdDriver();
+            $driver = new \Intervention\Image\Drivers\Imagick\Driver();
+        } elseif (extension_loaded('gd')) {
+            $driver = new \Intervention\Image\Drivers\Gd\Driver();
         }
 
         $manager = $driver ? new ImageManager($driver) : null;
 
         $supportsWebp = true;
-        if ($driver instanceof GdDriver) {
+        if ($driver instanceof \Intervention\Image\Drivers\Gd\Driver) {
             $supportsWebp = function_exists('imagewebp');
         }
         $targetExt = $supportsWebp ? 'webp' : 'jpg';
         $encodeFn  = $supportsWebp ? 'toWebp' : 'toJpeg';
 
+        // กรณีลบรูปโปรไฟล์
         if ($request->boolean('remove_avatar') === true) {
+            Log::info('Removing avatar', ['user_id' => $user->id]);
             $toDelete = array_values(array_filter([
                 $user->profile_photo_path ?: null,
                 $hasThumbCol ? ($user->profile_photo_thumb ?: null) : null,
@@ -90,7 +94,9 @@ class ProfileController extends Controller
             $avatarRemoved = true;
         }
 
+        // กรณีอัปโหลดรูปใหม่
         if ($request->hasFile('avatar')) {
+            Log::info('Uploading new avatar', ['user_id' => $user->id]);
             $toDelete = array_values(array_filter([
                 $user->profile_photo_path ?: null,
                 $hasThumbCol ? ($user->profile_photo_thumb ?: null) : null,
@@ -106,43 +112,25 @@ class ProfileController extends Controller
                     $mainPath = "avatars/{$basename}.{$ext}";
                     $disk->putFileAs('avatars', $file, "{$basename}.{$ext}");
                     $user->profile_photo_path = $mainPath;
-                    if ($hasThumbCol) {
-                        $user->profile_photo_thumb = $mainPath;
-                    }
-
-                    Log::warning('Avatar stored without processing (no image driver).', [
-                        'user_id' => $user->id,
-                        'php_gd' => extension_loaded('gd') ? 'yes' : 'no',
-                        'php_imagick' => extension_loaded('imagick') ? 'yes' : 'no',
-                    ]);
-
+                    if ($hasThumbCol) $user->profile_photo_thumb = $mainPath;
                     $avatarChanged = true;
                 } else {
-                    $img = $manager->read($file->getRealPath());
-
-                    $basename = $user->id . '-' . time();
+                    $basename  = $user->id . '-' . time();
                     $mainPath  = "avatars/{$basename}-512.{$targetExt}";
                     $thumbPath = "avatars/{$basename}-128.{$targetExt}";
 
-                    $main  = (clone $img)->cover(512, 512)->{$encodeFn}(quality: 80);
-                    $thumb = (clone $img)->cover(128, 128)->{$encodeFn}(quality: 80);
+                    $main  = $this->readImage($manager, $file->getRealPath())->cover(512, 512)->{$encodeFn}(80);
+                    $thumb = $this->readImage($manager, $file->getRealPath())->cover(128, 128)->{$encodeFn}(80);
 
                     $disk->put($mainPath,  (string) $main);
                     $disk->put($thumbPath, (string) $thumb);
 
                     $user->profile_photo_path = $mainPath;
                     if ($hasThumbCol) $user->profile_photo_thumb = $thumbPath;
-
                     $avatarChanged = true;
                 }
             } catch (\Throwable $e) {
-                Log::warning('Avatar process failed', [
-                    'user_id' => $user->id,
-                    'driver'  => $driver instanceof ImagickDriver ? 'imagick' : ($driver instanceof GdDriver ? 'gd' : 'none'),
-                    'webp'    => $supportsWebp ? 'yes' : 'no',
-                    'error'   => $e->getMessage(),
-                ]);
-
+                Log::error('Avatar process failed: ' . $e->getMessage(), ['user_id' => $user->id]);
                 return back()->with('toast', [
                     'type'     => 'error',
                     'message'  => 'ไฟล์รูปไม่ถูกต้องหรืออ่านไม่ได้',
@@ -154,6 +142,7 @@ class ProfileController extends Controller
         }
 
         $user->save();
+        Log::info('User profile updated successfully', ['user_id' => $user->id]);
 
         $message = 'อัปเดตโปรไฟล์เรียบร้อย';
         if ($avatarChanged)     $message .= ' — อัปเดตรูปโปรไฟล์ใหม่แล้ว';
@@ -170,11 +159,21 @@ class ProfileController extends Controller
 
     public function destroy(Request $request): RedirectResponse
     {
+        if ($request->user()->role === 'member') {
+            return back()->with('toast', [
+                'type'     => 'error',
+                'message'  => 'สมาชิกทั่วไปไม่ได้รับอนุญาตให้ลบบัญชีด้วยตนเอง',
+                'position' => 'tc',
+                'timeout'  => 4000,
+            ]);
+        }
+
         $request->validateWithBag('userDeletion', [
             'password' => ['required', 'current_password'],
         ]);
 
         $user = $request->user();
+        Log::warning('User deleting account', ['user_id' => $user->id]);
 
         $disk = Storage::disk('public');
         $toDelete = array_values(array_filter([
@@ -196,5 +195,14 @@ class ProfileController extends Controller
             'timeout'  => 3200,
             'size'     => 'lg',
         ]);
+    }
+
+    /**
+     * อ่านไฟล์รูปภาพด้วย ImageManager และ return ImageInterface
+     * เพื่อให้ static analysis tools (intelephense) infer type ได้ถูกต้อง
+     */
+    private function readImage(ImageManager $manager, string $path): ImageInterface
+    {
+        return $manager->read($path);
     }
 }
