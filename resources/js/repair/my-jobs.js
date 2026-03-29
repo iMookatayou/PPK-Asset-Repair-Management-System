@@ -76,7 +76,7 @@
     if (btn) btn.title = enabled ? "แจ้งเตือน (เปิดเสียงแล้ว)" : "แจ้งเตือน (กดเพื่อเปิดเสียง)";
 
     if (dot) {
-      dot.classList.remove("bg-slate-300", "bg-emerald-500", "bg-amber-500");
+      dot.classList.remove("bg-slate-300", "bg-emerald-500", "bg-amber-500", "bg-secondary");
       if (!enabled) dot.classList.add("bg-slate-300");
       else if (pendingBeep > 0) dot.classList.add("bg-amber-500"); // มีแจ้งเตือนค้าง
       else dot.classList.add("bg-emerald-500");
@@ -129,6 +129,9 @@
   function initRealtimeNotify() {
     const btn = $("notifyToggleBtn");
     const audio = $("notifySound");
+
+    // เจ้าหน้าที่เท่านั้น (audio + btn อยู่ที่ navbar สำหรับ role !== member)
+    if (!audio || !btn) return;
 
     // restore state
     soundEnabled = localStorage.getItem(LS_KEY) === "1";
@@ -190,7 +193,7 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     hideLoader();
-    renderDonut();
-    initRealtimeNotify();
+    if ($("donut")) renderDonut(); // เฉพาะหน้า my-jobs
+    initRealtimeNotify(); // รันทุกหน้า (สำหรับเจ้าหน้าที่จะมีเสียงทั้งระบบ)
   });
 })();

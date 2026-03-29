@@ -6,6 +6,7 @@ use App\Models\MaintenanceRequestType;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use App\Support\Toast;
+use Illuminate\Support\Facades\Auth;
 
 class MaintenanceRequestTypeController extends Controller
 {
@@ -15,7 +16,7 @@ class MaintenanceRequestTypeController extends Controller
 
         // กัน Member ตั้งแต่ระดับ Constructor (ถ้าเป็น member ให้ดีดออกทันที)
         $this->middleware(function ($request, $next) {
-            if (auth()->user()->role === 'member') {
+            if (Auth::user()?->role === 'member') {
                 abort(403, 'คุณไม่มีสิทธิ์เข้าถึงส่วนการตั้งค่าประเภทงาน');
             }
             return $next($request);
@@ -38,9 +39,7 @@ class MaintenanceRequestTypeController extends Controller
             $s = trim((string) $request->string('search'));
             $q->where(function ($w) use ($s) {
                 $w->where('name', 'like', "%{$s}%")
-                    ->orWhere('description', 'like', "%{$s}%")
-                    ->orWhere('default_department_code', 'like', "%{$s}%")
-                    ->orWhere('default_role_code', 'like', "%{$s}%");
+                    ->orWhere('description', 'like', "%{$s}%");
             });
         }
 
@@ -59,26 +58,36 @@ class MaintenanceRequestTypeController extends Controller
         return response()->json(['data' => $types]);
     }
 
+    public function create()
+    {
+        $this->authorize('create', MaintenanceRequestType::class);
+        return view('settings.maintenance-types.create');
+    }
+
     public function store(Request $request)
     {
         $this->authorize('create', MaintenanceRequestType::class);
 
-        $data = $request->validate([
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'name' => ['required', 'string', 'max:150', 'unique:maintenance_request_types,name'],
             'description' => ['nullable', 'string'],
-            'default_department_code' => ['nullable', 'string', 'max:100'],
-            'default_role_code' => ['nullable', 'string', 'max:50'],
-            'default_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'is_active' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
 
+        if ($validator->fails()) {
+            if ($request->expectsJson()) {
+                return response()->json(['errors' => $validator->errors()], 422);
+            }
+            return back()->withErrors($validator)->withInput()
+                ->with('toast', Toast::warning($validator->errors()->first(), 3000));
+        }
+
+        $data = $validator->validated();
+
         $type = MaintenanceRequestType::create([
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
-            'default_department_code' => $data['default_department_code'] ?? null,
-            'default_role_code' => $data['default_role_code'] ?? null,
-            'default_user_id' => $data['default_user_id'] ?? null,
             'is_active' => array_key_exists('is_active', $data) ? (bool) $data['is_active'] : true,
             'sort_order' => array_key_exists('sort_order', $data) ? (int) $data['sort_order'] : 0,
         ]);
@@ -92,7 +101,16 @@ class MaintenanceRequestTypeController extends Controller
         return response()->json([
             'message' => 'created',
             'data' => $type,
+            'toast' => Toast::success('เพิ่มประเภทงานเรียบร้อยแล้ว', 1800),
         ], 201);
+    }
+
+    public function edit(int $id)
+    {
+        $type = MaintenanceRequestType::findOrFail($id);
+        $this->authorize('update', $type);
+
+        return view('settings.maintenance-types.edit', compact('type'));
     }
 
     public function update(Request $request, int $id)
@@ -100,22 +118,26 @@ class MaintenanceRequestTypeController extends Controller
         $type = MaintenanceRequestType::findOrFail($id);
         $this->authorize('update', $type);
 
-        $data = $request->validate([
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'name' => ['required', 'string', 'max:150', Rule::unique('maintenance_request_types', 'name')->ignore($type->id)],
             'description' => ['nullable', 'string'],
-            'default_department_code' => ['nullable', 'string', 'max:100'],
-            'default_role_code' => ['nullable', 'string', 'max:50'],
-            'default_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'is_active' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
 
+        if ($validator->fails()) {
+            if ($request->expectsJson()) {
+                return response()->json(['errors' => $validator->errors()], 422);
+            }
+            return back()->withErrors($validator)->withInput()
+                ->with('toast', Toast::warning($validator->errors()->first(), 3000));
+        }
+
+        $data = $validator->validated();
+
         $type->update([
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
-            'default_department_code' => $data['default_department_code'] ?? null,
-            'default_role_code' => $data['default_role_code'] ?? null,
-            'default_user_id' => $data['default_user_id'] ?? null,
             'is_active' => array_key_exists('is_active', $data) ? (bool) $data['is_active'] : (bool) $type->is_active,
             'sort_order' => array_key_exists('sort_order', $data) ? (int) $data['sort_order'] : (int) $type->sort_order,
         ]);
@@ -129,6 +151,7 @@ class MaintenanceRequestTypeController extends Controller
         return response()->json([
             'message' => 'updated',
             'data' => $type->fresh(),
+            'toast' => Toast::success('บันทึกการแก้ไขเรียบร้อยแล้ว', 1800),
         ]);
     }
 
@@ -148,6 +171,7 @@ class MaintenanceRequestTypeController extends Controller
         return response()->json([
             'message' => 'disabled',
             'data' => $type->fresh(),
+            'toast' => Toast::success('ปิดใช้งานประเภทเรียบร้อยแล้ว', 1800),
         ]);
     }
 }

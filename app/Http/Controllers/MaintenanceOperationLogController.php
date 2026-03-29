@@ -20,7 +20,7 @@ class MaintenanceOperationLogController extends Controller
 
         $actorId = Auth::id();
 
-        $data = $request->validate([
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'operation_date'   => ['nullable', 'date'],
             'operation_method' => ['nullable', Rule::in(['requisition', 'service_fee', 'other'])],
             'property_code'    => ['nullable', 'string', 'max:100'],
@@ -29,6 +29,13 @@ class MaintenanceOperationLogController extends Controller
             'issue_software'   => ['nullable', 'boolean'],
             'issue_hardware'   => ['nullable', 'boolean'],
         ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput()
+                ->with('toast', Toast::warning($validator->errors()->first(), 3000));
+        }
+
+        $data = $validator->validated();
 
         // // Normalize date to Y-m-d (ถ้ามีการส่งมา)
         if (!empty($data['operation_date'])) {
@@ -74,7 +81,7 @@ class MaintenanceOperationLogController extends Controller
             return redirect()
                 ->back()
                 ->withInput()
-                ->with('toast', Toast::danger('เกิดข้อผิดพลาดในการบันทึกข้อมูล', 2200));
+                ->with('toast', Toast::error('เกิดข้อผิดพลาดในการบันทึกข้อมูล', 2200));
         }
     }
 }

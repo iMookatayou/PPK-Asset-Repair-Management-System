@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Schema;
+use App\Support\Toast;
 
 class UserController extends Controller
 {
@@ -105,6 +106,11 @@ class UserController extends Controller
      */
     public function create()
     {
+        $currentUser = Auth::user();
+        if ($currentUser->isTechnician() && !$currentUser->isAdmin() && !$currentUser->isSupervisor()) {
+            abort(403, 'เฉพาะผู้ดูแลระบบและหัวหน้างานเท่านั้นทื่สามารถสร้างผู้ใช้ได้');
+        }
+
         $roleCodes   = User::availableRoles();
         $roleLabels  = User::roleLabels();
 
@@ -127,6 +133,11 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
+        $currentUser = Auth::user();
+        if ($currentUser->isTechnician() && !$currentUser->isAdmin() && !$currentUser->isSupervisor()) {
+            abort(403, 'เฉพาะผู้ดูแลระบบและหัวหน้างานเท่านั้นทื่สามารถสร้างผู้ใช้ได้');
+        }
+
         $availableRoles = User::availableRoles();
 
         $validator = Validator::make(
@@ -180,16 +191,17 @@ class UserController extends Controller
             return back()
                 ->withInput()
                 ->withErrors($validator)
-                ->with('toast', [
-                    'type'     => 'error',
-                    'message'  => 'บันทึกผู้ใช้ไม่สำเร็จ',
-                    'position' => 'br',
-                    'timeout'  => 3200,
-                    'details'  => $validator->errors()->first() ?? null,
-                ]);
+                ->with('toast', Toast::error('บันทึกผู้ใช้ไม่สำเร็จ: ' . $validator->errors()->first(), 3200));
         }
 
         $data = $validator->validated();
+
+        // เช็คการตั้งค่า Role: เฉพาะ Admin เท่านั้นที่แอด Admin/Supervisor ได้
+        if (in_array($data['role'], [User::ROLE_ADMIN, User::ROLE_SUPERVISOR])) {
+            if (!Auth::user()->isAdmin()) {
+                return back()->withInput()->with('toast', Toast::error('เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถเพิ่มยศแอดมินหรือหัวหน้างานได้', 4000));
+            }
+        }
 
         try {
             DB::beginTransaction();
@@ -212,24 +224,14 @@ class UserController extends Controller
 
             return redirect()
                 ->route('admin.users.index')
-                ->with('toast', [
-                    'type'     => 'success',
-                    'message'  => 'สร้างผู้ใช้ใหม่เรียบร้อยแล้ว',
-                    'position' => 'br',
-                    'timeout'  => 2800,
-                ]);
+                ->with('toast', Toast::success('สร้างผู้ใช้ใหม่เรียบร้อยแล้ว', 2800));
         } catch (\Throwable $e) {
             DB::rollBack();
             report($e);
 
             return back()
                 ->withInput()
-                ->with('toast', [
-                    'type'     => 'error',
-                    'message'  => 'เกิดข้อผิดพลาดระหว่างบันทึกข้อมูลผู้ใช้',
-                    'position' => 'br',
-                    'timeout'  => 4000,
-                ]);
+                ->with('toast', Toast::error('เกิดข้อผิดพลาดระหว่างบันทึกข้อมูลผู้ใช้', 4000));
         }
     }
 
@@ -238,8 +240,20 @@ class UserController extends Controller
      */
     public function edit(User $user)
     {
+        $currentUser = Auth::user();
+        if ($currentUser->isTechnician() && !$currentUser->isAdmin() && !$currentUser->isSupervisor() && $user->id !== $currentUser->id) {
+            abort(403, 'เจ้าหน้าที่สามารถแก้ไขได้เฉพาะประวัติส่วนตัวของตนเองเท่านั้น');
+        }
+
         $roleCodes   = User::availableRoles();
         $roleLabels  = User::roleLabels();
+
+        // ป้องกันไม่ให้ใครที่ไม่ได้เป็น Admin มาแก้ไข Admin/Supervisor
+        if (in_array($user->role, [User::ROLE_ADMIN, User::ROLE_SUPERVISOR])) {
+            if (!Auth::user()->isAdmin() && Auth::id() !== $user->id) {
+                return back()->with('toast', Toast::error('คุณไม่มีสิทธิ์แก้ไขข้อมูลของผู้ดูแลระบบหรือหัวหน้างานท่านอื่น', 4000));
+            }
+        }
 
         $departments = Department::orderBy('code')->get([
             'id',
@@ -261,6 +275,11 @@ class UserController extends Controller
      */
     public function update(Request $request, User $user)
     {
+        $currentUser = Auth::user();
+        if ($currentUser->isTechnician() && !$currentUser->isAdmin() && !$currentUser->isSupervisor() && $user->id !== $currentUser->id) {
+            abort(403, 'เจ้าหน้าที่สามารถแก้ไขได้เฉพาะประวัติส่วนตัวของตนเองเท่านั้น');
+        }
+
         $availableRoles = User::availableRoles();
 
         $validator = Validator::make(
@@ -313,16 +332,22 @@ class UserController extends Controller
             return back()
                 ->withInput()
                 ->withErrors($validator)
-                ->with('toast', [
-                    'type'     => 'error',
-                    'message'  => 'อัพเดตข้อมูลผู้ใช้ไม่สำเร็จ',
-                    'position' => 'br',
-                    'timeout'  => 3200,
-                    'details'  => $validator->errors()->first() ?? null,
-                ]);
+                ->with('toast', Toast::error('อัพเดตข้อมูลผู้ใช้ไม่สำเร็จ: ' . $validator->errors()->first(), 3200));
         }
 
         $data = $validator->validated();
+
+        // ป้องกันสิทธิ์การอัพเดต Role เปลี่ยนผู้ใช้เป็น Admin/Supervisor
+        if (in_array($data['role'], [User::ROLE_ADMIN, User::ROLE_SUPERVISOR])) {
+            if (!Auth::user()->isAdmin() && !(Auth::id() === $user->id && $user->role === $data['role'])) {
+                return back()->withInput()->with('toast', Toast::error('เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถตั้งค่าผู้ใช้เป็นแอดมินหรือหัวหน้างานได้', 4000));
+            }
+        }
+
+        // ป้องกันการแก้ไข Admin/Supervisor ท่านอื่น ถ้าคนแก้ไม่ใช่ Admin 
+        if (in_array($user->role, [User::ROLE_ADMIN, User::ROLE_SUPERVISOR]) && !Auth::user()->isAdmin() && Auth::id() !== $user->id) {
+            return back()->withInput()->with('toast', Toast::error('คุณไม่มีสิทธิ์อัพเดตข้อมูลของผู้ดูแลระบบหรือหัวหน้างานท่านอื่น', 4000));
+        }
 
         try {
             DB::beginTransaction();
@@ -343,24 +368,14 @@ class UserController extends Controller
 
             return redirect()
                 ->route('admin.users.index')
-                ->with('toast', [
-                    'type'     => 'success',
-                    'message'  => 'อัพเดตข้อมูลผู้ใช้เรียบร้อยแล้ว',
-                    'position' => 'br',
-                    'timeout'  => 2800,
-                ]);
+                ->with('toast', Toast::success('อัพเดตข้อมูลผู้ใช้เรียบร้อยแล้ว', 2800));
         } catch (\Throwable $e) {
             DB::rollBack();
             report($e);
 
             return back()
                 ->withInput()
-                ->with('toast', [
-                    'type'     => 'error',
-                    'message'  => 'เกิดข้อผิดพลาดระหว่างอัพเดตข้อมูลผู้ใช้',
-                    'position' => 'br',
-                    'timeout'  => 4000,
-                ]);
+                ->with('toast', Toast::error('เกิดข้อผิดพลาดระหว่างอัพเดตข้อมูลผู้ใช้', 4000));
         }
     }
 
@@ -369,14 +384,21 @@ class UserController extends Controller
      */
     public function destroy(User $user)
     {
+        $currentUser = Auth::user();
+        if ($currentUser->isTechnician() && !$currentUser->isAdmin() && !$currentUser->isSupervisor()) {
+            abort(403, 'เฉพาะผู้ดูแลระบบและหัวหน้างานเท่านั้นที่มีสิทธิ์ลบบัญชีผู้ใช้');
+        }
+
         // กันลบตัวเอง
         if ($user->id === Auth::id()) {
-            return back()->with('toast', [
-                'type'     => 'error',
-                'message'  => 'ไม่สามารถลบบัญชีของตัวเองได้',
-                'position' => 'br',
-                'timeout'  => 3200,
-            ]);
+            return back()->with('toast', Toast::error('ไม่สามารถลบบัญชีของตัวเองได้', 3200));
+        }
+
+        // ป้องกันการลบ Admin/Supervisor ถ้าไม่ใช่ Admin
+        if (in_array($user->role, [User::ROLE_ADMIN, User::ROLE_SUPERVISOR])) {
+            if (!Auth::user()->isAdmin()) {
+                return back()->with('toast', Toast::error('เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถลบบัญชีของแอดมินหรือหัวหน้างานได้', 4000));
+            }
         }
 
         try {
@@ -388,22 +410,12 @@ class UserController extends Controller
 
             return redirect()
                 ->route('admin.users.index')
-                ->with('toast', [
-                    'type'     => 'success',
-                    'message'  => 'ลบผู้ใช้เรียบร้อยแล้ว',
-                    'position' => 'br',
-                    'timeout'  => 2800,
-                ]);
+                ->with('toast', Toast::success('ลบผู้ใช้เรียบร้อยแล้ว', 2800));
         } catch (\Throwable $e) {
             DB::rollBack();
             report($e);
 
-            return back()->with('toast', [
-                'type'     => 'error',
-                'message'  => 'เกิดข้อผิดพลาดระหว่างลบผู้ใช้',
-                'position' => 'br',
-                'timeout'  => 4000,
-            ]);
+            return back()->with('toast', Toast::error('เกิดข้อผิดพลาดระหว่างลบผู้ใช้', 4000));
         }
     }
 }

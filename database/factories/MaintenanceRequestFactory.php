@@ -33,8 +33,12 @@ class MaintenanceRequestFactory extends Factory
             $this->faker->dateTimeBetween('-11 months', 'now')
         );
 
+        $acknowledgedAt = in_array($status, ['accepted','in_progress','resolved','closed'], true)
+            ? $requestDate->copy()->addHours(rand(1, 12))
+            : null;
+
         $acceptedAt = in_array($status, ['accepted','in_progress','resolved','closed'], true)
-            ? $requestDate->copy()->addHours(rand(1, 48))
+            ? optional($acknowledgedAt)->copy()->addHours(rand(1, 24))
             : null;
 
         $startedAt = in_array($status, ['in_progress','resolved','closed'], true)
@@ -69,11 +73,15 @@ class MaintenanceRequestFactory extends Factory
 
             'request_date'  => $requestDate,
             'assigned_date' => $acceptedAt,
+            'acknowledged_at' => $acknowledgedAt,
             'accepted_at'   => $acceptedAt,
             'started_at'    => $startedAt,
             'resolved_at'   => $resolvedAt,
             'closed_at'     => $closedAt,
             'completed_date'=> $closedAt,
+            
+            'sla_due_date'  => $requestDate->copy()->addDays(7),
+            'paused_duration_minutes' => 0,
 
             'cost'          => in_array($status, ['resolved','closed'], true)
                 ? $this->faker->randomFloat(2, 200, 15000)

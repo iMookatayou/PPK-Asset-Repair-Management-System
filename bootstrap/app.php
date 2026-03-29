@@ -108,6 +108,21 @@ return Application::configure(basePath: dirname(__DIR__))
 
             /*
             |-----------------------------
+            | WEB: Session / CSRF Token expired (419)
+            |-----------------------------
+            */
+            if (!$request->is('api/*') && $e instanceof \Illuminate\Session\TokenMismatchException) {
+                return redirect()->back()->withInput($request->except(['password', 'password_confirmation', '_token']))->with('toast', [
+                    'type'     => 'warning',
+                    'message'  => 'หน้าเว็บหมดอายุ (Page Expired) หรือเปิดหน้านี้ทิ้งไว้นานเกินไป กรุณาลองใหม่อีกครั้ง',
+                    'timeout'  => 4000,
+                    'position' => 'tc',
+                    'size'     => 'md',
+                ]);
+            }
+
+            /*
+            |-----------------------------
             | WEB: default handling
             |-----------------------------
             */

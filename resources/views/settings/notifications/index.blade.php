@@ -16,13 +16,6 @@
                     <h1 class="text-[17px] font-semibold text-slate-900">ตั้งค่า - การแจ้งเตือน</h1>
                     <p class="text-[13px] text-slate-600">จัดการเสียงและคลังไฟล์แจ้งเตือนในระบบ</p>
                 </div>
-                <div class="flex items-center gap-2">
-                    <a href="{{ route('maintenance.requests.index') }}"
-                       class="inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50">
-                        <i class="fa-solid fa-chevron-left text-[11px]"></i>
-                        กลับหน้ารายการ
-                    </a>
-                </div>
             </div>
 
             <form action="{{ route('settings.notifications.update_sound') }}" method="POST"

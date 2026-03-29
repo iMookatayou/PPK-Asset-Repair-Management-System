@@ -1,5 +1,7 @@
 import '../css/app.css'
 import Alpine from 'alpinejs'
+import SignaturePad from 'signature_pad'
+window.SignaturePad = SignaturePad
 import './nav-intro';
 import './bootstrap';
 import './repair/my-jobs';

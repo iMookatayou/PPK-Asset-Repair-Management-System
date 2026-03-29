@@ -151,8 +151,12 @@ class User extends Authenticatable
 
     public function getRoleLabelAttribute(): string
     {
-        $labels = self::roleLabels();
-        return $labels[$this->role] ?? ucfirst((string) $this->role);
+        return match($this->role) {
+            'technician' => 'ช่างซ่อมบำรุง',
+            'it'         => 'IT',
+            'engineer'   => 'วิศวกร',
+            default      => ucfirst($this->role ?? 'Unknown'),
+        };
     }
 
     public function roleRef()
@@ -206,7 +210,7 @@ class User extends Authenticatable
 
     public function getDepartmentNameAttribute(): ?string
     {
-        return $this->departmentRef?->name_th ?? $this->departmentRef?->name;
+        return $this->departmentRef?->name_th ?? $this->departmentRef?->name_en;
     }
 
     // การให้คะแนนโดย User คนนี้
@@ -269,5 +273,10 @@ class User extends Authenticatable
     public function technicianRatings()
     {
         return $this->hasMany(\App\Models\MaintenanceRating::class, 'technician_id');
+    }
+
+    public function technicianAssignments()
+    {
+        return $this->hasMany(MaintenanceAssignment::class, 'user_id');
     }
 }

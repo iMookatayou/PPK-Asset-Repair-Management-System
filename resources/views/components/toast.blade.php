@@ -2,11 +2,11 @@
   $toast = session('toast');
   if ($toast) { session()->forget('toast'); }
 
-  $type     = $toast['type']     ?? null;      // success|info|warning|error
+  $type     = $toast['type']     ?? null;
   $message  = $toast['message']  ?? null;
-  $position = $toast['position'] ?? 'tr';      // tr|tl|br|bl
+  $position = $toast['position'] ?? 'tr';
   $timeout  = (int)($toast['timeout'] ?? 3800);
-  $size     = $toast['size']     ?? 'lg';      // sm|md|lg|xl
+  $size     = $toast['size']     ?? 'lg';
 
   $firstError = (isset($errors) && method_exists($errors,'first') && $errors->any()) ? $errors->first() : null;
   if (!$message && $firstError) { $message = $firstError; $type = $type ?: 'warning'; }
@@ -15,226 +15,224 @@
 @endphp
 
 <style>
-  :root{
+  :root {
     --toast-z: 100001;
-    --toast-gap: 12px;
-
-    --toast-max-w: min(92vw, 460px);
+    --toast-gap: 10px;
+    --toast-max-w: min(92vw, 420px);
     --toast-min-w: 340px;
-
-    --toast-radius: 8px;
-    --toast-shadow: 0 12px 30px rgba(15,23,42,.24);
-    --toast-border: rgba(255,255,255,.20);
-
-    --toast-pad-x: 16px;
-    --toast-pad-y: 14px;
-
-    --toast-title-fs: 15px;
-    --toast-msg-fs: 15px;
-
-    --toast-icon: 34px;
-    --toast-icon-box: 42px;
-
-    --toast-bar-h: 4px;
+    --toast-radius: 14px;
   }
 
-  .toast-overlay{
-    position:fixed; inset:0;
-    z-index:var(--toast-z);
-    pointer-events:none;
+  .toast-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: var(--toast-z);
+    pointer-events: none;
   }
 
-  .toast-pos{
-    width:100%; height:100%;
-    display:flex;
-    flex-direction:column;
+  .toast-pos {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
     gap: var(--toast-gap);
-    padding: 14px;
+    padding: 16px;
   }
-  .toast-pos.tr{
-    align-items:flex-end;
-    justify-content:flex-start;
-    padding-top: calc(var(--topbar-h, 0px) + 14px);
+  .toast-pos.tr {
+    align-items: flex-end;
+    justify-content: flex-start;
+    padding-top: calc(var(--nav-h, 64px) + 16px);
   }
-  .toast-pos.tl{
-    align-items:flex-start;
-    justify-content:flex-start;
-    padding-top: calc(var(--topbar-h, 0px) + 14px);
+  .toast-pos.tl {
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding-top: calc(var(--nav-h, 64px) + 16px);
   }
-  .toast-pos.br{ align-items:flex-end; justify-content:flex-end; }
-  .toast-pos.bl{ align-items:flex-start; justify-content:flex-end; }
+  .toast-pos.br { align-items: flex-end;   justify-content: flex-end; }
+  .toast-pos.bl { align-items: flex-start; justify-content: flex-end; }
 
-  .toast-card{
-    pointer-events:auto;
+  /* ── Card ── */
+  .toast-card {
+    pointer-events: auto;
     width: min(100%, var(--toast-max-w));
     min-width: var(--toast-min-w);
-
     border-radius: var(--toast-radius);
-    box-shadow: var(--toast-shadow);
-    border: 1px solid var(--toast-border);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 28px rgba(0,0,0,.20), 0 2px 8px rgba(0,0,0,.10);
 
-    position:relative;
-    overflow:hidden;
-
-    opacity:0;
-    transform: translateY(-10px);
+    opacity: 0;
+    transform: translateX(20px) scale(.98);
+    transition:
+      opacity .25s cubic-bezier(.16,1,.3,1),
+      transform .25s cubic-bezier(.16,1,.3,1);
+  }
+  .toast-card.show {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  .toast-card.hide {
+    opacity: 0;
+    transform: translateX(20px) scale(.97);
     transition: opacity .18s ease, transform .18s ease;
-
-    outline:none !important;
-  }
-  .toast-card.show{ opacity:1; transform: translateY(0); }
-
-  .toast-inner{
-    display:flex;
-    align-items:center;
-    gap: 12px;
-    padding: var(--toast-pad-y) var(--toast-pad-x);
-    color:#fff;
-  }
-  .toast-ico{
-    flex:0 0 var(--toast-icon-box);
-    width:var(--toast-icon-box);
-    height:var(--toast-icon-box);
-    display:grid;
-    place-items:center;
-    border-radius: 6px;
-    background: rgba(255,255,255,.18);
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,.14);
-  }
-  .toast-ico svg{
-    width: var(--toast-icon);
-    height: var(--toast-icon);
-    display:block;
-    fill: currentColor;
-    color:#fff;
-    filter: drop-shadow(0 1px 0 rgba(0,0,0,.18));
   }
 
-  .toast-text{ flex:1; min-width:0; }
+  /* ── Background colors ── */
+  .toast--success { background: #4CAF50; }
+  .toast--error   { background: #F44336; }
+  .toast--warning { background: #FFC107; }
+  .toast--info    { background: #2196F3; }
 
-  .toast-title{
-    font-size: var(--toast-title-fs);
-    font-weight: 900;
-    letter-spacing:.01em;
+  /* ── Inner (default = lg) ── */
+  .toast-inner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 16px 15px 18px;
+  }
+
+  /* ── Icon — พื้นขาว ไอคอนมีสี ── */
+  .toast-ico {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #fff;
+    display: grid;
+    place-items: center;
+  }
+  .toast-ico svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .toast--success .toast-ico svg { stroke: #4CAF50; }
+  .toast--error   .toast-ico svg { stroke: #F44336; }
+  .toast--warning .toast-ico svg { stroke: #F59E0B; }
+  .toast--info    .toast-ico svg { stroke: #2196F3; }
+
+  /* ── Text ── */
+  .toast-text { flex: 1; min-width: 0; }
+
+  .toast-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: #fff;
     margin: 0 0 4px 0;
-    text-shadow: 0 1px 0 rgba(0,0,0,.18);
+    letter-spacing: .01em;
+    line-height: 1.2;
+    text-shadow: 0 1px 2px rgba(0,0,0,.10);
   }
-
-  .toast-msg{
-    font-size: var(--toast-msg-fs);
-    line-height: 1.45;
-    margin:0;
-    opacity:.96;
-
-    display:-webkit-box;
-    -webkit-line-clamp: 2;
+  .toast-msg {
+    font-size: 13px;
+    line-height: 1.5;
+    color: rgba(255,255,255,.92);
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
-    overflow:hidden;
-    text-overflow: ellipsis;
+    overflow: hidden;
     word-break: break-word;
   }
 
-  .toast-close{
-    border:0;
-    background: rgba(255,255,255,.18);
-    color:#fff;
-    width: 34px; height: 34px;
+  /* Warning — text เข้มบน background เหลือง */
+  .toast--warning .toast-title { color: #3d2e00; text-shadow: none; }
+  .toast--warning .toast-msg   { color: rgba(40,28,0,.80); }
+  .toast--warning .toast-close { color: rgba(40,28,0,.55); }
+  .toast--warning .toast-close:hover { color: #3d2e00; background: rgba(0,0,0,.08); }
+
+  /* ── Close ── */
+  .toast-close {
+    flex-shrink: 0;
+    border: 0;
+    background: transparent;
+    color: rgba(255,255,255,.80);
+    width: 26px;
+    height: 26px;
     border-radius: 6px;
-    cursor:pointer;
-    display:grid;
-    place-items:center;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
     font-size: 20px;
-    line-height:0;
-    transition: background .12s ease;
-    outline:none !important;
+    font-weight: 700;
+    line-height: 1;
+    transition: color .12s, background .12s;
+    outline: none !important;
   }
-  .toast-close:hover{ background: rgba(255,255,255,.30); }
-  .toast-close:focus,
-  .toast-close:focus-visible{ outline:none !important; box-shadow:none; }
+  .toast-close:hover {
+    color: #fff;
+    background: rgba(0,0,0,.12);
+  }
 
-  .toast-bar{
-    height: var(--toast-bar-h);
-    background: rgba(0,0,0,.18);
+  /* ── Progress bar ── */
+  .toast-bar {
+    height: 5px;
+    background: rgba(0,0,0,.15);
   }
-  .toast-fill{
-    height: var(--toast-bar-h);
-    width:0;
+  .toast-fill {
+    height: 100%;
+    width: 0;
     transition: width linear;
-    background: rgba(255,255,255,.58);
+    background: rgba(255,255,255,.45);
   }
+  .toast--warning .toast-fill { background: rgba(0,0,0,.18); }
 
-  .toast--success{ background:#6ea35e; }
-  .toast--error  { background:#b5564c; }
-  .toast--warning{ background:#e3a23a; }
-  .toast--info   { background:#5a9db5; }
+  /* ── Size overrides ── */
+  .toast--sm {
+    --toast-max-w: min(92vw, 300px);
+    --toast-min-w: 220px;
+  }
+  .toast--sm .toast-inner   { padding: 11px 11px 10px 13px; gap: 10px; }
+  .toast--sm .toast-title   { font-size: 13px; }
+  .toast--sm .toast-msg     { font-size: 12px; }
+  .toast--sm .toast-ico     { width: 32px; height: 32px; }
+  .toast--sm .toast-ico svg { width: 16px; height: 16px; }
 
-  .toast--sm{
-    --toast-max-w: min(92vw, 420px);
-    --toast-min-w: 320px;
-    --toast-pad-x: 14px;
-    --toast-pad-y: 12px;
-    --toast-title-fs: 14px;
-    --toast-msg-fs: 14px;
-    --toast-icon: 30px;
-    --toast-icon-box: 38px;
-    --toast-bar-h: 3px;
+  .toast--md {
+    --toast-max-w: min(92vw, 360px);
+    --toast-min-w: 280px;
   }
-  .toast--md{
-    --toast-max-w: min(92vw, 440px);
-    --toast-min-w: 330px;
-    --toast-pad-x: 15px;
-    --toast-pad-y: 13px;
-    --toast-title-fs: 14px;
-    --toast-msg-fs: 14px;
-    --toast-icon: 32px;
-    --toast-icon-box: 40px;
-    --toast-bar-h: 4px;
-  }
-  .toast--lg{
-    --toast-max-w: min(92vw, 460px);
-    --toast-min-w: 340px;
-    --toast-pad-x: 16px;
-    --toast-pad-y: 14px;
-    --toast-title-fs: 15px;
-    --toast-msg-fs: 15px;
-    --toast-icon: 34px;
-    --toast-icon-box: 42px;
-    --toast-bar-h: 4px;
-  }
-  .toast--xl{
-    --toast-max-w: min(92vw, 520px);
-    --toast-min-w: 360px;
-    --toast-pad-x: 18px;
-    --toast-pad-y: 16px;
-    --toast-title-fs: 16px;
-    --toast-msg-fs: 16px;
-    --toast-icon: 38px;
-    --toast-icon-box: 48px;
-    --toast-bar-h: 5px;
-  }
+  .toast--md .toast-inner   { padding: 14px 14px 13px 16px; gap: 12px; }
+  .toast--md .toast-title   { font-size: 14px; }
+  .toast--md .toast-msg     { font-size: 12px; }
+  .toast--md .toast-ico     { width: 38px; height: 38px; }
+  .toast--md .toast-ico svg { width: 19px; height: 19px; }
 
-  @media (max-width: 420px){
-    .toast-card{ min-width: calc(100vw - 28px); }
-  }
+  /* lg = default (:root) — ไม่ต้องกำหนดซ้ำ */
 
-  @media (prefers-reduced-motion: reduce){
-    .toast-card{ transition:none; transform:none; }
-    .toast-fill{ transition:none !important; }
+  .toast--xl {
+    --toast-max-w: min(92vw, 500px);
+    --toast-min-w: 400px;
+  }
+  .toast--xl .toast-inner   { padding: 18px 18px 17px 20px; gap: 16px; }
+  .toast--xl .toast-title   { font-size: 16px; }
+  .toast--xl .toast-msg     { font-size: 14px; }
+  .toast--xl .toast-ico     { width: 50px; height: 50px; }
+  .toast--xl .toast-ico svg { width: 25px; height: 25px; }
+
+  @media (max-width: 420px) {
+    .toast-card { min-width: calc(100vw - 32px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .toast-card { transition: none; transform: none; }
+    .toast-fill { transition: none !important; }
   }
 </style>
 
 <div class="toast-overlay" aria-live="polite" aria-atomic="true"></div>
 
 <script>
-(function(){
+(function () {
   const DEFAULT_POSITION = 'tr';
   const FORCE_POSITION   = 'tr';
-  const DEFAULT_SIZE     = 'xl';
+  const DEFAULT_SIZE     = 'lg';
 
-  function ensurePos(position){
+  function ensurePos(position) {
     const overlay = document.querySelector('.toast-overlay');
     if (!overlay) return null;
-
     let posEl = overlay.querySelector('.toast-pos');
     if (!posEl || !posEl.classList.contains(position)) {
       overlay.innerHTML = '';
@@ -242,57 +240,40 @@
       posEl.className = 'toast-pos ' + position;
       overlay.appendChild(posEl);
     }
-    return { posEl };
+    return posEl;
   }
 
-  function titleByType(type){
-    switch(type){
-      case 'success': return 'สำเร็จ';
-      case 'error':   return 'เกิดข้อผิดพลาด';
-      case 'warning': return 'โปรดตรวจสอบ';
-      case 'info':    return 'แจ้งเตือน';
-      default:        return 'แจ้งเตือน';
-    }
+  function titleByType(type) {
+    return {
+      success: 'สำเร็จ',
+      error:   'เกิดข้อผิดพลาด',
+      warning: 'โปรดตรวจสอบ',
+      info:    'แจ้งเตือน',
+    }[type] ?? 'แจ้งเตือน';
   }
 
-  function iconSvg(type){
-    if (type === 'success') return `
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"></path>
-      </svg>`;
-    if (type === 'error') return `
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59Z"></path>
-      </svg>`;
-    if (type === 'warning') return `
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"></path>
-      </svg>`;
-    return `
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M11 17h2v-6h-2v6zm0-8h2V7h-2v2zm1-7C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"></path>
-      </svg>`;
+  function iconSvg(type) {
+    if (type === 'success')
+      return `<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`;
+    if (type === 'error')
+      return `<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+    if (type === 'warning')
+      return `<svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+    return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
   }
 
-  function showToast({type='info', message='', position=DEFAULT_POSITION, timeout=3800, size=DEFAULT_SIZE, title=null} = {}){
-    type = (['success','info','warning','error'].includes(type) ? type : 'info');
-
+  function showToast({ type = 'info', message = '', position = DEFAULT_POSITION, timeout = 3800, size = DEFAULT_SIZE, title = null } = {}) {
+    type     = ['success','info','warning','error'].includes(type) ? type : 'info';
     position = FORCE_POSITION || position || DEFAULT_POSITION;
-    const allowedPos = ['tr','tl','br','bl'];
-    if (!allowedPos.includes(position)) position = DEFAULT_POSITION;
+    timeout  = Number.isFinite(Number(timeout)) && Number(timeout) >= 800 ? Number(timeout) : 3800;
+    size     = ['sm','md','lg','xl'].includes(size) ? size : DEFAULT_SIZE;
 
-    timeout = Number(timeout);
-    if (!Number.isFinite(timeout) || timeout < 800) timeout = 3800;
-
-    const s = (['sm','md','lg','xl'].includes(size) ? size : DEFAULT_SIZE);
-
-    const ctx = ensurePos(position);
-    if (!ctx) return;
-    const { posEl } = ctx;
+    const posEl = ensurePos(position);
+    if (!posEl) return;
 
     const card = document.createElement('section');
-    card.className = `toast-card toast--${s} toast--${type}`;
-    card.setAttribute('role','status');
+    card.className = `toast-card toast--${size} toast--${type}`;
+    card.setAttribute('role', 'status');
 
     const inner = document.createElement('div');
     inner.className = 'toast-inner';
@@ -301,29 +282,28 @@
     ico.className = 'toast-ico';
     ico.innerHTML = iconSvg(type);
 
-    const text = document.createElement('div');
-    text.className = 'toast-text';
+    const textWrap = document.createElement('div');
+    textWrap.className = 'toast-text';
 
     const h = document.createElement('div');
     h.className = 'toast-title';
-    h.textContent = (title ?? titleByType(type));
+    h.textContent = title ?? titleByType(type);
 
     const p = document.createElement('p');
     p.className = 'toast-msg';
     p.textContent = message ?? '';
 
-    text.append(h, p);
+    textWrap.append(h, p);
 
     const btn = document.createElement('button');
     btn.className = 'toast-close';
-    btn.setAttribute('aria-label','Close');
+    btn.setAttribute('aria-label', 'ปิด');
     btn.innerHTML = '&times;';
 
-    inner.append(ico, text, btn);
+    inner.append(ico, textWrap, btn);
 
-    const bar = document.createElement('div');
+    const bar  = document.createElement('div');
     bar.className = 'toast-bar';
-
     const fill = document.createElement('div');
     fill.className = 'toast-fill';
     bar.appendChild(fill);
@@ -340,24 +320,25 @@
     });
 
     let startAt = Date.now();
-    let remain = timeout;
+    let remain  = timeout;
+    let timer;
 
-    function close(){
+    function close() {
+      clearTimeout(timer);
       card.classList.remove('show');
-      setTimeout(()=> card.remove(), 180);
+      card.classList.add('hide');
+      setTimeout(() => card.remove(), 200);
     }
 
-    let timer = setTimeout(close, timeout + 60);
+    timer = setTimeout(close, timeout + 60);
     btn.addEventListener('click', close);
-
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); }, { once:true });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); }, { once: true });
 
     card.addEventListener('mouseenter', () => {
       clearTimeout(timer);
       remain = Math.max(0, remain - (Date.now() - startAt));
       fill.style.transition = 'none';
-      const doneRatio = 1 - (remain / timeout);
-      fill.style.width = (doneRatio * 100) + '%';
+      fill.style.width = ((1 - remain / timeout) * 100) + '%';
     });
 
     card.addEventListener('mouseleave', () => {
@@ -372,18 +353,16 @@
   window.addEventListener('app:toast', e => showToast(e.detail || {}));
 
   @if ($type && $message)
-  (function fireToast(){
+  (function fireToast() {
     const payload = {
-      type: @json($type),
-      message: @json($message),
+      type:     @json($type),
+      message:  @json($message),
       position: @json($position ?? 'tr'),
-      timeout: @json($timeout),
-      size: @json($size ?? 'xl'),
+      timeout:  @json($timeout),
+      size:     @json($size ?? 'lg'),
     };
 
-    function fire() {
-      window.showToast(payload);
-    }
+    function fire() { window.showToast(payload); }
 
     const needWait =
       document.documentElement.classList.contains('intro-pending') ||
@@ -391,6 +370,8 @@
 
     if (needWait) {
       window.addEventListener('introReveal:done', fire, { once: true });
+    } else if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', fire, { once: true });
     } else {
       fire();
     }

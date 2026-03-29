@@ -76,11 +76,15 @@ return new class extends Migration
             $table->timestamp('assigned_date')->nullable();
             $table->timestamp('completed_date')->nullable(); // legacy
 
+            $table->timestamp('acknowledged_at')->nullable();
             $table->timestamp('accepted_at')->nullable();
             $table->timestamp('started_at')->nullable();
             $table->timestamp('on_hold_at')->nullable();
             $table->timestamp('resolved_at')->nullable();
             $table->timestamp('closed_at')->nullable();
+            
+            $table->timestamp('sla_due_date')->nullable();
+            $table->unsignedInteger('paused_duration_minutes')->default(0);
 
             // ====== ผลการซ่อม ======
             $table->text('remark')->nullable();

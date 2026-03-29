@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Auth;
 
 class MaintenanceRequest extends Model
 {
@@ -44,11 +45,15 @@ class MaintenanceRequest extends Model
         'request_date',
         'assigned_date',
         'completed_date', // legacy
+        'acknowledged_at',
         'accepted_at',
         'started_at',
         'on_hold_at',
         'resolved_at',
         'closed_at',
+        
+        'sla_due_date',
+        'paused_duration_minutes',
 
         // ===== อื่น ๆ =====
         'remark',
@@ -62,11 +67,14 @@ class MaintenanceRequest extends Model
         'request_date'        => 'datetime',
         'assigned_date'       => 'datetime',
         'completed_date'      => 'datetime',
+        'acknowledged_at'     => 'datetime',
         'accepted_at'         => 'datetime',
         'started_at'          => 'datetime',
         'on_hold_at'          => 'datetime',
         'resolved_at'         => 'datetime',
         'closed_at'           => 'datetime',
+        'sla_due_date'        => 'datetime',
+        'paused_duration_minutes' => 'integer',
 
         'status_updated_at'   => 'datetime',
 
@@ -99,6 +107,21 @@ class MaintenanceRequest extends Model
     public const PRIORITY_HIGH   = 'high';
     public const PRIORITY_URGENT = 'urgent';
 
+    /**
+     * Transition map: สถานะปัจจุบัน => สถานะที่อนุญาตให้เปลี่ยนไปได้
+     */
+    public const ALLOWED_TRANSITIONS = [
+        self::STATUS_PENDING      => [self::STATUS_ACKNOWLEDGED, self::STATUS_CANCELLED],
+        self::STATUS_ACKNOWLEDGED => [self::STATUS_ACCEPTED, self::STATUS_CANCELLED, self::STATUS_REJECTED],
+        self::STATUS_ACCEPTED     => [self::STATUS_IN_PROGRESS, self::STATUS_ON_HOLD, self::STATUS_CANCELLED],
+        self::STATUS_IN_PROGRESS  => [self::STATUS_RESOLVED, self::STATUS_CANCELLED, self::STATUS_ON_HOLD],
+        self::STATUS_ON_HOLD      => [self::STATUS_IN_PROGRESS, self::STATUS_CANCELLED],
+        self::STATUS_RESOLVED     => [self::STATUS_CLOSED],
+        self::STATUS_CLOSED       => [],
+        self::STATUS_CANCELLED    => [],
+        self::STATUS_REJECTED     => [],
+    ];
+
     public static function statusLabels(): array
     {
         return [
@@ -106,7 +129,7 @@ class MaintenanceRequest extends Model
             self::STATUS_ACKNOWLEDGED => 'รับทราบแล้ว',
             self::STATUS_ACCEPTED     => 'รับเรื่องแล้ว',
             self::STATUS_IN_PROGRESS  => 'กำลังดำเนินการ',
-            self::STATUS_ON_HOLD      => 'พักไว้',
+            self::STATUS_ON_HOLD      => 'พักชั่วคราว',
             self::STATUS_RESOLVED     => 'แก้ไขแล้ว',
             self::STATUS_CLOSED       => 'ปิดงาน',
             self::STATUS_CANCELLED    => 'ยกเลิก',
@@ -193,8 +216,10 @@ class MaintenanceRequest extends Model
 
     public function rating()
     {
+        $user = Auth::user();
+
         return $this->hasOne(MaintenanceRating::class, 'maintenance_request_id')
-            ->where('rater_id', auth()->id());
+            ->when($user, fn($q) => $q->where('rater_id', $user->getKey()));
     }
 
     public function ratingBy(int $userId)
@@ -222,11 +247,20 @@ class MaintenanceRequest extends Model
 
         $type = '10'; // legacy fixed type
 
-        $count = static::query()
+        // ใช้ MAX(request_no) แทน count() เพื่อป้องกัน race condition
+        $lastNo = static::query()
             ->whereYear('created_at', now()->year)
-            ->count() + 1;
+            ->lockForUpdate()
+            ->max('request_no');
 
-        $run = str_pad((string) $count, 5, '0', STR_PAD_LEFT);
+        if ($lastNo && strlen($lastNo) >= 7) {
+            $lastRun = (int) substr($lastNo, -5);
+            $nextRun = $lastRun + 1;
+        } else {
+            $nextRun = 1;
+        }
+
+        $run = str_pad((string) $nextRun, 5, '0', STR_PAD_LEFT);
 
         return $yy . $type . $run;
     }
@@ -293,7 +327,8 @@ class MaintenanceRequest extends Model
         }
 
         return $q->where(function ($w) use ($term) {
-                $w->where('maintenance_requests.title', 'like', "%{$term}%")
+                $w->where('maintenance_requests.id', $term)
+                  ->orWhere('maintenance_requests.title', 'like', "%{$term}%")
                   ->orWhere('maintenance_requests.description', 'like', "%{$term}%")
                   ->orWhere('maintenance_requests.request_no', 'like', "%{$term}%")
                   ->orWhere('maintenance_requests.reporter_name', 'like', "%{$term}%")
@@ -326,8 +361,11 @@ class MaintenanceRequest extends Model
 
     public function canHold(): bool
     {
-        // กำลังทำอยู่ -> พักได้
-        return $this->hasStatus(self::STATUS_IN_PROGRESS);
+        // รับเรื่องแล้ว/กำลังทำ -> พักได้
+        return in_array((string) $this->status, [
+            self::STATUS_ACCEPTED,
+            self::STATUS_IN_PROGRESS,
+        ], true);
     }
 
     public function canResume(): bool
@@ -338,11 +376,8 @@ class MaintenanceRequest extends Model
 
     public function canResolve(): bool
     {
-        // ทำอยู่/พักอยู่ -> ทำเสร็จได้
-        return in_array((string) $this->status, [
-            self::STATUS_IN_PROGRESS,
-            self::STATUS_ON_HOLD,
-        ], true);
+        // ทำอยู่ -> ทำเสร็จได้ (ตัด พักอยู่ ออกตาม requirement ใหม่)
+        return $this->hasStatus(self::STATUS_IN_PROGRESS);
     }
 
     public function canClose(): bool
@@ -358,20 +393,52 @@ class MaintenanceRequest extends Model
             return true;
         }
 
+        // ตรวจสอบลำดับสถานะที่อนุญาต
+        $allowed = self::ALLOWED_TRANSITIONS[$from] ?? [];
+        if (!in_array($toStatus, $allowed, true)) {
+            throw new \InvalidArgumentException(
+                "ไม่สามารถเปลี่ยนสถานะจาก [{$from}] ไปเป็น [{$toStatus}] ได้"
+            );
+        }
+
         $this->status = $toStatus;
 
         $now = now();
         switch ($toStatus) {
+            case self::STATUS_ACKNOWLEDGED:
+                $this->acknowledged_at ??= $now;
+                break;
+
             case self::STATUS_ACCEPTED:
-                $this->accepted_at ??= $now;
+                if (!$this->accepted_at) {
+                    $this->accepted_at = $now;
+                    
+                    $slaTarget = \App\Models\SlaConfig::where('priority_level', $this->priority ?? \App\Models\SlaConfig::PRIORITY_DEFAULT)
+                        ->where('is_active', true)->first() 
+                        ?? \App\Models\SlaConfig::where('priority_level', \App\Models\SlaConfig::PRIORITY_DEFAULT)->first();
+                    
+                    if ($slaTarget) {
+                        $this->sla_due_date = $now->copy()->addMinutes($slaTarget->resolution_time_minutes);
+                    }
+                }
                 break;
 
             case self::STATUS_IN_PROGRESS:
                 $this->started_at ??= $now;
+                // Extend SLA if resuming from ON_HOLD
+                if ($from === self::STATUS_ON_HOLD && $this->on_hold_at) {
+                    $onHoldAt = \Carbon\Carbon::parse($this->on_hold_at);
+                    $pausedMins = (int) ceil($onHoldAt->diffInMinutes($now));
+                    $this->paused_duration_minutes = (int) $this->paused_duration_minutes + $pausedMins;
+                    
+                    if ($this->sla_due_date) {
+                        $this->sla_due_date = \Carbon\Carbon::parse($this->sla_due_date)->addMinutes($pausedMins);
+                    }
+                }
                 break;
 
             case self::STATUS_ON_HOLD:
-                $this->on_hold_at ??= $now;
+                $this->on_hold_at = $now;
                 break;
 
             case self::STATUS_RESOLVED:

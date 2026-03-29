@@ -20,7 +20,7 @@
   $statusLabel = fn(?string $s) => [
     'acknowledged' => 'รับทราบแล้ว',
     'pending'     => 'รอดำเนินการ',
-    'accepted'    => 'รับงานแล้ว',
+    'accepted'    => 'รับเรื่องแล้ว',
     'in_progress' => 'กำลังดำเนินการ',
     'on_hold'     => 'พักไว้ชั่วคราว',
     'resolved'    => 'แก้ไขเสร็จสิ้น',
@@ -51,14 +51,14 @@
   $priorityLabel = fn(?string $p) => [
     'low'    => 'ต่ำ',
     'medium' => 'ปานกลาง',
-    'high'   => 'สูง',
-    'urgent' => 'เร่งด่วน',
+    'high'   => 'เร่งด่วน',
+    'urgent' => 'เร่งด่วนมาก',
   ][strtolower((string)$p)] ?? '-';
 
   $statusOptions = [
     'acknowledged' => 'รับทราบแล้ว',
     'pending'     => 'รอดำเนินการ',
-    'accepted'    => 'รับงานแล้ว',
+    'accepted'    => 'รับเรื่องแล้ว',
     'in_progress' => 'กำลังดำเนินการ',
     'on_hold'     => 'พักไว้ชั่วคราว',
     'resolved'    => 'แก้ไขเสร็จสิ้น',
@@ -69,8 +69,8 @@
   $priorityOptions = [
     'low'    => 'ต่ำ',
     'medium' => 'ปานกลาง',
-    'high'   => 'สูง',
-    'urgent' => 'เร่งด่วน',
+    'high'   => 'เร่งด่วน',
+    'urgent' => 'เร่งด่วนมาก',
   ];
 
   $types = is_iterable($types ?? null) ? collect($types) : collect();

@@ -38,121 +38,218 @@ import Chart from 'chart.js/auto';
 
   const safeGet = (id) => document.getElementById(id);
 
+  const DURATION = 1000;
+  const EASING   = 'easeOutQuart';
+
+  function watchAndAnimate(canvas, chart) {
+      if (!('IntersectionObserver' in window)) return;
+      const io = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+              if (entry.isIntersecting) {
+                  io.unobserve(entry.target);
+                  chart.reset();
+                  chart.update();
+              }
+          });
+      }, { threshold: 0.25 });
+      io.observe(canvas);
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
+    Chart.defaults.font.family = "'Inter', sans-serif";
+    Chart.defaults.color       = '#747781';
+
+    const tooltipDefaults = {
+        backgroundColor : '#0F2D5C',
+        titleColor      : '#ffffff',
+        bodyColor       : '#e2e8f0',
+        borderColor     : '#0F2D5C',
+        borderWidth     : 1,
+        padding         : 12,
+        cornerRadius    : 8,
+        position        : 'nearest',
+        titleFont : { family: 'Inter', size: 13, weight: 'bold' },
+        bodyFont  : { family: 'Inter', size: 12 },
+    };
+
     const charts = [];
 
-    const makeChart = (canvas, config) => {
-      const chart = new Chart(canvas.getContext('2d'), config);
-      charts.push(chart);
-      return chart;
-    };
-
-    // สีเดิมตามที่คุณใช้
-    const BLUE_SOLID = '#2B6CEB';
-    const GRAY_SOLID = '#5F6F86';
-    const BLUE_SET = ['#0B1F3B', '#15345F', '#2B6CEB', '#19B5FE', '#8ECFFF', '#D9EFFF'];
+    // AssetCentral Theme Colors
+    const PRIMARY_NAVY = '#00275f';
+    const SECONDARY_GREEN = '#006c46';
+    const ACCENT_BLUE = '#00609b';
+    const DANGER_RED = '#ba1a1a';
+    
+    const BLUE_SET = [PRIMARY_NAVY, ACCENT_BLUE, SECONDARY_GREEN, DANGER_RED, '#6b7280', '#94a3b8'];
 
     const commonOptions = {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { display: false }, ticks: { color: '#15345F', font: { size: 10, weight: '700' } } },
-        y: { beginAtZero: true, grid: { display: false }, ticks: { display: false } },
-      },
-    };
+        responsive          : true,
+        maintainAspectRatio : false,
+        interaction         : { mode: 'nearest', intersect: true },
 
-    // Monthly Trend
-    const trendCanvas = safeGet('trendBar');
-    if (trendCanvas) {
-      makeChart(trendCanvas, {
-        type: 'bar',
-        data: {
-          labels: parseJSON(trendCanvas.dataset.labels),
-          datasets: [{
-            data: parseJSON(trendCanvas.dataset.values),
-            backgroundColor: BLUE_SOLID,
-            borderRadius: 2,
-            barPercentage: 0.62,
-          }],
+        // Bars grow from baseline, each bar delayed 60ms
+        animation: {
+            duration : DURATION,
+            easing   : EASING,
         },
-        options: commonOptions,
-      });
-    }
+        animations: {
+            y: {
+                duration : DURATION,
+                easing   : EASING,
+                from     : (ctx) => {
+                    if (ctx.type !== 'data') return undefined;
+                    const chart = ctx.chart;
+                    return chart.scales.y
+                        ? chart.scales.y.getPixelForValue(0)
+                        : undefined;
+                },
+            },
+        },
+        datasets: {
+            bar  : { animation: { delay : (ctx) => ctx.dataIndex * 60 } },
+        },
+
+        scales: {
+            x  : { grid: { display: false } },
+            y  : {
+                type        : 'linear',
+                position    : 'left',
+                beginAtZero : true,
+                grid        : { color: '#f1f5f9' },
+                ticks       : { font: { size: 11 }, stepSize: 1 },
+            },
+        },
+        plugins: {
+            legend  : { display: false },
+            tooltip : tooltipDefaults,
+        },
+    };
 
     // donut factory
     const donutConfig = (labels, data, colors) => ({
-      type: 'doughnut',
-      data: {
-        labels,
-        datasets: [{
-          data,
-          backgroundColor: colors,
-          borderWidth: 0,
-          hoverOffset: 4,
-        }],
+      type : 'doughnut',
+      data : {
+          labels   : labels,
+          datasets : [{
+              data            : data,
+              backgroundColor : colors,
+              borderWidth     : 3,
+              borderColor     : '#ffffff',
+              hoverOffset     : 10,
+          }],
       },
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '74%',
-        plugins: { legend: { display: false } },
+          responsive          : true,
+          maintainAspectRatio : false,
+          cutout              : '70%',
+
+          // Spin in from 0, scale up, segments staggered
+          animation: {
+              animateRotate : true,
+              animateScale  : true,
+              duration      : DURATION + 100,
+              easing        : EASING,
+          },
+          animations: {
+              delay: {
+                  fn   : (ctx) => ctx.dataIndex * 80,
+                  from : 0,
+              },
+          },
+
+          plugins: {
+              legend: { display: false },
+              tooltip : tooltipDefaults,
+          },
       },
     });
 
-    // Asset Type donut
-    const typeCanvas = safeGet('typeDonut');
-    if (typeCanvas) {
-      makeChart(typeCanvas, donutConfig(
-        parseJSON(typeCanvas.dataset.labels),
-        parseJSON(typeCanvas.dataset.values),
-        [BLUE_SET[0], BLUE_SET[2], BLUE_SET[3], BLUE_SET[4], BLUE_SET[5], BLUE_SET[1]]
-      ));
-    }
+    document.fonts.ready.then(() => {
+      // 1. Monthly Trend Bar
+      const trendEl = safeGet('trendBar');
+      if (trendEl) {
+        const trendCtx = trendEl.getContext('2d');
+        const vals = parseJSON(trendEl.dataset.values);
+        
+        const trendChart = new Chart(trendCtx, {
+          type: 'bar',
+          data: {
+            labels: parseJSON(trendEl.dataset.labels),
+            datasets: [{
+              label: 'จำนวนแจ้งซ่อม',
+              data: vals,
+              backgroundColor: 'rgba(15, 45, 92, 0.85)',
+              borderRadius: 6,
+              borderSkipped: 'bottom',
+              barPercentage: 0.45,
+              categoryPercentage: 0.9,
+            }],
+          },
+          options: commonOptions,
+        });
+        charts.push(trendChart);
+        watchAndAnimate(trendEl, trendChart);
+      }
 
-    // Status donut
-    const statusCanvas = safeGet('statusDonut');
-    if (statusCanvas) {
-      makeChart(statusCanvas, donutConfig(
-        ['Pending', 'In Progress', 'Completed', 'Other'],
-        [
-          Number(statusCanvas.dataset.pending || 0),
-          Number(statusCanvas.dataset.progress || 0),
-          Number(statusCanvas.dataset.completed || 0),
-          Number(statusCanvas.dataset.other || 0),
-        ],
-        [BLUE_SET[3], BLUE_SET[2], BLUE_SET[0], BLUE_SET[5]]
-      ));
-    }
+      // 2. Asset Type donut
+      const typeEl = safeGet('typeDonut');
+      if (typeEl) {
+        const typeChart = new Chart(typeEl.getContext('2d'), donutConfig(
+          parseJSON(typeEl.dataset.labels),
+          parseJSON(typeEl.dataset.values),
+          BLUE_SET
+        ));
+        charts.push(typeChart);
+        watchAndAnimate(typeEl, typeChart);
+      }
 
-    // Department Bar
-    const deptCanvas = safeGet('deptBar');
-    if (deptCanvas) {
-      makeChart(deptCanvas, {
-        type: 'bar',
-        data: {
-          labels: parseJSON(deptCanvas.dataset.labels),
-          datasets: [{
-            data: parseJSON(deptCanvas.dataset.values),
-            backgroundColor: GRAY_SOLID,
-            borderRadius: 2,
-            barPercentage: 0.62,
-          }],
-        },
-        options: commonOptions,
-      });
-    }
+      // 3. Status donut
+      const statusEl = safeGet('statusDonut');
+      if (statusEl) {
+        const statusChart = new Chart(statusEl.getContext('2d'), donutConfig(
+          ['รอดำเนินการ', 'กำลังดำเนินการ', 'เสร็จสิ้นแล้ว', 'ยกเลิก/ปฏิเสธ'],
+          [
+            Number(statusEl.dataset.pending || 0),
+            Number(statusEl.dataset.progress || 0),
+            Number(statusEl.dataset.completed || 0),
+            Number(statusEl.dataset.cancelled || 0),
+          ],
+          [ACCENT_BLUE, PRIMARY_NAVY, SECONDARY_GREEN, DANGER_RED]
+        ));
+        charts.push(statusChart);
+        watchAndAnimate(statusEl, statusChart);
+      }
 
-    // ResizeObserver: responsive จริงทุกกรณี
+      // 4. Department Bar
+      const deptEl = safeGet('deptBar');
+      if (deptEl) {
+        const deptCtx = deptEl.getContext('2d');
+        const vals = parseJSON(deptEl.dataset.values);
+
+        const deptChart = new Chart(deptCtx, {
+          type: 'bar',
+          data: {
+            labels: parseJSON(deptEl.dataset.labels),
+            datasets: [{
+              label: 'จำนวนงาน',
+              data: vals,
+              backgroundColor: SECONDARY_GREEN,
+              borderRadius: 6,
+              borderSkipped: 'bottom',
+              barPercentage: 0.5,
+              categoryPercentage: 0.8,
+            }],
+          },
+          options: commonOptions,
+        });
+        charts.push(deptChart);
+        watchAndAnimate(deptEl, deptChart);
+      }
+    });
+
     const safeResizeAll = () => requestAnimationFrame(() => charts.forEach((c) => c.resize()));
-    if ('ResizeObserver' in window) {
-      const ro = new ResizeObserver(() => safeResizeAll());
-      document.querySelectorAll('.chart-box, .card, .dash-grid-2, .dash-wrap').forEach((el) => ro.observe(el));
-    } else {
-      window.addEventListener('resize', safeResizeAll);
-    }
 
-    // filter toggle (ถ้ามี)
+    // filter toggle
     const btn = safeGet('filterToggle');
     const panel = safeGet('filtersPanel');
     if (btn && panel) {
@@ -162,7 +259,7 @@ import Chart from 'chart.js/auto';
       });
     }
 
-    // toast (รับค่าจาก Blade ผ่าน window.__DASH__)
+    // toast
     const payload = window.__DASH__ || {};
     if (payload?.message) {
       showToast({

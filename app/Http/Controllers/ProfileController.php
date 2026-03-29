@@ -11,20 +11,19 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
+use Intervention\Image\Interfaces\ImageInterface;
 use Intervention\Image\ImageManager;
 
 class ProfileController extends Controller
 {
     public function show(Request $request): View
     {
-        // โหลดความสัมพันธ์แผนกเพื่อแสดงชื่อหน่วยงานในหน้า Profile
         $user = $request->user()->loadMissing('departmentRef');
         return view('profile.show', compact('user'));
     }
 
     public function edit(Request $request): View|RedirectResponse
     {
-        // โหลดความสัมพันธ์แผนกเพื่อใช้ในหน้าแก้ไข
         $user = $request->user()->loadMissing('departmentRef');
         return view('profile.edit', compact('user'));
     }
@@ -34,7 +33,6 @@ class ProfileController extends Controller
         $user = $request->user();
         Log::info('User update started', ['user_id' => $user->id]);
 
-        // รับข้อมูลที่ผ่านการ Validate
         $data = $request->validated();
 
         $request->validate([
@@ -45,15 +43,14 @@ class ProfileController extends Controller
         if ($request->boolean('remove_avatar') && $request->hasFile('avatar')) {
             Log::warning('User tried to upload and remove avatar at the same time', ['user_id' => $user->id]);
             return back()->with('toast', [
-                'type' => 'warning',
-                'message' => 'เลือกระหว่างอัปโหลดรูปใหม่หรือ “ลบรูปปัจจุบัน” อย่างใดอย่างหนึ่ง',
+                'type'     => 'warning',
+                'message'  => 'เลือกระหว่างอัปโหลดรูปใหม่หรือ "ลบรูปปัจจุบัน" อย่างใดอย่างหนึ่ง',
                 'position' => 'tc',
-                'timeout' => 3800,
-                'size' => 'md',
+                'timeout'  => 3800,
+                'size'     => 'md',
             ]);
         }
 
-        // ใช้ fill เพื่ออัปเดต name, email และ department
         $user->fill($data);
 
         if ($user->isDirty('email')) {
@@ -67,7 +64,6 @@ class ProfileController extends Controller
         $disk->makeDirectory('avatars');
         $hasThumbCol = Schema::hasColumn('users', 'profile_photo_thumb');
 
-        // จัดการเรื่อง Driver ของรูปภาพ
         $driver = null;
         if (extension_loaded('imagick')) {
             $driver = new \Intervention\Image\Drivers\Imagick\Driver();
@@ -75,7 +71,7 @@ class ProfileController extends Controller
             $driver = new \Intervention\Image\Drivers\Gd\Driver();
         }
 
-        $manager = $driver ? new \Intervention\Image\ImageManager($driver) : null;
+        $manager = $driver ? new ImageManager($driver) : null;
 
         $supportsWebp = true;
         if ($driver instanceof \Intervention\Image\Drivers\Gd\Driver) {
@@ -119,13 +115,12 @@ class ProfileController extends Controller
                     if ($hasThumbCol) $user->profile_photo_thumb = $mainPath;
                     $avatarChanged = true;
                 } else {
-                    $img = $manager->read($file->getRealPath());
-                    $basename = $user->id . '-' . time();
+                    $basename  = $user->id . '-' . time();
                     $mainPath  = "avatars/{$basename}-512.{$targetExt}";
                     $thumbPath = "avatars/{$basename}-128.{$targetExt}";
 
-                    $main  = $img->clone()->cover(512, 512)->{$encodeFn}(80);
-                    $thumb = $img->clone()->cover(128, 128)->{$encodeFn}(80);
+                    $main  = $this->readImage($manager, $file->getRealPath())->cover(512, 512)->{$encodeFn}(80);
+                    $thumb = $this->readImage($manager, $file->getRealPath())->cover(128, 128)->{$encodeFn}(80);
 
                     $disk->put($mainPath,  (string) $main);
                     $disk->put($thumbPath, (string) $thumb);
@@ -137,11 +132,11 @@ class ProfileController extends Controller
             } catch (\Throwable $e) {
                 Log::error('Avatar process failed: ' . $e->getMessage(), ['user_id' => $user->id]);
                 return back()->with('toast', [
-                    'type'      => 'error',
-                    'message'   => 'ไฟล์รูปไม่ถูกต้องหรืออ่านไม่ได้',
-                    'position'  => 'tc',
-                    'timeout'   => 3600,
-                    'size'      => 'md',
+                    'type'     => 'error',
+                    'message'  => 'ไฟล์รูปไม่ถูกต้องหรืออ่านไม่ได้',
+                    'position' => 'tc',
+                    'timeout'  => 3600,
+                    'size'     => 'md',
                 ]);
             }
         }
@@ -154,23 +149,22 @@ class ProfileController extends Controller
         elseif ($avatarRemoved) $message .= ' — ลบรูปโปรไฟล์เรียบร้อย';
 
         return Redirect::route('profile.show')->with('toast', [
-            'type'      => 'success',
-            'message'   => $message,
-            'position'  => 'tc',
-            'timeout'   => 2800,
-            'size'      => 'lg',
+            'type'     => 'success',
+            'message'  => $message,
+            'position' => 'tc',
+            'timeout'  => 2800,
+            'size'     => 'lg',
         ]);
     }
 
     public function destroy(Request $request): RedirectResponse
     {
-        // ส่วนที่เพิ่มเพื่อกัน Member ลบบัญชี
         if ($request->user()->role === 'member') {
             return back()->with('toast', [
-                'type' => 'error',
-                'message' => 'สมาชิกทั่วไปไม่ได้รับอนุญาตให้ลบบัญชีด้วยตนเอง',
+                'type'     => 'error',
+                'message'  => 'สมาชิกทั่วไปไม่ได้รับอนุญาตให้ลบบัญชีด้วยตนเอง',
                 'position' => 'tc',
-                'timeout' => 4000,
+                'timeout'  => 4000,
             ]);
         }
 
@@ -201,5 +195,14 @@ class ProfileController extends Controller
             'timeout'  => 3200,
             'size'     => 'lg',
         ]);
+    }
+
+    /**
+     * อ่านไฟล์รูปภาพด้วย ImageManager และ return ImageInterface
+     * เพื่อให้ static analysis tools (intelephense) infer type ได้ถูกต้อง
+     */
+    private function readImage(ImageManager $manager, string $path): ImageInterface
+    {
+        return $manager->read($path);
     }
 }

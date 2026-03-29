@@ -64,19 +64,25 @@ class DashboardController extends Controller
         $stats = [
             'total'      => (clone $base)->count(),
             'pending'    => (clone $base)->where('mr.status','pending')->count(),
-            'inProgress' => (clone $base)->where('mr.status','in_progress')->count(),
+            'processing' => (clone $base)->whereIn('mr.status', ['acknowledged','accepted','in_progress', 'on_hold'])->count(),
             'completed'  => (clone $base)->whereIn('mr.status', ['resolved','closed'])->count(),
-            'cancelled'  => (clone $base)->where('mr.status','cancelled')->count(),
+            'cancelled'  => (clone $base)->whereIn('mr.status', ['cancelled','rejected'])->count(),
             'monthCost'  => 0.0,
         ];
 
-        // แสดงใน UI เป็น Active (ตาม ref)
-        $stats['active'] = $stats['inProgress'];
+        // สำหรับ UI card ที่เขียนว่า "Active"
+        $stats['inProgress'] = $stats['processing'];
 
-        // ----- Monthly trend (6 เดือนล่าสุด) -----
+        // ----- Monthly trend (Default: 12 months) -----
         if ($dateCol) {
-            $monthlyTrend = (clone $base)
-                ->where($dateCol, '>=', now()->startOfMonth()->subMonths(5))
+            $trendQuery = (clone $base);
+            
+            // If no FROM date is filtered, default to last 12 months
+            if (!$from) {
+                $trendQuery->where($dateCol, '>=', now()->startOfMonth()->subMonths(11));
+            }
+
+            $monthlyTrend = $trendQuery
                 ->selectRaw("DATE_FORMAT($dateCol, '%Y-%m') as ym, COUNT(*) as cnt")
                 ->groupBy('ym')
                 ->orderBy('ym')
@@ -85,7 +91,6 @@ class DashboardController extends Controller
                     'ym'  => (string)$r->ym,
                     'cnt' => (int)$r->cnt,
                 ])
-                ->take(6)
                 ->values();
         } else {
             $monthlyTrend = collect();
@@ -204,57 +209,6 @@ class DashboardController extends Controller
                 : collect();
         }
 
-        // ----- Recent jobs -----
-        $recentQ = (clone $base);
-
-        if ($hasReqDate) {
-            $recentQ->orderByDesc('mr.request_date');
-        } elseif ($hasCreatedAt) {
-            $recentQ->orderByDesc('mr.created_at');
-        }
-
-        $recentQ->limit(12);
-
-        $selects = ['mr.*'];
-        if ($hasReqDate)       $selects[] = DB::raw('mr.request_date   as req_dt');
-        if ($hasCreatedAt)     $selects[] = DB::raw('mr.created_at     as created_dt');
-        if ($hasCompletedDate) $selects[] = DB::raw('mr.completed_date as comp_dt');
-        if ($hasCompletedAt)   $selects[] = DB::raw('mr.completed_at   as completed_dt');
-
-        if ($hasAssets) {
-            $recentQ->leftJoin('assets as a', 'a.id', '=', 'mr.asset_id');
-            $selects[] = 'a.name as asset_name';
-        }
-
-        $hasUsers = Schema::hasTable('users') && Schema::hasColumn('users','name');
-        if ($hasUsers) {
-            $recentQ->leftJoin('users as r', 'r.id', '=', 'mr.reporter_id')
-                    ->leftJoin('users as t', 't.id', '=', 'mr.technician_id');
-            $selects[] = 'r.name as reporter_name';
-            $selects[] = 't.name as technician_name';
-        }
-
-        $fmt = function ($v) {
-            if ($v === null || $v === '') return '-';
-            try { return Carbon::parse($v)->format('Y-m-d H:i'); }
-            catch (\Throwable $e) { return is_string($v) ? $v : '-'; }
-        };
-
-        $recent = $recentQ->get($selects)->map(function ($r) use ($fmt) {
-            $reqRaw  = $r->req_dt   ?? $r->created_dt   ?? null;
-            $compRaw = $r->comp_dt  ?? $r->completed_dt ?? null;
-
-            return [
-                'request_date' => $fmt($reqRaw),
-                'asset_id'     => (int) ($r->asset_id ?? 0),
-                'asset_name'   => (string) ($r->asset_name ?? '-'),
-                'reporter'     => (string) ($r->reporter_name ?? '-'),
-                'technician'   => (string) ($r->technician_name ?? '-'),
-                'status'       => (string) ($r->status ?? ''),
-                'completed_at' => $fmt($compRaw),
-            ];
-        });
-
         // ----- Toast เมื่อมีการใช้ตัวกรอง -----
         if ($hasFilter) {
             if ($stats['total'] > 0) {
@@ -276,8 +230,39 @@ class DashboardController extends Controller
             }
         }
 
+        // ----- Technician Workload -----
+        $hasTechId = Schema::hasColumn('maintenance_requests', 'technician_id');
+        $hasUsers  = Schema::hasTable('users') && Schema::hasColumn('users', 'name');
+
+        if ($hasTechId && $hasUsers) {
+            $techRows = DB::table('maintenance_requests as mr')
+                ->join('users as t', 't.id', '=', 'mr.technician_id')
+                ->whereNotNull('mr.technician_id')
+                ->whereNotIn('mr.status', ['resolved', 'closed', 'cancelled'])
+                ->selectRaw("t.id as tech_id, COUNT(*) as total")
+                ->groupBy('t.id')
+                ->orderByDesc('total')
+                ->limit(15)
+                ->get();
+
+            $techIds = $techRows->pluck('tech_id')->all();
+            $users   = \App\Models\User::whereIn('id', $techIds)->get()->keyBy('id');
+
+            $techWorkload = $techRows->map(function ($r) use ($users) {
+                $user = $users->get($r->tech_id);
+                return [
+                    'id'     => (int) $r->tech_id,
+                    'name'   => $user ? $user->name : 'Unknown',
+                    'total'  => (int) $r->total,
+                    'avatar' => $user ? $user->avatar_thumb_url : '',
+                ];
+            })->values();
+        } else {
+            $techWorkload = collect();
+        }
+
         return view('repair.dashboard',
-            compact('stats','monthlyTrend','byAssetType','byDept','recent','kpi')
+            compact('stats','monthlyTrend','byAssetType','byDept','kpi','techWorkload')
         );
     }
 }

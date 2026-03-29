@@ -16,7 +16,7 @@ class NotificationSettingController extends Controller
 
         // บล็อก Member ไม่ให้เข้าถึงการตั้งค่าการแจ้งเตือน
         $this->middleware(function ($request, $next) {
-            if (auth()->user()->role === 'member') {
+            if (Auth::user()?->role === 'member') {
                 abort(403, 'คุณไม่มีสิทธิ์เข้าถึงส่วนการตั้งค่าการแจ้งเตือน');
             }
             return $next($request);
@@ -42,39 +42,29 @@ class NotificationSettingController extends Controller
         return view('settings.notifications.index', compact('sounds', 'currentSound'));
     }
 
-    public function uploadSound(Request $request)
+    public function updateSound(Request $request)
     {
         $request->validate([
-            'sound_file' => [
-                'required',
-                'file',
-                'mimes:mp3,wav,ogg',
-                'max:2048' // จำกัดขนาดไม่เกิน 2MB
-            ],
+            'notification_sound' => ['required', 'string'],
         ]);
 
         try {
-            if ($request->hasFile('sound_file')) {
-                $file = $request->file('sound_file');
-                $fileName = $file->getClientOriginalName();
+            $user = Auth::user();
+            $user->notification_sound = $request->notification_sound;
+            $user->save();
 
-                // ตรวจสอบชื่อไฟล์ซ้ำ หรือทำความสะอาดชื่อไฟล์
-                $fileName = time() . '_' . str_replace(' ', '_', $fileName);
+            Log::info('[NotificationSetting::updateSound] sound updated', [
+                'sound'    => $request->notification_sound,
+                'actor_id' => Auth::id()
+            ]);
 
-                $file->move(public_path('sounds'), $fileName);
-
-                Log::info('[NotificationSetting::uploadSound] new sound uploaded', [
-                    'file_name' => $fileName,
-                    'actor_id'  => Auth::id()
-                ]);
-
-                return back()->with('toast', Toast::success('อัปโหลดไฟล์เสียงใหม่เรียบร้อย', 1800));
-            }
+            return back()->with('toast', Toast::success('บันทึกการตั้งค่าเสียงเรียบร้อย', 1800));
         } catch (\Throwable $e) {
-            Log::error('[NotificationSetting::uploadSound] upload failed', [
+            Log::error('[NotificationSetting::updateSound] failed', [
                 'error' => $e->getMessage()
             ]);
-            return back()->with('toast', Toast::error('ไม่สามารถอัปโหลดไฟล์ได้', 2500));
+
+            return back()->with('toast', Toast::error('ไม่สามารถบันทึกการตั้งค่าได้', 2500));
         }
     }
 
@@ -101,7 +91,6 @@ class NotificationSettingController extends Controller
             }
 
             return back()->with('toast', Toast::error('ไม่พบไฟล์ที่ต้องการลบ', 2000));
-
         } catch (\Throwable $e) {
             Log::error('[NotificationSetting::destroySound] failed', [
                 'file'  => $fileName,

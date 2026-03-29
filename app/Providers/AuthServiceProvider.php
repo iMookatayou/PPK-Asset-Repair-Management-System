@@ -25,7 +25,7 @@ class AuthServiceProvider extends ServiceProvider
 
         // manage users
         Gate::define('manage-users', function (User $user): bool {
-            return $user->role === User::ROLE_ADMIN || $user->isSupervisor();
+            return $user->role === User::ROLE_ADMIN || $user->isSupervisor() || $user->isTechnician();
         });
 
         // repair dashboard

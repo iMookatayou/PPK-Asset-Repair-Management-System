@@ -16,10 +16,10 @@
             </span>
             <div class="min-w-0">
               <h1 class="text-[20px] sm:text-[22px] font-semibold text-slate-900 leading-tight">
-                Create Maintenance
+                ทะเบียนแจ้งซ่อม
               </h1>
               <div class="mt-1 text-xs sm:text-[13px] text-slate-600 flex flex-wrap gap-x-4 gap-y-1">
-                <span>สร้างคำขอซ่อมใหม่</span>
+                <span>สร้างใบงานแจ้งซ่อมใหม่</span>
               </div>
             </div>
           </div>
@@ -39,15 +39,6 @@
 @endsection
 @section('content')
   <div class="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8 pb-8 pt-0">
-    @if ($errors->any())
-      <div class="mb-6 rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-800">
-        <ul class="list-disc pl-5 text-sm space-y-1">
-          @foreach ($errors->all() as $error)
-            <li>{{ $error }}</li>
-          @endforeach
-        </ul>
-      </div>
-    @endif
 
     <form method="POST"
           action="{{ route('maintenance.requests.store') }}"
@@ -62,18 +53,7 @@
         'depts'       => $depts ?? collect(),
         'attachments' => [],
       ])
-      <div class="flex justify-end gap-2 pt-4 border-t {{ $line }}">
-        <a href="{{ route('maintenance.requests.index') }}"
-           class="inline-flex items-center justify-center h-11 px-5 rounded-xl border {{ $line }} bg-white
-                  text-sm font-medium text-slate-700 hover:bg-slate-50">
-          ยกเลิก
-        </a>
-        <button type="submit"
-                class="inline-flex items-center justify-center h-11 px-5 rounded-xl bg-emerald-700
-                       text-sm font-medium text-white hover:bg-emerald-800 focus:ring-2 focus:ring-emerald-200 transition-all">
-          บันทึก
-        </button>
-      </div>
+
     </form>
   </div>
 @endsection

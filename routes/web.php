@@ -170,9 +170,21 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('can:maintenance-type-manage')
         ->group(function () {
             Route::get('/', [MaintenanceRequestTypeController::class, 'index'])->name('index');
+            Route::get('/create', [MaintenanceRequestTypeController::class, 'create'])->name('create');
             Route::post('/', [MaintenanceRequestTypeController::class, 'store'])->name('store');
+            Route::get('/{id}/edit', [MaintenanceRequestTypeController::class, 'edit'])->name('edit');
             Route::put('/{id}', [MaintenanceRequestTypeController::class, 'update'])->name('update');
             Route::delete('/{id}', [MaintenanceRequestTypeController::class, 'destroy'])->name('destroy');
+        });
+
+    // Settings - SLA
+    Route::prefix('settings/sla')
+        ->name('settings.sla.')
+        ->middleware('can:maintenance-type-manage')
+        ->group(function () {
+            Route::get('/', [\App\Http\Controllers\SlaConfigController::class, 'index'])->name('index');
+            Route::post('/report', [\App\Http\Controllers\SlaConfigController::class, 'report'])->name('report');
+            Route::put('/{slaConfig}', [\App\Http\Controllers\SlaConfigController::class, 'update'])->name('update');
         });
 
     // Profile
@@ -183,6 +195,10 @@ Route::middleware(['auth'])->group(function () {
 
     Route::put('/password', [PasswordController::class, 'update'])->name('password.update');
 });
+
+    Route::get('/technicians/{user}/rating-summary', [MaintenanceRatingController::class, 'summary'])
+        ->name('technicians.rating.summary')
+        ->middleware('auth');
 
 // Auth scaffolding routes
 require __DIR__ . '/auth.php';

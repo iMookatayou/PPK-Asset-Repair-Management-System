@@ -14,7 +14,7 @@
             'acknowledged' => 'รับทราบแล้ว',
             'accepted' => 'รับเรื่องแล้ว',
             'in_progress' => 'กำลังดำเนินการ',
-            'on_hold' => 'พักไว้ก่อน',
+            'on_hold' => 'พักชั่วคราว',
             'resolved' => 'เสร็จสิ้น',
             'closed' => 'ปิดงาน',
             'cancelled' => 'ยกเลิก',
@@ -63,14 +63,15 @@
         $canHold =
             in_array($status, [MR::STATUS_ACCEPTED, MR::STATUS_IN_PROGRESS], true) && \Gate::allows('hold', $req);
         $canResume = $status === MR::STATUS_ON_HOLD && \Gate::allows('resume', $req);
-        $canResolve = $status === MR::STATUS_IN_PROGRESS && \Gate::allows('resolve', $req);
+        $canResolve =
+            $status === MR::STATUS_IN_PROGRESS && \Gate::allows('resolve', $req);
         $canClose = $status === MR::STATUS_RESOLVED && \Gate::allows('close', $req);
 
         $btnBase = 'inline-flex items-center justify-center gap-2
-              rounded-md px-4 py-1.5
-              text-[13px] font-medium
-              transition
-              focus:outline-none focus:ring-2 focus:ring-offset-1';
+              rounded-lg px-4 h-9
+              text-sm font-medium
+              transition-all duration-200
+              focus:outline-none focus:ring-2 focus:ring-offset-2';
     @endphp
 
     <style>
@@ -94,54 +95,166 @@
     </style>
 
     <div class="w-full bg-slate-50 border-b {{ $line }}">
-        <div class="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8 py-5">
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div class="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8 py-4">
 
-                <div class="min-w-0">
-                    <div class="flex items-start gap-3">
-                        <span class="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-xl text-emerald-700">
-                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="M9 12h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-                                <path d="M9 16h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-                                <path d="M7 3h7l3 3v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" stroke="currentColor"
-                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </span>
+            {{-- Row 1: Title + Actions --}}
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 
-                        <div class="min-w-0">
-                            <h1 class="text-[20px] sm:text-[22px] font-semibold text-slate-900 leading-tight">
-                                Maintenance Summary
-                                <span class="ml-2 text-slate-500 text-[13px] sm:text-[14px] font-semibold">
-                                    #{{ $req->request_no ?? $req->id }}
-                                </span>
+                <div class="flex items-center gap-3 min-w-0">
+                    <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center">
+                        <img src="/icon/maintenance1.avif" class="h-7 w-7 object-contain"
+                            style="filter: invert(24%) sepia(87%) saturate(1469%) hue-rotate(139deg) brightness(91%) contrast(102%);"
+                            alt="Icon">
+                    </span>
+
+                    <div class="min-w-0">
+                        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                            <h1 class="text-[18px] sm:text-[20px] font-semibold text-slate-900 leading-tight">
+                                ทะเบียนแจ้งซ่อม
                             </h1>
-
-                            <div class="mt-1 text-xs sm:text-[13px] text-slate-600 flex flex-wrap gap-x-4 gap-y-1">
-                                <span>สถานะปัจจุบัน:
-                                    <span class="font-semibold text-slate-900">{{ $currentStatusTH }}</span>
-                                </span>
-
-                                @if ($req->updated_at)
-                                    <span>อัปเดต:
-                                        <span
-                                            class="font-medium text-slate-900">{{ $req->updated_at->format('Y-m-d H:i') }}</span>
-                                    </span>
-                                @endif
-
-                                <span>ผู้รับผิดชอบหลัก:
-                                    <span class="font-semibold text-slate-900">
-                                        {{ $req->technician?->name ?? 'ยังไม่มีช่างรับงาน' }}
-                                    </span>
-                                </span>
-                            </div>
+                            <span class="text-slate-400 text-[13px] font-semibold">
+                                #{{ $req->request_no ?? $req->id }}
+                            </span>
+                        </div>
+                        <div class="mt-0.5 text-[12px] text-slate-500 flex flex-wrap gap-x-3">
+                            @if ($req->updated_at)
+                                <span>อัปเดต: <span
+                                        class="font-medium text-slate-700">{{ $req->updated_at->format('Y-m-d H:i') }}</span></span>
+                            @endif
+                            <span>ผู้รับผิดชอบ: <span
+                                    class="font-medium text-slate-700">{{ $req->technician?->name ?? 'ยังไม่มีช่างรับเรื่อง' }}</span></span>
                         </div>
                     </div>
                 </div>
 
-                <div class="flex flex-wrap items-center justify-start sm:justify-end gap-2">
+                {{-- Action buttons: workflow left, nav right --}}
+                <div class="flex flex-wrap items-center gap-2 shrink-0">
+                    {{-- Workflow buttons --}}
+                    @if ($canAcknowledge)
+                        <form method="POST" action="{{ route('maintenance.requests.acknowledge', $req->id) }}">
+                            @csrf
+                            <button
+                                class="{{ $btnBase }} bg-[#1e3a8a] text-white hover:bg-blue-900 focus:ring-blue-300">
+                                <span
+                                    class="material-symbols-outlined ms text-[16px] leading-none">approval_delegation</span>
+                                รับทราบ
+                            </button>
+                        </form>
+                    @endif
+
+                    @if ($canAccept)
+                        <form method="POST" action="{{ route('maintenance.requests.accept', $req->id) }}">
+                            @csrf
+                            <button
+                                class="{{ $btnBase }} bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-300">
+                                <span class="material-symbols-outlined ms text-[16px] leading-none">check</span>
+                                รับเรื่อง
+                            </button>
+                        </form>
+                    @endif
+
+                    @if ($canStart)
+                        <form method="POST" action="{{ route('maintenance.requests.start', $req->id) }}">
+                            @csrf
+                            <button
+                                class="{{ $btnBase }} bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-200">
+                                <span
+                                    class="material-symbols-outlined ms text-[16px] leading-none">keyboard_arrow_right</span>
+                                ดำเนินการ
+                            </button>
+                        </form>
+                    @endif
+
+                    @if ($canHold)
+                        <button type="button" id="openHoldModalBtn"
+                            class="{{ $btnBase }} bg-amber-600 text-white hover:bg-amber-700 focus:ring-amber-200">
+                            <span class="material-symbols-outlined ms text-[16px] leading-none">pause_circle</span>
+                            พักชั่วคราว
+                        </button>
+                    @endif
+
+                    @if ($canResume)
+                        <form method="POST" action="{{ route('maintenance.requests.resume', $req->id) }}">
+                            @csrf
+                            <button class="{{ $btnBase }} bg-sky-600 text-white hover:bg-sky-700 focus:ring-sky-200">
+                                <span
+                                    class="material-symbols-outlined ms text-[16px] leading-none">keyboard_double_arrow_right</span>
+                                กลับเข้าดำเนินการ
+                            </button>
+                        </form>
+                    @endif
+
+                    @if ($canResolve)
+                        <form method="POST" action="{{ route('maintenance.requests.resolve', $req->id) }}">
+                            @csrf
+                            <button
+                                class="{{ $btnBase }} bg-emerald-700 text-white hover:bg-emerald-800 focus:ring-emerald-200">
+                                <span class="material-symbols-outlined ms text-[16px] leading-none">task_alt</span>
+                                ซ่อมเสร็จ
+                            </button>
+                        </form>
+                    @endif
+
+                    @if ($canClose)
+                        <form method="POST" action="{{ route('maintenance.requests.close', $req->id) }}">
+                            @csrf
+                            <button
+                                class="{{ $btnBase }} bg-slate-700 text-white hover:bg-slate-800 focus:ring-slate-300">
+                                <span class="material-symbols-outlined ms text-[16px] leading-none">done_all</span>
+                                ปิดงาน
+                            </button>
+                        </form>
+                    @endif
+
+                    @if ($req->status === \App\Models\MaintenanceRequest::STATUS_CLOSED)
+                        @can('rate', $req)
+                            <a href="{{ route('maintenance.ratings.create', $req->id) }}"
+                                class="{{ $btnBase }} bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-200">
+                                <span class="material-symbols-outlined ms text-[16px] leading-none">star</span>
+                                ประเมินความพึงพอใจ
+                            </a>
+                        @endcan
+                    @endif
+
+                    @if ($canReject)
+                        <button type="button" id="openRejectModalBtn"
+                            class="{{ $btnBase }} bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-300">
+                            <span class="material-symbols-outlined ms text-[16px] leading-none">block</span>
+                            ไม่รับเรื่อง
+                        </button>
+                    @endif
+
+                    @if ($canCancel)
+                        <form method="POST" action="{{ route('maintenance.requests.cancel', $req->id) }}"
+                            onsubmit="return confirm('ยืนยันการยกเลิก?');">
+                            @csrf
+                            <button
+                                class="{{ $btnBase }} bg-slate-500 text-white hover:bg-slate-600 focus:ring-slate-300">
+                                <span class="material-symbols-outlined ms text-[16px] leading-none">cancel</span>
+                                ยกเลิกซ่อม
+                            </button>
+                        </form>
+                    @endif
+
+                    {{-- Divider: แสดงเฉพาะเมื่อมี workflow button --}}
+                    @if (
+                        $canAcknowledge ||
+                            $canAccept ||
+                            $canStart ||
+                            $canHold ||
+                            $canResume ||
+                            $canResolve ||
+                            $canClose ||
+                            $canReject ||
+                            $canCancel ||
+                            $req->status === \App\Models\MaintenanceRequest::STATUS_CLOSED)
+                        <div class="h-6 w-px bg-slate-200"></div>
+                    @endif
+
+                    {{-- Nav buttons --}}
                     <a href="{{ route('maintenance.requests.index') }}"
-                        class="inline-flex items-center gap-2 rounded-lg border {{ $line }} bg-white px-4 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50">
-                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        class="inline-flex items-center gap-1.5 rounded-lg border {{ $line }} bg-white px-3 h-9 text-[13px] font-medium text-slate-700 hover:bg-slate-50">
+                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none">
                             <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                 stroke-linejoin="round" />
                         </svg>
@@ -149,15 +262,15 @@
                     </a>
 
                     <a href="{{ route('maintenance.requests.work-order', $req->id) }}" target="_blank"
-                        class="inline-flex items-center gap-2 rounded-lg border {{ $line }} bg-white px-4 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50">
-                        <span class="material-symbols-outlined ms text-[18px] leading-none">print</span>
+                        class="inline-flex items-center gap-1.5 rounded-lg border {{ $line }} bg-white px-3 h-9 text-[13px] font-medium text-slate-700 hover:bg-slate-50">
+                        <span class="material-symbols-outlined ms text-[16px] leading-none">print</span>
                         พิมพ์ PDF
                     </a>
                 </div>
-
             </div>
 
-            <div class="w-full px-2 sm:px-4 mt-6 mb-2">
+            {{-- Row 2: Progress bar --}}
+            <div class="w-full px-2 sm:px-4 mt-5">
                 <div class="relative w-full">
                     <div class="absolute top-[22px] left-0 w-full h-[6px] bg-slate-200 rounded-full z-0"></div>
                     <div class="absolute top-[22px] left-0 h-[6px] bg-[#1e3a8a] rounded-full z-0 transition-all duration-700 ease-out"
@@ -184,10 +297,9 @@
                             <div class="flex flex-col items-center w-32">
                                 <div
                                     class="w-[44px] h-[44px] rounded-full flex items-center justify-center transition-all duration-300
-                                {{ $isDone ? 'bg-[#408a5c] border-4 border-[#408a5c]' : '' }}
-                                {{ $isCurrent ? 'bg-white' : '' }}
-                                {{ !$isDone && !$isCurrent ? 'bg-slate-200 border-4 border-slate-200' : '' }}
-                                ">
+                                    {{ $isDone ? 'bg-[#408a5c] border-4 border-[#408a5c]' : '' }}
+                                    {{ $isCurrent ? 'bg-white' : '' }}
+                                    {{ !$isDone && !$isCurrent ? 'bg-slate-200 border-4 border-slate-200' : '' }}">
                                     @if ($isDone)
                                         <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24"
                                             stroke="currentColor" stroke-width="3">
@@ -203,121 +315,23 @@
                                     @endif
                                 </div>
 
-                                <div class="mt-3 text-center">
+                                <div class="mt-2 text-center">
                                     <p
-                                        class="text-[14px] font-bold {{ $isCurrent || $isDone ? 'text-slate-900' : 'text-slate-400' }}">
+                                        class="text-[13px] font-bold {{ $isCurrent || $isDone ? 'text-slate-900' : 'text-slate-400' }}">
                                         {{ $label }}
                                     </p>
                                     @if ($isCurrent)
-                                        <p class="text-[12px] font-medium text-[#1e3a8a] mt-0.5">(ปัจจุบัน)</p>
+                                        <p class="text-[11px] font-medium text-[#1e3a8a] mt-0.5">(ปัจจุบัน)</p>
                                     @elseif($dateVal)
-                                        <p class="text-[12px] text-slate-500 mt-0.5">({{ $fmt($dateVal) }})</p>
+                                        <p class="text-[11px] text-slate-400 mt-0.5">{{ $fmt($dateVal) }}</p>
                                     @else
-                                        <p class="h-[18px]"></p>
+                                        <p class="h-[16px]"></p>
                                     @endif
                                 </div>
                             </div>
                         @endforeach
                     </div>
-
                 </div>
-            </div>
-
-            <div class="flex justify-end gap-2 mt-6 pt-5 border-t border-slate-100">
-                @if ($canAcknowledge)
-                    <form method="POST" action="{{ route('maintenance.requests.acknowledge', $req->id) }}">
-                        @csrf
-                        <button class="{{ $btnBase }} bg-[#1e3a8a] text-white hover:bg-blue-900 focus:ring-blue-300">
-                            <span class="material-symbols-outlined ms text-[18px] leading-none">approval_delegation</span>
-                            รับทราบ
-                        </button>
-                    </form>
-                @endif
-
-                @if ($canAccept)
-                    <form method="POST" action="{{ route('maintenance.requests.accept', $req->id) }}">
-                        @csrf
-                        <button class="{{ $btnBase }} bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-300">
-                            <span class="material-symbols-outlined ms text-[18px] leading-none">check</span>
-                            รับเรื่อง
-                        </button>
-                    </form>
-                @endif
-
-                @if ($canStart)
-                    <form method="POST" action="{{ route('maintenance.requests.start', $req->id) }}">
-                        @csrf
-                        <button
-                            class="{{ $btnBase }} bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-200">
-                            <span class="material-symbols-outlined ms text-[18px] leading-none">keyboard_arrow_right</span>
-                            ดำเนินการ
-                        </button>
-                    </form>
-                @endif
-
-                @if ($canHold)
-                    <form method="POST" action="{{ route('maintenance.requests.hold', $req->id) }}">
-                        @csrf
-                        <button
-                            class="{{ $btnBase }} bg-amber-600 text-white hover:bg-amber-700 focus:ring-amber-200">
-                            <span class="material-symbols-outlined ms text-[18px] leading-none">pause_circle</span>
-                            พักไว้ก่อน
-                        </button>
-                    </form>
-                @endif
-
-                @if ($canResume)
-                    <form method="POST" action="{{ route('maintenance.requests.resume', $req->id) }}">
-                        @csrf
-                        <button class="{{ $btnBase }} bg-sky-600 text-white hover:bg-sky-700 focus:ring-sky-200">
-                            <span
-                                class="material-symbols-outlined ms text-[18px] leading-none">keyboard_double_arrow_right</span>
-                            กลับเข้าดำเนินการ
-                        </button>
-                    </form>
-                @endif
-
-                @if ($canResolve)
-                    <form method="POST" action="{{ route('maintenance.requests.resolve', $req->id) }}">
-                        @csrf
-                        <button
-                            class="{{ $btnBase }} bg-emerald-700 text-white hover:bg-emerald-800 focus:ring-emerald-200">
-                            <span class="material-symbols-outlined ms text-[18px] leading-none">task_alt</span>
-                            ซ่อมเสร็จ
-                        </button>
-                    </form>
-                @endif
-
-                @if ($canClose)
-                    <form method="POST" action="{{ route('maintenance.requests.close', $req->id) }}">
-                        @csrf
-                        <button
-                            class="{{ $btnBase }} bg-slate-800 text-white hover:bg-slate-900 focus:ring-slate-300">
-                            <span class="material-symbols-outlined ms text-[18px] leading-none">done_all</span>
-                            ปิดงาน
-                        </button>
-                    </form>
-                @endif
-
-                @if ($canReject)
-                    <button type="button" id="openRejectModalBtn"
-                        class="{{ $btnBase }} bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-300">
-                        <span class="material-symbols-outlined ms text-[18px] leading-none">block</span>
-                        ไม่รับเรื่อง
-                    </button>
-                @endif
-
-                @if ($canCancel)
-                    <form method="POST" action="{{ route('maintenance.requests.cancel', $req->id) }}"
-                        onsubmit="return confirm('ยืนยันการยกเลิก?');">
-                        @csrf
-                        <button
-                            class="{{ $btnBase }} bg-slate-600 text-white hover:bg-slate-700 focus:ring-slate-300">
-                            <span class="material-symbols-outlined ms text-[18px] leading-none">cancel</span>
-                            ยกเลิกซ่อม
-                        </button>
-                    </form>
-                @endif
             </div>
 
         </div>
@@ -330,7 +344,7 @@
 
         $line = 'border-slate-200';
 
-        $input = "mt-2 w-full h-11 rounded-md border $line bg-white px-3 py-2 text-sm
+        $input = "mt-2 w-full h-10 rounded-md border $line bg-white px-3 py-2 text-sm
             focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
         $textarea = "mt-2 w-full rounded-md border $line bg-white px-3 py-2 text-sm
               focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
@@ -352,8 +366,8 @@
             [
                 'low' => 'ต่ำ',
                 'medium' => 'ปานกลาง',
-                'high' => 'สูง',
-                'urgent' => 'เร่งด่วน',
+                'high' => 'เร่งด่วน',
+                'urgent' => 'เร่งด่วนมาก',
             ][$prio] ?? '-';
 
         $prioTextTone = match ($prio) {
@@ -412,8 +426,8 @@
     @endphp
 
     <div class="mx-auto max-w-screen-2xl px-3 sm:px-6 lg:px-8 pb-8">
-        <div class="mt-6 space-y-10">
-            <div class="relative grid grid-cols-1 lg:grid-cols-2 gap-10">
+        <div class="mt-4 space-y-6">
+            <div class="relative grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div class="hidden lg:block absolute inset-y-0 left-1/2 w-px bg-slate-200"></div>
 
                 <section>
@@ -496,8 +510,8 @@
                                         @endforeach
                                     </select>
                                     <button type="submit"
-                                        class="inline-flex items-center justify-center h-9 w-9 rounded-md bg-slate-800 text-white
-                               hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                                        class="inline-flex items-center justify-center h-9 w-9 rounded-md bg-emerald-600 text-white
+                               hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
                                         title="บันทึกประเภท">
                                         <span class="material-symbols-outlined ms text-[18px] leading-none">save</span>
                                     </button>
@@ -537,8 +551,8 @@
                     <div class="{{ $noCls }}">3</div>
                     <div class="{{ $accentWrap }}">
                         <span class="{{ $accentBar }}"></span>
-                        <div class="{{ $titleCls }}">ผู้แจ้ง &amp; ความสำคัญ</div>
-                        <div class="{{ $subCls }}">ข้อมูลผู้แจ้ง + ระดับความสำคัญ</div>
+                        <div class="{{ $titleCls }}">ผู้แจ้ง &amp; ความเร่งด่วน</div>
+                        <div class="{{ $subCls }}">ข้อมูลผู้แจ้ง / ระดับความเร่งด่วน</div>
                     </div>
                 </div>
 
@@ -566,7 +580,7 @@
 
                     <div class="space-y-4 text-sm">
                         <div>
-                            <div class="text-sm font-medium text-slate-700">ระดับความสำคัญ</div>
+                            <div class="text-sm font-medium text-slate-700">ระดับความเร่งด่วน</div>
                             <div class="mt-2 text-[15px] font-semibold {{ $prioTextTone }}">
                                 {{ $prioLabel }}
                             </div>
@@ -591,36 +605,166 @@
                     <form method="post" enctype="multipart/form-data" action="{{ $attachUploadUrl }}" class="space-y-4"
                         novalidate>
                         @csrf
-                        <div>
-                            <label for="caption" class="block text-sm font-medium text-slate-700">คำอธิบายไฟล์</label>
-                            <input id="caption" type="text" name="caption" class="{{ $input }}"
-                                value="{{ old('caption') }}" placeholder="เช่น รูปก่อนซ่อม / รูปหลังซ่อม / ใบเสนอราคา">
+                        <input id="mr_files_any" type="file" name="files[]" multiple accept="image/*,application/pdf"
+                            class="hidden">
+                        <input id="mr_files_camera" type="file" name="files[]" accept="image/*" capture="environment"
+                            class="hidden">
+
+                        <div class="flex items-center gap-2">
+                            <button type="button" id="mr_files_any_btn"
+                                class="inline-flex items-center justify-center h-10 px-4 rounded-md border {{ $line }} bg-white
+                                       text-sm font-medium text-slate-700 hover:bg-slate-50
+                                       focus:outline-none focus:ring-2 focus:ring-emerald-100">
+                                <svg class="h-4 w-4 mr-2 text-slate-600" viewBox="0 0 24 24" fill="none"
+                                    aria-hidden="true">
+                                    <path
+                                        d="M21 11.5l-8.5 8.5a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.7-8.7"
+                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" />
+                                </svg>
+                                เลือกไฟล์เพิ่ม
+                            </button>
+
+                            <button type="button" id="mr_files_camera_btn"
+                                class="inline-flex items-center justify-center h-10 w-11 rounded-md border {{ $line }} bg-white
+                                       hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100">
+                                <svg class="h-5 w-5 text-emerald-700" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path
+                                        d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                                    <circle cx="12" cy="13" r="4" />
+                                </svg>
+                            </button>
                         </div>
-                        <div>
-                            <label for="file" class="block text-sm font-medium text-slate-700">เลือกไฟล์ <span
-                                    class="text-rose-600">*</span></label>
-                            <input id="file" type="file" name="file" required accept="image/*,application/pdf"
-                                class="mt-2 block w-full rounded-md border {{ $line }} bg-white px-3 py-2 text-sm">
-                            <p class="mt-1 text-xs text-slate-500">รองรับรูปภาพ และ PDF • สูงสุดไฟล์ละ 10MB</p>
+
+                        <div class="mt-3 p-3 rounded-md bg-amber-50 border border-amber-200">
+                            <div class="flex gap-2">
+                                <svg class="h-5 w-5 text-amber-600 shrink-0" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2">
+                                    <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round"
+                                        stroke-linejoin="round" />
+                                </svg>
+                                <div class="text-xs text-amber-800">
+                                    <p class="font-bold">เงื่อนไขการแนบไฟล์:</p>
+                                    <p>จำกัดสูงสุด 3 ไฟล์ต่อใบงาน และสามารถเพิ่ม/ลบได้ตามสิทธิ์และสถานะของใบงานเท่านั้น</p>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label for="alt_text" class="block text-sm font-medium text-slate-700">Alt text
-                                (เพื่อการเข้าถึง)</label>
-                            <input id="alt_text" type="text" name="alt_text" class="{{ $input }}"
-                                value="{{ old('alt_text') }}" placeholder="ข้อความอธิบายรูปภาพ">
-                            <label class="mt-2 inline-flex items-center gap-2 text-sm text-slate-700">
-                                <input type="checkbox" name="is_private" value="1"
-                                    class="h-4 w-4 rounded border-slate-300">
-                                เก็บเป็นไฟล์ส่วนตัว
-                            </label>
+
+                        {{-- Preview list --}}
+                        <div id="mr_files_preview" class="mt-3 hidden">
+                            <div class="text-xs font-medium text-slate-600">ไฟล์ที่เลือก</div>
+                            <div id="mr_files_list"
+                                class="mt-2 divide-y divide-slate-200 rounded-md border {{ $line }} bg-white"></div>
                         </div>
-                        <div class="flex justify-end">
+
+                        <div class="flex justify-end pt-2">
                             <button type="submit"
-                                class="inline-flex items-center rounded-lg border {{ $line }} bg-white px-4 py-2 text-xs sm:text-[13px] font-semibold text-slate-800 hover:bg-slate-50">
-                                อัปโหลดไฟล์
+                                class="inline-flex items-center justify-center h-10 px-4 rounded-lg bg-emerald-600 text-sm font-medium text-white hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-200">
+                                แนบไฟล์
                             </button>
                         </div>
                     </form>
+
+                    <script>
+                        (function() {
+                            const anyInput = document.getElementById('mr_files_any');
+                            const camInput = document.getElementById('mr_files_camera');
+                            const anyBtn = document.getElementById('mr_files_any_btn');
+                            const camBtn = document.getElementById('mr_files_camera_btn');
+                            const preview = document.getElementById('mr_files_preview');
+                            const list = document.getElementById('mr_files_list');
+                            if (!anyInput || !camInput || !anyBtn || !camBtn || !preview || !list) return;
+
+                            let filesBag = [];
+                            const keyOf = (f) => `${f.name}|${f.size}|${f.type}|${f.lastModified || 0}`;
+                            const syncToInputs = () => {
+                                const dt = new DataTransfer();
+                                filesBag.forEach(f => dt.items.add(f));
+                                anyInput.files = dt.files;
+                            };
+                            const escapeHtml = (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g,
+                                '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+                            const render = () => {
+                                list.innerHTML = '';
+                                if (!filesBag.length) {
+                                    preview.classList.add('hidden');
+                                    return;
+                                }
+                                preview.classList.remove('hidden');
+                                filesBag.forEach((f, idx) => {
+                                    const card = document.createElement('div');
+                                    card.className = 'p-3 rounded-lg border border-slate-200 bg-slate-50 space-y-2';
+
+                                    const top = document.createElement('div');
+                                    top.className = 'flex items-center justify-between gap-3';
+
+                                    const left = document.createElement('div');
+                                    left.className = 'min-w-0';
+                                    const name = document.createElement('div');
+                                    name.className = 'truncate text-[13px] font-medium text-slate-700';
+                                    name.textContent = f.name;
+                                    const meta = document.createElement('div');
+                                    meta.className = 'text-[11px] text-slate-500';
+                                    meta.textContent = (f.type || 'file') + ' • ' + Math.round(f.size / 1024) + ' KB';
+                                    left.appendChild(name);
+                                    left.appendChild(meta);
+
+                                    const del = document.createElement('button');
+                                    del.type = 'button';
+                                    del.className = 'shrink-0 text-rose-600 hover:text-rose-700 text-xs font-medium';
+                                    del.textContent = 'ลบ';
+                                    del.addEventListener('click', () => {
+                                        filesBag.splice(idx, 1);
+                                        syncToInputs();
+                                        render();
+                                    });
+
+                                    top.appendChild(left);
+                                    top.appendChild(del);
+                                    card.appendChild(top);
+
+                                    // Caption Input
+                                    const capInput = document.createElement('input');
+                                    capInput.type = 'text';
+                                    capInput.name = 'captions[]';
+                                    capInput.placeholder = 'เพิ่มคำอธิบายภาพ...';
+                                    capInput.className =
+                                        'w-full h-8 px-2 py-1 text-[12px] rounded border border-slate-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-100 outline-none transition';
+                                    card.appendChild(capInput);
+
+                                    list.appendChild(card);
+                                });
+                            };
+                            const addFiles = (files) => {
+                                const arr = Array.from(files || []);
+                                if (!arr.length) return;
+                                const map = new Map(filesBag.map(f => [keyOf(f), f]));
+                                arr.forEach(f => map.set(keyOf(f), f));
+                                const currentCount = {{ $atts->count() }};
+                                const maxAllowed = Math.max(0, 3 - currentCount);
+
+                                if (map.size > maxAllowed) {
+                                    window.dispatchEvent(new CustomEvent('app:toast', {
+                                        detail: { type: 'warning', message: 'สามารถแนบไฟล์เพิ่มได้อีก ' + maxAllowed + ' ไฟล์ (สูงสุด 3 ไฟล์ต่อใบงาน)' }
+                                    }));
+                                }
+                                filesBag = Array.from(map.values()).slice(0, maxAllowed);
+                                syncToInputs();
+                                render();
+                            };
+                            anyBtn.addEventListener('click', () => anyInput.click());
+                            camBtn.addEventListener('click', () => camInput.click());
+                            anyInput.addEventListener('change', () => {
+                                addFiles(anyInput.files);
+                                anyInput.value = '';
+                            });
+                            camInput.addEventListener('change', () => {
+                                addFiles(camInput.files);
+                                camInput.value = '';
+                            });
+                        })();
+                    </script>
                 @else
                     <div class="rounded-md border {{ $line }} bg-white px-3 py-2 text-sm text-slate-600">
                         คุณไม่มีสิทธิ์แนบไฟล์ในใบงานนี้
@@ -643,7 +787,9 @@
                                     $publicUrl = null;
                                     if ($file && ($file->disk ?? null) && ($file->path ?? null)) {
                                         try {
-                                            $publicUrl = Storage::disk($file->disk)->url($file->path);
+                                            /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
+                                            $disk = Storage::disk($file->disk);
+                                            $publicUrl = $disk->url($file->path);
                                         } catch (\Throwable $e) {
                                             $publicUrl = null;
                                         }
@@ -687,6 +833,12 @@
                                             <span class="truncate text-slate-600 text-[12px]"
                                                 title="{{ $name }}">{{ $name }}</span>
                                         </div>
+                                        @if ($att->caption)
+                                            <div class="text-[12px] text-slate-800 font-medium line-clamp-2 italic"
+                                                title="{{ $att->caption }}">
+                                                "{{ $att->caption }}"
+                                            </div>
+                                        @endif
                                         <div class="flex items-center justify-between gap-2">
                                             @if ($canOpen && $openUrl)
                                                 <a href="{{ $openUrl }}" target="_blank" rel="noopener"
@@ -725,20 +877,21 @@
 
             <div class="border-t {{ $line }}"></div>
 
-            <div class="relative grid grid-cols-1 lg:grid-cols-2 gap-10">
+            <div class="relative grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div class="hidden lg:block absolute inset-y-0 left-1/2 w-px bg-slate-200"></div>
                 <section>
                     <div class="{{ $headCls }}">
                         <div class="{{ $noCls }}">5</div>
                         <div class="{{ $accentWrap }}">
                             <span class="{{ $accentBar }}"></span>
-                            <div class="{{ $titleCls }}">รายงานการปฏิบัติงานและค่าใช้จ่าย</div>
+                            <div class="{{ $titleCls }}">รายงานการปฏิบัติงานและค่าใช้จ่าย <span
+                                    class="text-slate-500 text-[13px] font-normal">(บันทึกภายหลังได้)</span></div>
                             <div class="{{ $subCls }}">สำหรับทีมช่าง: ระบุวิธีคิดค่าใช้จ่าย, รพจ.
                                 และรายละเอียดประกอบ</div>
                         </div>
                     </div>
 
-                    @can('update', $req)
+                    @can('updateOperationLog', $req)
                         <form method="post" action="{{ $opLogUrl }}" class="space-y-4" novalidate>
                             @csrf
                             <div>
@@ -809,14 +962,20 @@
                             </div>
                             <div class="flex justify-end">
                                 <button type="submit"
-                                    class="inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-xs sm:text-[13px] font-semibold text-white hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-200">
+                                    class="inline-flex items-center justify-center h-10 px-4 rounded-lg bg-emerald-600 text-sm font-medium text-white hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-200">
                                     บันทึกรายงานการปฏิบัติงาน
                                 </button>
                             </div>
                         </form>
                     @else
-                        <div class="rounded-md border {{ $line }} bg-white px-3 py-2 text-sm text-slate-600">
-                            คุณไม่มีสิทธิ์แก้ไขรายงานการปฏิบัติงาน (Operation Log)
+                        <div
+                            class="rounded-md border {{ $line }} bg-white px-4 py-3 text-sm text-slate-600 shadow-sm italic">
+                            <div class="flex items-center gap-2 text-rose-600 font-semibold mb-1">
+                                <span class="material-symbols-outlined text-[18px]">lock</span>
+                                สิทธิ์การบันทึกรายงานถูกระงับ
+                            </div>
+                            เนื่องจากใบงานอยู่ในสถานะ "{{ $req->status_label }}"
+                            ซึ่งไม่ได้รับอนุญาตให้แก้ไขรายงานการปฏิบัติงานในขณะนี้
                         </div>
                     @endcan
 
@@ -847,39 +1006,20 @@
                         <div
                             class="rounded-lg border {{ $line }} bg-white max-h-72 overflow-y-auto divide-y divide-slate-200">
                             @if ($workers->isEmpty())
-                                <div class="px-4 py-3 text-[12px] text-slate-500">ยังไม่ได้มอบหมายงานให้ทีมช่าง</div>
+                                <div class="px-4 py-3 text-[13px] text-slate-500">ยังไม่ได้มอบหมายงานให้ทีมช่าง</div>
                             @else
                                 @foreach ($workers as $worker)
                                     @php
-                                        // 1. ดึงข้อมูลการมอบหมาย
                                         $assign = $assignments->firstWhere('user_id', $worker->id);
-
-                                        // 2. ถ้าไม่มีข้อมูลการมอบหมาย หรือสถานะถูกสั่งยกเลิก ให้ "ข้าม" ไปเลย (ไม่ต้องโชว์)
-                                        // บรรทัดนี้จะทำให้ชื่อที่เคยขึ้น "ยกเลิก" หายวับไปทันที
                                         if (
                                             !$assign ||
                                             $assign->status === \App\Models\MaintenanceAssignment::STATUS_CANCELLED
                                         ) {
                                             continue;
                                         }
-
-                                        $aStatus = $assign->status;
-                                        $badgeTone = 'bg-slate-50 text-slate-700 border-slate-200';
-                                        $badgeText = 'ไม่ระบุ';
-
-                                        if ($aStatus === \App\Models\MaintenanceAssignment::STATUS_IN_PROGRESS) {
-                                            $badgeTone = 'bg-sky-50 text-sky-800 border-sky-200';
-                                            $badgeText = 'กำลังดำเนินการ';
-                                        } elseif ($aStatus === \App\Models\MaintenanceAssignment::STATUS_DONE) {
-                                            $badgeTone = 'bg-emerald-50 text-emerald-800 border-emerald-200';
-                                            $badgeText = 'ทำเสร็จแล้ว';
-                                        }
-
                                         $isLead = (bool) ($assign->is_lead ?? false);
                                         $avatar = $worker->avatar_thumb_url ?? null;
                                     @endphp
-
-                                    {{-- ส่วนแสดงผล HTML ด้านล่างจะทำงานเฉพาะคนที่มีสถานะปกติเท่านั้น --}}
                                     <div class="flex items-center justify-between gap-3 px-4 py-3">
                                         <div class="flex min-w-0 items-center gap-3">
                                             <div
@@ -893,25 +1033,16 @@
                                                         —</div>
                                                 @endif
                                             </div>
-                                            <div class="min-w-0">
-                                                <div class="truncate text-[14px] font-semibold text-slate-900">
+                                            <div class="min-w-0 flex-1">
+                                                <div class="truncate text-[14px] font-semibold text-slate-900"
+                                                    title="{{ $worker->name }}">
                                                     {{ $worker->name }}
-                                                    @if ($isLead)
-                                                        <span
-                                                            class="ml-2 inline-flex items-center rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
-                                                            Lead
-                                                        </span>
-                                                    @endif
                                                 </div>
                                                 <div class="truncate text-[12px] text-slate-500">
                                                     {{ $worker->role_label ?? ($fallbackRoleLabels[$worker->role ?? 'unknown'] ?? ($worker->role ?? 'unknown')) }}
                                                 </div>
                                             </div>
                                         </div>
-                                        <span
-                                            class="inline-flex items-center rounded-md border px-3 py-1 text-[11px] font-semibold {{ $badgeTone }}">
-                                            {{ $badgeText }}
-                                        </span>
                                     </div>
                                 @endforeach
                             @endif
@@ -920,14 +1051,10 @@
                         @can('assign', $req)
                             <div class="flex justify-end">
                                 <button type="button" id="openAssignModalBtn"
-                                    class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-[13px] font-semibold
-                             text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-200">
-                                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                        <path d="M20 21v-1a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v1" stroke="currentColor"
-                                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                                        <circle cx="12" cy="7" r="4" stroke="currentColor"
-                                            stroke-width="2" />
-                                    </svg>
+                                    class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2 text-[13px] font-semibold
+                    text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 shadow-sm transition-all active:scale-95">
+                                    <img src="/icon/technical-support.avif" class="w-4 h-4 object-contain brightness-0 invert"
+                                        alt="Assign">
                                     มอบหมายทีมช่าง
                                 </button>
                             </div>
@@ -940,26 +1067,24 @@
         {{-- Assign Modal --}}
         @can('assign', $req)
             <div id="assignModal"
-                class="fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-900/40 p-3 sm:p-4">
+                class="fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-900/40 backdrop-blur-sm p-3 sm:p-4">
                 <div
-                    class="relative z-[10000] w-full max-w-5xl overflow-hidden rounded-2xl border {{ $line }} bg-white shadow-xl">
+                    class="relative z-[10000] w-full max-w-4xl overflow-hidden rounded-2xl border {{ $line }} bg-white shadow-xl">
+
+                    {{-- Modal Header --}}
                     <div class="flex items-center justify-between border-b {{ $line }} px-6 py-4">
                         <div class="flex items-start gap-3 min-w-0">
-                            <span class="mt-0.5 inline-flex h-8 w-8 items-center justify-center text-indigo-700">
-                                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                    <path d="M20 21v-1a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v1" stroke="currentColor" stroke-width="2"
-                                        stroke-linecap="round" stroke-linejoin="round" />
-                                    <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2" />
-                                </svg>
+                            <span class="mt-0.5 inline-flex h-10 w-10 items-center justify-center text-indigo-700">
+                                <img src="/icon/technical-support.avif" class="h-9 w-9 object-contain" alt="Icon">
                             </span>
                             <div class="min-w-0">
                                 <div class="text-[16px] font-semibold text-slate-900 leading-tight">มอบหมายทีมช่าง</div>
-                                <p class="text-[12px] text-slate-500">ค้นหาและเลือกช่างที่ต้องการ</p>
+                                <p class="text-[13px] text-slate-500">ค้นหาและเลือกช่างที่ต้องการ</p>
                             </div>
                         </div>
                         <button type="button" id="closeAssignModalBtn"
-                            class="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none">
                                 <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2"
                                     stroke-linecap="round" />
                             </svg>
@@ -969,21 +1094,22 @@
                     <form method="POST" action="{{ $assignStoreUrl }}">
                         @csrf
                         <input type="hidden" id="assignSuggestRole" value="{{ $suggestRole }}">
-
                         <input type="hidden" name="update_team_flag" value="1">
 
-                        <div class="grid grid-cols-1 lg:grid-cols-[320px,1fr] lg:h-[72vh]">
+                        <div class="grid grid-cols-1 lg:grid-cols-[380px,1fr] lg:h-[65vh]">
 
                             {{-- Left Sidebar --}}
                             <div
-                                class="border-b lg:border-b-0 lg:border-r {{ $line }} bg-slate-50 p-6 flex flex-col min-h-0">
-                                <div class="space-y-6 flex-none">
+                                class="border-b lg:border-b-0 lg:border-r {{ $line }} bg-slate-50 flex flex-col min-h-0">
+
+                                {{-- Controls --}}
+                                <div class="p-5 space-y-4 flex-none">
                                     <div>
-                                        <label class="block text-[12px] font-semibold text-slate-700 mb-2">ค้นหาชื่อ</label>
+                                        <label class="block text-[13px] font-semibold text-slate-700 mb-1.5">ค้นหาชื่อ</label>
                                         <div class="relative">
                                             <span
                                                 class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
-                                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none">
                                                     <circle cx="11" cy="11" r="7" stroke="currentColor"
                                                         stroke-width="2" />
                                                     <path d="M20 20l-3.5-3.5" stroke="currentColor" stroke-width="2"
@@ -992,17 +1118,17 @@
                                             </span>
                                             <input id="assignSearch" type="text"
                                                 class="w-full rounded-lg border {{ $line }} bg-white pl-9 pr-3 py-2.5 text-[13px]
-                                focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                                        focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
                                                 placeholder="พิมพ์ชื่อช่าง...">
                                         </div>
                                     </div>
 
                                     <div>
                                         <label
-                                            class="block text-[12px] font-semibold text-slate-700 mb-2">กรองตามตำแหน่ง</label>
+                                            class="block text-[13px] font-semibold text-slate-700 mb-1.5">กรองตามตำแหน่ง</label>
                                         <select id="assignRoleFilter"
                                             class="w-full rounded-lg border {{ $line }} bg-white px-3 py-2.5 text-[13px]
-                               focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400">
+                                    focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400">
                                             <option value="">— ทั้งหมด —</option>
                                             @foreach ($roleGroupsSorted as $roleCode => $users)
                                                 <option value="{{ strtolower((string) $roleCode) }}">
@@ -1010,52 +1136,75 @@
                                                 </option>
                                             @endforeach
                                         </select>
-                                        <div id="assignSuggestHint" class="mt-2 text-[12px] text-indigo-600 hidden">
+                                        <div id="assignSuggestHint" class="mt-1.5 text-[12px] text-indigo-600 hidden">
                                             ตัวกรองถูกตั้งค่าตามประเภทงานโดยอัตโนมัติ
                                         </div>
                                     </div>
 
-                                    <div class="grid grid-cols-1 gap-2">
+                                    <div class="grid grid-cols-2 gap-2">
                                         <button type="button" id="assignSelectAllBtn"
-                                            class="w-full inline-flex items-center justify-center rounded-lg border {{ $line }} bg-white px-3 py-2.5
-                               text-[12px] font-semibold text-slate-700 hover:bg-slate-100 transition-colors">
-                                            เลือกที่แสดงทั้งหมด
+                                            class="inline-flex items-center justify-center rounded-lg border {{ $line }} bg-white px-3 py-2
+                                    text-[12px] font-semibold text-slate-700 hover:bg-slate-100 transition-colors">
+                                            เลือกทั้งหมด
                                         </button>
                                         <button type="button" id="assignClearAllBtn"
-                                            class="w-full inline-flex items-center justify-center rounded-lg border {{ $line }} bg-white px-3 py-2.5
-                               text-[12px] font-semibold text-slate-700 hover:bg-slate-100 transition-colors">
+                                            class="inline-flex items-center justify-center rounded-lg border {{ $line }} bg-white px-3 py-2
+                                    text-[12px] font-semibold text-slate-700 hover:bg-slate-100 transition-colors">
                                             ล้างการเลือก
                                         </button>
                                     </div>
                                 </div>
 
-                                <div class="mt-6 pt-5 border-t {{ $line }} flex flex-col flex-1 min-h-0">
-                                    <div class="flex items-center justify-between flex-none">
-                                        <div class="text-[12px] font-semibold text-slate-700">เลือกแล้ว</div>
-                                        <div class="text-[12px] text-slate-500" id="assignSelectedMeta">0 คน</div>
+                                {{-- Selected List — เติบโตเต็ม sidebar ที่เหลือ --}}
+                                <div class="px-5 pb-4 border-t {{ $line }} pt-4 flex flex-col flex-1 min-h-0">
+                                    <div class="flex items-center justify-between flex-none mb-2">
+                                        <div class="text-[13px] font-semibold text-slate-700">เลือกแล้ว</div>
+                                        <div class="text-[13px] text-slate-500" id="assignSelectedMeta">0 คน</div>
                                     </div>
-                                    <div id="assignSelectedEmpty" class="mt-3 text-[12px] text-slate-500 flex-none">
+                                    <div id="assignSelectedEmpty" class="text-[13px] text-slate-400 flex-none">
                                         ยังไม่ได้เลือกช่าง
                                     </div>
+                                    {{-- แต่ละ item แสดงชื่อเต็ม ไม่ตัด --}}
                                     <div id="assignSelectedList"
-                                        class="mt-3 space-y-2 overflow-y-auto pr-1 hidden flex-1 min-h-0">
-                                    </div>
+                                        class="space-y-1.5 overflow-y-auto pr-1 hidden flex-1 min-h-0"></div>
                                 </div>
+
+                                {{-- Footer ปุ่มย้ายมาอยู่ใต้ sidebar --}}
+                                <div class="border-t {{ $line }} bg-slate-50 px-5 py-3 flex gap-2">
+                                    <button type="button" id="cancelAssignModalBtn"
+                                        class="flex-1 py-2.5 text-[13px] font-semibold border {{ $line }} rounded-lg bg-white text-slate-700 hover:bg-slate-100 transition-colors">
+                                        ยกเลิก
+                                    </button>
+                                    <button type="submit"
+                                        class="flex-1 py-2.5 text-[13px] font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-200 transition-colors">
+                                        บันทึก
+                                    </button>
+                                </div>
+
                             </div>
 
                             {{-- Right List --}}
                             <div class="flex flex-col min-h-0">
+
+                                {{-- Right Header --}}
                                 <div
-                                    class="px-6 py-4 border-b {{ $line }} bg-white flex items-center justify-between">
+                                    class="px-5 py-3 border-b {{ $line }} bg-white flex items-center justify-between">
                                     <div class="text-[14px] font-semibold text-slate-800">
                                         รายชื่อช่าง
                                         <span id="assignVisibleCount" class="text-slate-500 font-normal">(0)</span>
                                     </div>
                                 </div>
 
+                                {{-- Hint --}}
+                                <div class="px-5 py-2 border-b {{ $line }} bg-slate-50">
+                                    <p class="text-[12px] text-slate-400">ใช้ตัวกรองด้านซ้ายเพื่อค้นหาและเลือกช่างได้รวดเร็ว
+                                    </p>
+                                </div>
+
+                                {{-- List --}}
                                 <div class="flex-1 min-h-0 overflow-y-auto" id="assignListScroll">
                                     @if ($roleGroupsSorted->isEmpty())
-                                        <div class="px-6 py-10 text-center text-[13px] text-slate-500">
+                                        <div class="px-5 py-10 text-center text-[14px] text-slate-500">
                                             ไม่พบข้อมูลช่างในระบบ
                                         </div>
                                     @else
@@ -1069,13 +1218,16 @@
                                             @endphp
                                             <section class="border-b {{ $line }}" data-role-group="1"
                                                 data-role-group-code="{{ $roleKey }}">
+
+                                                {{-- Section Header --}}
                                                 <div
-                                                    class="sticky top-0 z-10 px-6 py-3 bg-slate-50/80 border-b {{ $line }} backdrop-blur-sm">
-                                                    <div class="text-[13px] font-semibold text-slate-800">
-                                                        {{ $roleTitle }}
-                                                        <span class="font-normal text-slate-500">({{ $roleCount }})</span>
+                                                    class="sticky top-0 z-10 px-5 py-2 bg-slate-100 border-b {{ $line }}">
+                                                    <div
+                                                        class="text-[12px] font-bold text-slate-600 uppercase tracking-widest">
+                                                        {{ $roleTitle }} ({{ $roleCount }})
                                                     </div>
                                                 </div>
+
                                                 <div class="divide-y divide-slate-100">
                                                     @foreach ($users as $worker)
                                                         @php
@@ -1083,22 +1235,37 @@
                                                                 $worker->role_label ??
                                                                 ($fallbackRoleLabels[$worker->role ?? 'unknown'] ??
                                                                     ($worker->role ?? 'unknown'));
+                                                            $avatar = $worker->avatar_thumb_url ?? null;
                                                         @endphp
                                                         <label
-                                                            class="assign-user-row flex items-center gap-4 px-6 py-4 hover:bg-indigo-50/30 cursor-pointer transition-colors"
+                                                            class="assign-user-row flex items-center gap-3 px-5 py-2.5 hover:bg-indigo-50/30 cursor-pointer transition-colors"
                                                             data-role="{{ $roleKey }}"
                                                             data-name="{{ strtolower((string) $worker->name) }}"
                                                             data-display-name="{{ $worker->name }}"
                                                             data-role-label="{{ $roleLabelRow }}">
+
                                                             <input type="checkbox"
                                                                 class="assign-user-checkbox h-4 w-4 flex-shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                                                                 data-role="{{ (string) $roleCode }}" name="user_ids[]"
                                                                 value="{{ $worker->id }}" @checked($workers->contains('id', $worker->id))>
-                                                            <div class="flex-1 min-w-0">
-                                                                <div class="text-[14px] font-semibold text-slate-900 truncate">
-                                                                    {{ $worker->name }}</div>
-                                                                <div class="text-[12px] text-slate-500 truncate">
-                                                                    {{ $roleLabelRow }}</div>
+
+                                                            <div
+                                                                class="h-8 w-8 flex-shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100">
+                                                                @if ($avatar)
+                                                                    <img src="{{ $avatar }}"
+                                                                        alt="{{ $worker->name }}"
+                                                                        class="h-full w-full object-cover">
+                                                                @else
+                                                                    <div
+                                                                        class="grid h-full w-full place-items-center text-[12px] font-semibold text-slate-500 bg-slate-100 uppercase">
+                                                                        {{ mb_substr($worker->name, 0, 1) }}
+                                                                    </div>
+                                                                @endif
+                                                            </div>
+
+                                                            <div class="flex-1 min-w-0 truncate">
+                                                                <span
+                                                                    class="text-[14px] font-semibold text-slate-900">{{ $worker->name }}</span>
                                                             </div>
                                                         </label>
                                                     @endforeach
@@ -1108,38 +1275,22 @@
                                     @endif
                                 </div>
 
-                                <div
-                                    class="border-t {{ $line }} bg-white px-6 py-4 flex items-center justify-between gap-3">
-                                    <div class="text-[12px] text-slate-500 flex-1">
-                                        ใช้ตัวกรองด้านซ้ายเพื่อค้นหาและเลือกช่างได้รวดเร็ว
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <button type="button" id="cancelAssignModalBtn"
-                                            class="px-5 py-2.5 text-[13px] font-semibold border {{ $line }} rounded-lg bg-white text-slate-700 hover:bg-slate-50 transition-colors">
-                                            ยกเลิก
-                                        </button>
-                                        <button type="submit"
-                                            class="px-6 py-2.5 text-[13px] font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-200 transition-colors">
-                                            บันทึกการมอบหมาย
-                                        </button>
-                                    </div>
-                                </div>
                             </div>
-
                         </div>
                     </form>
                 </div>
             </div>
         @endcan
 
-        {{-- Reject Modal --}}
-        @if ($canReject)
-            <div id="rejectModal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-900/40 p-4">
+        {{-- Hold Modal --}}
+        @if ($canHold)
+            <div id="holdModal"
+                class="fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
                 <div
                     class="relative z-[10000] w-full max-w-xl rounded-2xl border {{ $line }} bg-white shadow-xl">
                     <div class="flex items-center justify-between border-b {{ $line }} px-4 py-3">
-                        <div class="text-sm font-semibold text-slate-900">ไม่รับเรื่อง</div>
-                        <button type="button" id="closeRejectModalBtn"
+                        <div class="text-sm font-semibold text-slate-900">พักชั่วคราว</div>
+                        <button type="button" id="closeHoldModalBtn"
                             class="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700">
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                 <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2"
@@ -1147,30 +1298,73 @@
                             </svg>
                         </button>
                     </div>
-                    <form method="POST" action="{{ route('maintenance.requests.reject', $req->id) }}"
+                    <form method="POST" action="{{ route('maintenance.requests.hold', $req->id) }}"
                         class="px-4 py-4 space-y-4">
                         @csrf
                         <div>
-                            <label class="block text-sm font-medium text-slate-700">เหตุผล <span
-                                    class="text-rose-600">*</span></label>
-                            <textarea name="remark" rows="4" required
+                            <label class="block text-sm font-medium text-slate-700">ระบุเหตุผลในการพักชั่วคราว <span
+                                    class="text-amber-600">*</span></label>
+                            <textarea name="note" rows="4" required
                                 class="mt-2 w-full rounded-md border {{ $line }} bg-white px-3 py-2 text-sm
-                           focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
-                                placeholder="ระบุเหตุผลที่ไม่รับเรื่อง"></textarea>
+                           focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                                placeholder="เช่น รออะไหล่, รอเบิกเครื่องมือ, หรือเหตุผลอื่น ๆ..."></textarea>
                         </div>
                         <div class="flex justify-end gap-2 pt-2">
-                            <button type="button" id="cancelRejectModalBtn"
+                            <button type="button" id="cancelHoldModalBtn"
                                 class="px-3 py-2 text-xs border {{ $line }} rounded-md bg-white hover:bg-slate-50">
                                 ยกเลิก
                             </button>
                             <button type="submit"
-                                class="px-3 py-2 text-xs bg-rose-600 text-white rounded-md hover:bg-rose-700 focus:ring-2 focus:ring-rose-200">
-                                ยืนยันไม่รับเรื่อง
+                                class="px-3 py-2 text-xs bg-amber-600 text-white rounded-md hover:bg-amber-700 focus:ring-2 focus:ring-amber-200">
+                                ยืนยันการพักชั่วคราว
                             </button>
                         </div>
                     </form>
                 </div>
             </div>
+        @endif
+
+        {{-- Post-Close Action Modal --}}
+        @if (session('show_post_close_modal'))
+            <div id="postCloseModal"
+                class="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
+                <div
+                    class="relative z-[10000] w-full max-w-md transform transition-all animate-in fade-in zoom-in duration-300">
+                    <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+                        {{-- Icon Header --}}
+                        <div class="bg-slate-50 px-6 py-8 text-center border-b border-slate-100">
+                            <div
+                                class="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 mb-4 shadow-inner">
+                                <span class="material-symbols-outlined text-[48px]">check_circle</span>
+                            </div>
+                            <h3 class="text-xl font-bold text-slate-900">ปิดงานเรียบร้อยแล้ว!</h3>
+                            <p class="mt-2 text-sm text-slate-500">ขอบคุณที่ใช้บริการครับ คุณต้องการดำเนินการอย่างไรต่อ?
+                            </p>
+                        </div>
+
+                        {{-- Action Buttons --}}
+                        <div class="p-6 space-y-3">
+                            @can('rate', $req)
+                                <a href="{{ route('maintenance.ratings.create', $req->id) }}"
+                                    class="flex w-full items-center justify-center gap-3 rounded-2xl bg-amber-500 py-4 text-[15px] font-bold text-white shadow-lg shadow-amber-200 hover:bg-amber-600 hover:scale-[1.02] active:scale-[0.98] transition-all">
+                                    <span class="material-symbols-outlined text-[20px]">star</span>
+                                    ประเมินความพึงพอใจ
+                                </a>
+                            @endcan
+
+                            <button type="button"
+                                onclick="document.getElementById('postCloseModal').remove(); document.body.style.overflow = '';"
+                                class="flex w-full items-center justify-center gap-3 rounded-2xl bg-white border-2 border-slate-100 py-4 text-[15px] font-bold text-slate-600 hover:bg-slate-50 hover:border-slate-200 active:scale-[0.98] transition-all">
+                                <span class="material-symbols-outlined text-[20px]">visibility</span>
+                                ดูรายละเอียดใบงาน
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <script>
+                document.body.style.overflow = 'hidden';
+            </script>
         @endif
 
     </div>
@@ -1262,8 +1456,8 @@
                         ${escapeHtml(ini)}
                     </div>
                     <div class="min-w-0 flex-1">
-                        <div class="truncate text-[12px] font-bold text-slate-900 leading-tight">${escapeHtml(displayName)}</div>
-                        <div class="truncate text-[10px] text-slate-500 uppercase tracking-tighter">${escapeHtml(roleLabel)}</div>
+                        <div class="truncate text-[12px] font-bold text-slate-900 leading-tight" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</div>
+                        <div class="truncate text-[10px] text-slate-500 uppercase tracking-tighter" title="${escapeHtml(roleLabel)}">${escapeHtml(roleLabel)}</div>
                     </div>
                     <button type="button" class="assign-chip-remove flex-shrink-0 inline-flex items-center justify-center h-6 w-6 rounded-full text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors" data-user-id="${escapeHtml(userId)}" title="ลบออก">
                         <svg class="h-3.5 w-3.5 pointer-events-none" viewBox="0 0 24 24" fill="none">
@@ -1405,6 +1599,31 @@
                 cancelRejectBtn?.addEventListener('click', hideReject);
                 rejectModal.addEventListener('click', e => {
                     if (e.target === rejectModal) hideReject();
+                });
+            }
+
+            // --- 7. Hold Modal Logic ---
+            const holdModal = document.getElementById('holdModal');
+            const openHoldBtn = document.getElementById('openHoldModalBtn');
+            const closeHoldBtn = document.getElementById('closeHoldModalBtn');
+            const cancelHoldBtn = document.getElementById('cancelHoldModalBtn');
+
+            if (holdModal && openHoldBtn) {
+                const showHold = () => {
+                    holdModal.classList.remove('hidden');
+                    holdModal.classList.add('flex');
+                    document.body.style.overflow = 'hidden';
+                };
+                const hideHold = () => {
+                    holdModal.classList.add('hidden');
+                    holdModal.classList.remove('flex');
+                    document.body.style.overflow = '';
+                };
+                openHoldBtn.addEventListener('click', showHold);
+                closeHoldBtn?.addEventListener('click', hideHold);
+                cancelHoldBtn?.addEventListener('click', hideHold);
+                holdModal.addEventListener('click', e => {
+                    if (e.target === holdModal) hideHold();
                 });
             }
         })();

@@ -35,7 +35,7 @@ class MaintenanceRatingController extends Controller
                 $q->where('rater_id', $user->id);
             })
             ->get()
-            ->filter(fn (MaintenanceRequest $req) => $this->withinRatingWindow($req))
+            ->filter(fn(MaintenanceRequest $req) => $this->withinRatingWindow($req))
             ->values();
 
         // งานที่ให้คะแนนแล้ว
@@ -63,22 +63,32 @@ class MaintenanceRatingController extends Controller
     // Dashboard คะแนนของช่าง (รองรับ Sorting)
     public function technicianDashboard(Request $request)
     {
-        $sort = $request->get('sort', 'score_desc'); // รับค่าการเรียงลำดับจาก Request
+        $sort = $request->get('sort', 'score_desc');
+        $from = $request->get('from');
+        $to   = $request->get('to');
+
+        // Default to current year if no filter
+        $start = $from ? \Carbon\Carbon::parse($from)->startOfDay() : \Carbon\Carbon::now()->startOfYear();
+        $end   = $to   ? \Carbon\Carbon::parse($to)->endOfDay()   : \Carbon\Carbon::now()->endOfMonth();
 
         $query = User::query()
             ->where('role', 'technician')
-            ->withAvg('technicianRatings', 'score')
-            ->withCount('technicianRatings');
+            ->withAvg(['technicianRatings as technician_ratings_avg_score' => function($q) use ($start, $end) {
+                $q->whereBetween('created_at', [$start, $end]);
+            }], 'score')
+            ->withCount(['technicianRatings as technician_ratings_count' => function($q) use ($start, $end) {
+                $q->whereBetween('created_at', [$start, $end]);
+            }]);
 
-        // การเรียงลำดับข้อมูลตามเงื่อนไข (Professional Sorting)
+        // Sorting
         $query = match ($sort) {
             'score_asc'  => $query->orderBy('technician_ratings_avg_score', 'asc'),
             'count_desc' => $query->orderBy('technician_ratings_count', 'desc'),
             'count_asc'  => $query->orderBy('technician_ratings_count', 'asc'),
-            default      => $query->orderByDesc('technician_ratings_avg_score'), // score_desc (ค่าเริ่มต้น)
+            default      => $query->orderByDesc('technician_ratings_avg_score'),
         };
 
-        $technicians = $query->get(['id', 'name']);
+        $technicians = $query->get(['id', 'name', 'citizen_id']);
 
         Log::info("Technician Dashboard viewed. Sorting by: {$sort}"); // บันทึก Log การเข้าดู Dashboard พร้อมค่าการเรียง
 
@@ -244,7 +254,7 @@ class MaintenanceRatingController extends Controller
     {
         $assignment = $maintenanceRequest->assignments()
             // อนุญาตให้ทั้ง technician และ admin สามารถรับการประเมินได้
-            ->whereHas('user', function($q) {
+            ->whereHas('user', function ($q) {
                 $q->whereIn('role', ['technician', 'admin']);
             })
             ->orderByDesc('is_lead')
@@ -253,5 +263,68 @@ class MaintenanceRatingController extends Controller
             ->first();
 
         return $assignment?->user_id;
+    }
+
+    public function summary(User $user)
+    {
+        // โหลดข้อมูลพื้นฐานและสถิติ
+        $user->loadCount(['technicianRatings', 'technicianAssignments' => function($q) {
+            $q->where('status', 'done');
+        }])
+        ->loadAvg('technicianRatings', 'score');
+
+        // ข้อมูลสถิติการกระจายคะแนน (Score Distribution)
+        $scoreDistribution = $user->technicianRatings()
+            ->selectRaw('score, count(*) as count')
+            ->groupBy('score')
+            ->pluck('count', 'score')
+            ->toArray();
+
+        // ทั้งหมด 5-1 ดาว
+        $distribution = [];
+        for ($i = 5; $i >= 1; $i--) {
+            $count = $scoreDistribution[$i] ?? 0;
+            $percent = $user->technician_ratings_count > 0 
+                ? ($count / $user->technician_ratings_count) * 100 
+                : 0;
+            $distribution[$i] = [
+                'count' => $count,
+                'percent' => $percent
+            ];
+        }
+
+        // ความคิดเห็นล่าสุด
+        $reviews = $user->technicianRatings()
+            ->with('rater:id,name,role')
+            ->latest()
+            ->paginate(10);
+
+        // งานล่าสุดที่ทำเสร็จ
+        $recentJobs = $user->technicianAssignments()
+            ->with(['maintenanceRequest' => function($q) {
+                $q->with('reporter:id,name');
+            }])
+            ->where('status', 'done')
+            ->latest() // ใช้ created_at แทน completed_at ที่ไม่มีในตาราง
+            ->take(5)
+            ->get();
+
+        if (request()->wantsJson()) {
+            return response()->json([
+                'id'          => $user->id,
+                'name'        => $user->name,
+                'avatar_url'  => $user->avatar_thumb_url,
+                'role_label'  => $user->role_label,
+                'avg_score'   => round((float) $user->technician_ratings_avg_score, 2),
+                'total_count' => (int) $user->technician_ratings_count,
+            ]);
+        }
+
+        return view('maintenance.rating.technician-show', [
+            'tech' => $user,
+            'distribution' => $distribution,
+            'reviews' => $reviews,
+            'recentJobs' => $recentJobs
+        ]);
     }
 }

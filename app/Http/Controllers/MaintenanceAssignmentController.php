@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Auth;
 
 class MaintenanceAssignmentController extends Controller
 {
@@ -19,10 +20,17 @@ class MaintenanceAssignmentController extends Controller
         Gate::authorize('assign', $req);
 
         // ตัด lead_user_id ออกจากการ validate ไปเลย ไม่ใช้แล้ว
-        $data = $request->validate([
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'user_ids'   => ['nullable', 'array'],
             'user_ids.*' => ['integer', 'exists:users,id'],
         ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput()
+                ->with('toast', Toast::warning($validator->errors()->first(), 3000));
+        }
+
+        $data = $validator->validated();
 
         $actorId = $request->user()?->id;
 
@@ -38,77 +46,97 @@ class MaintenanceAssignmentController extends Controller
             ->get(['id', 'name', 'role'])
             ->keyBy('id');
 
-        DB::transaction(function () use ($req, $workers, $userIds, $actorId) {
-            $now = now();
+        // ตรวจสอบสิทธิ์การมอบหมายงาน: หัวหน้า/แอดมินเท่านั้นที่จะเพิ่มรับผิดชอบเป็นหัวหน้า/แอดมินได้
+        $currentUser = $request->user();
+        $isAssignerAdminTeam = $currentUser && ($currentUser->isAdmin() || $currentUser->isSupervisor());
 
-            $lockedReq = MaintenanceRequest::query()
-                ->whereKey($req->id)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            $existing = $lockedReq->assignments()->get()->keyBy('user_id');
-
-            // บังคับเป็น null เสมอ เพราะเราไม่ใช้ระบบช่างรับผิดชอบหลัก (Lead) แล้ว
-            $lockedReq->technician_id = null;
-
-            if ($workers->isNotEmpty() && $lockedReq->assigned_date === null) {
-                $lockedReq->assigned_date = $now;
-            }
-            $lockedReq->save();
-
-            foreach ($userIds as $uid) {
-                $worker = $workers->get((int) $uid);
-                if (!$worker) continue;
-
-                $assignment = $existing->get($worker->id);
-
-                if ($assignment) {
-                    // ถ้ามีรายชื่ออยู่แล้ว แต่อาจจะเคยโดนยกเลิกไป ให้ดึงกลับมาใหม่
-                    $updateData = [
-                        'role'    => $worker->role,
-                        'is_lead' => false, // ทุกคนคือช่างเท่ากันหมด ไม่มี Lead
-                    ];
-
-                    if ($assignment->status === MaintenanceAssignment::STATUS_CANCELLED) {
-                        $updateData['status'] = MaintenanceAssignment::STATUS_IN_PROGRESS;
-                        $updateData['response_status'] = MaintenanceAssignment::RESP_PENDING;
-                        $updateData['responded_at'] = null;
-                    }
-
-                    $assignment->update($updateData);
-                } else {
-                    // ถ้าเป็นช่างใหม่ที่เพิ่งเพิ่มเข้ามา
-                    MaintenanceAssignment::create([
-                        'maintenance_request_id' => $lockedReq->id,
-                        'user_id'                => $worker->id,
-                        'role'                   => $worker->role,
-                        'is_lead'                => false,
-                        'assigned_at'            => $now,
-                        'response_status'        => MaintenanceAssignment::RESP_PENDING,
-                        'status'                 => MaintenanceAssignment::STATUS_IN_PROGRESS,
-                    ]);
+        foreach ($workers as $w) {
+            if (in_array($w->role, [User::ROLE_ADMIN, User::ROLE_SUPERVISOR])) {
+                if (!$isAssignerAdminTeam) {
+                    return back()->withInput()->with('toast', Toast::error('เจ้าหน้าที่ไม่สามารถมอบหมายงานให้ผู้ดูแลระบบหรือหัวหน้างานได้', 4000));
                 }
             }
+        }
 
-            $keepIds = $userIds->all();
-            $lockedReq->assignments()
-                ->whereNotIn('user_id', $keepIds)
-                ->update([
-                    'status'          => MaintenanceAssignment::STATUS_CANCELLED,
-                    'is_lead'         => false,
-                    'response_status' => MaintenanceAssignment::RESP_PENDING,
-                    'responded_at'    => null,
-                    'updated_at'      => $now,
-                ]);
-        });
+        try {
+            DB::transaction(function () use ($req, $workers, $userIds, $actorId) {
+                $now = now();
 
-        Log::info('[MaintenanceAssignment::store] team updated - Lead system removed', [
-            'request_id' => $req->id,
-            'user_count' => $userIds->count(),
-            'actor_id'   => $actorId,
-        ]);
+                $lockedReq = MaintenanceRequest::query()
+                    ->whereKey($req->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-        return back()->with('toast', Toast::success('อัปเดตรายชื่อช่างเรียบร้อยแล้ว', 1800));
+                $existing = $lockedReq->assignments()->get()->keyBy('user_id');
+
+                // บังคับเป็น null เสมอ เพราะเราไม่ใช้ระบบช่างรับผิดชอบหลัก (Lead) แล้ว
+                $lockedReq->technician_id = null;
+
+                if ($workers->isNotEmpty() && $lockedReq->assigned_date === null) {
+                    $lockedReq->assigned_date = $now;
+                }
+                $lockedReq->save();
+
+                foreach ($userIds as $uid) {
+                    $worker = $workers->get((int) $uid);
+                    if (!$worker) continue;
+
+                    $assignment = $existing->get($worker->id);
+
+                    if ($assignment) {
+                        // ถ้ามีรายชื่ออยู่แล้ว แต่อาจจะเคยโดนยกเลิกไป ให้ดึงกลับมาใหม่
+                        $updateData = [
+                            'role'    => $worker->role,
+                            'is_lead' => false, // ทุกคนคือช่างเท่ากันหมด ไม่มี Lead
+                        ];
+
+                        if ($assignment->status === MaintenanceAssignment::STATUS_CANCELLED) {
+                            $updateData['status'] = MaintenanceAssignment::STATUS_IN_PROGRESS;
+                            $updateData['response_status'] = MaintenanceAssignment::RESP_PENDING;
+                            $updateData['responded_at'] = null;
+                        }
+
+                        $assignment->update($updateData);
+                    } else {
+                        // ถ้าเป็นช่างใหม่ที่เพิ่งเพิ่มเข้ามา
+                        MaintenanceAssignment::create([
+                            'maintenance_request_id' => $lockedReq->id,
+                            'user_id'                => $worker->id,
+                            'role'                   => $worker->role,
+                            'is_lead'                => false,
+                            'assigned_at'            => $now,
+                            'response_status'        => MaintenanceAssignment::RESP_PENDING,
+                            'status'                 => MaintenanceAssignment::STATUS_IN_PROGRESS,
+                        ]);
+                    }
+                }
+
+                $keepIds = $userIds->all();
+                $lockedReq->assignments()
+                    ->whereNotIn('user_id', $keepIds)
+                    ->update([
+                        'status'          => MaintenanceAssignment::STATUS_CANCELLED,
+                        'is_lead'         => false,
+                        'response_status' => MaintenanceAssignment::RESP_PENDING,
+                        'responded_at'    => null,
+                        'updated_at'      => $now,
+                    ]);
+            });
+
+            Log::info('[MaintenanceAssignment::store] team updated - Lead system removed', [
+                'request_id' => $req->id,
+                'user_count' => $userIds->count(),
+                'actor_id'   => $actorId,
+            ]);
+
+            return back()->with('toast', Toast::success('อัปเดตรายชื่อช่างเรียบร้อยแล้ว', 1800));
+        } catch (\Throwable $e) {
+            Log::error('[MaintenanceAssignment::store] failed', [
+                'request_id' => $req->id,
+                'error'      => $e->getMessage()
+            ]);
+            return back()->with('toast', Toast::error('เกิดข้อผิดพลาด: ' . $e->getMessage(), 3000));
+        }
     }
 
     public function destroy(MaintenanceAssignment $assignment)
@@ -127,19 +155,27 @@ class MaintenanceAssignmentController extends Controller
             return back()->with('toast', Toast::warning('งานนี้ถูกทำเสร็จแล้ว ไม่สามารถยกเลิกได้', 2200));
         }
 
-        $assignment->update([
-            'status'          => MaintenanceAssignment::STATUS_CANCELLED,
-            'is_lead'         => false,
-            'response_status' => MaintenanceAssignment::RESP_PENDING,
-            'responded_at'    => null,
-        ]);
+        try {
+            $assignment->update([
+                'status'          => MaintenanceAssignment::STATUS_CANCELLED,
+                'is_lead'         => false,
+                'response_status' => MaintenanceAssignment::RESP_PENDING,
+                'responded_at'    => null,
+            ]);
 
-        Log::info('[MaintenanceAssignment::destroy] assignment cancelled', [
-            'assignment_id' => $assignment->id,
-            'user_id'       => $assignment->user_id,
-            'actor_id'      => $actorId,
-        ]);
+            Log::info('[MaintenanceAssignment::destroy] assignment cancelled', [
+                'assignment_id' => $assignment->id,
+                'user_id'       => $assignment->user_id,
+                'actor_id'      => $actorId,
+            ]);
 
-        return back()->with('toast', Toast::success('ยกเลิกการมอบหมายช่างเรียบร้อยแล้ว', 1800));
+            return back()->with('toast', Toast::success('ยกเลิกการมอบหมายช่างเรียบร้อยแล้ว', 1800));
+        } catch (\Throwable $e) {
+            Log::error('[MaintenanceAssignment::destroy] failed', [
+                'assignment_id' => $assignment->id,
+                'error'      => $e->getMessage()
+            ]);
+            return back()->with('toast', Toast::error('เกิดข้อผิดพลาด: ' . $e->getMessage(), 3000));
+        }
     }
 }

@@ -16,30 +16,22 @@ class Toast
         return compact('type', 'message', 'position', 'timeout', 'size');
     }
 
-    // สร้าง Toast ประเภทสำเร็จ (Success)
     public static function success(string $message, int $timeout = 1600): array
     {
-        return self::make($message, 'success', 'tc', $timeout, 'lg');
+        return self::make($message, 'success', 'tr', $timeout, 'lg');
     }
-
-    // สร้าง Toast ประเภทแจ้งข้อมูล (Info)
     public static function info(string $message, int $timeout = 1600): array
     {
-        return self::make($message, 'info', 'tc', $timeout, 'lg');
+        return self::make($message, 'info', 'tr', $timeout, 'lg');
     }
-
-    // สร้าง Toast ประเภทข้อผิดพลาด (Error)
     public static function error(string $message, int $timeout = 2000): array
     {
-        return self::make($message, 'error', 'tc', $timeout, 'lg');
+        return self::make($message, 'error', 'tr', $timeout, 'lg');
     }
-
-    // สร้าง Toast ประเภทคำเตือน (Warning)
     public static function warning(string $message, int $timeout = 2000): array
     {
-        return self::make($message, 'warning', 'tc', $timeout, 'lg');
+        return self::make($message, 'warning', 'tr', $timeout, 'lg');
     }
-
     // แปลงข้อมูลจาก Array ดิบให้เข้าฟอร์แมตของคลาส
     public static function from(array $raw): array
     {

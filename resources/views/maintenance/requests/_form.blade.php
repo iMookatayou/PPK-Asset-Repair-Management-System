@@ -4,6 +4,7 @@
 
   $assets = is_iterable($assets ?? null) ? collect($assets) : collect();
   $depts  = is_iterable($depts ?? null) ? collect($depts) : collect();
+  $types  = is_iterable($types ?? null) ? collect($types) : collect();
 
   $user   = auth()->user();
   $isEdit = (bool) optional($req)->exists;
@@ -54,7 +55,10 @@
           </div>
         </div>
 
-        <label class="block text-sm font-medium text-slate-700">ทรัพย์สิน</label>
+        <label class="block text-sm font-medium text-slate-700">
+          ทรัพย์สิน <span class="text-rose-500 font-bold">*</span>
+          <span class="ml-1 text-[11px] font-normal text-slate-500 italic">(ไม่จำเป็นต้องระบุหากไม่ได้ซ่อมครุภัณฑ์ในระบบ)</span>
+        </label>
         <select name="asset_id" class="ts-basic mt-2 w-full" data-placeholder="— เลือกทรัพย์สิน —">
           <option value="">— ไม่ระบุ —</option>
           @foreach($assets as $a)
@@ -94,6 +98,18 @@
         </div>
 
         <label class="block text-sm font-medium text-slate-700">
+          ประเภทงาน (Report Type)
+        </label>
+        <select name="type_id" class="ts-basic mt-2 w-full" data-placeholder="— เลือกประเภทงาน —">
+          <option value="">— ไม่ระบุ —</option>
+          @foreach($types as $t)
+            <option value="{{ $t->id }}" @selected((string)$v('type_id') === (string)$t->id)>
+              {{ $t->name }}
+            </option>
+          @endforeach
+        </select>
+
+        <label class="block text-sm font-medium text-slate-700 mt-4">
           หัวข้อ <span class="text-rose-600">*</span>
         </label>
         <input type="text" name="title" value="{{ $v('title') }}" autocomplete="off" class="{{ $input }}" required>
@@ -119,13 +135,13 @@
         </div>
 
         <div class="grid grid-cols-1 gap-4">
-          @if($user)
+          @if(!$isEdit && $user)
             <div>
               <label class="block text-sm font-medium text-slate-700">ผู้แจ้ง</label>
               <div class="mt-2 h-11 rounded-md border {{ $line }} bg-slate-50 px-3 flex items-center text-sm text-slate-700">
                 {{ $user->name }}
               </div>
-              <input type="hidden" name="reporter_name" value="{{ $v('reporter_name', $user->name) }}">
+              <input type="hidden" name="reporter_name" value="{{ $user->name }}">
             </div>
 
             <div>
@@ -246,14 +262,22 @@
           <div id="mr_files_list" class="mt-2 divide-y divide-slate-200 rounded-md border {{ $line }} bg-white"></div>
         </div>
 
-        <p class="mt-2 text-xs text-slate-500">สูงสุด 10 ไฟล์ (ตาม validation ฝั่งเซิร์ฟเวอร์)</p>
+        <div class="mt-2 p-3 rounded-md bg-amber-50 border border-amber-200">
+          <div class="flex gap-2">
+            <svg class="h-5 w-5 text-amber-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div class="text-xs text-amber-800 space-y-1">
+              <p class="font-bold">เงื่อนไขการแนบไฟล์และแก้ไขข้อมูล:</p>
+              <ul class="list-disc ml-4 space-y-0.5">
+                <li>จำกัดจำนวนไฟล์แนบสูงสุด 3 ไฟล์ต่อใบงาน</li>
+                <li>ผู้แจ้งซ่อมสามารถแก้ไขข้อมูลและไฟล์แนบได้เฉพาะก่อนช่างรับทราบงาน</li>
+                <li>เมื่อใบงานถูกปิดหรือช่างเริ่มดำเนินการแล้ว จะไม่สามารถแก้ไขข้อมูลพื้นฐานได้</li>
+              </ul>
+            </div>
+          </div>
+        </div>
 
-        @error('files')
-          <p class="mt-2 text-xs text-rose-700">{{ $message }}</p>
-        @enderror
-        @error('files.*')
-          <p class="mt-2 text-xs text-rose-700">{{ $message }}</p>
-        @enderror
 
         <script>
           (function () {
@@ -286,18 +310,21 @@
               preview.classList.remove('hidden');
 
               filesBag.forEach((f, idx) => {
-                const row = document.createElement('div');
-                row.className = 'px-3 py-2 text-sm flex items-center justify-between gap-3';
+                const card = document.createElement('div');
+                card.className = 'p-3 rounded-lg border border-slate-200 bg-slate-50 space-y-2';
+
+                const top = document.createElement('div');
+                top.className = 'flex items-center justify-between gap-3';
 
                 const left = document.createElement('div');
                 left.className = 'min-w-0';
 
                 const name = document.createElement('div');
-                name.className = 'truncate text-slate-700';
+                name.className = 'truncate text-[13px] font-medium text-slate-700';
                 name.textContent = f.name;
 
                 const meta = document.createElement('div');
-                meta.className = 'text-xs text-slate-500';
+                meta.className = 'text-[11px] text-slate-500';
                 meta.textContent = (f.type || 'file') + ' • ' + Math.round(f.size / 1024) + ' KB';
 
                 left.appendChild(name);
@@ -313,9 +340,19 @@
                   render();
                 });
 
-                row.appendChild(left);
-                row.appendChild(del);
-                list.appendChild(row);
+                top.appendChild(left);
+                top.appendChild(del);
+                card.appendChild(top);
+
+                // Caption Input
+                const capInput = document.createElement('input');
+                capInput.type = 'text';
+                capInput.name = 'captions[]';
+                capInput.placeholder = 'เพิ่มคำอธิบายภาพ...';
+                capInput.className = 'w-full h-8 px-2 py-1 text-[12px] rounded border border-slate-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-100 outline-none transition';
+                card.appendChild(capInput);
+
+                list.appendChild(card);
               });
             };
 
@@ -326,7 +363,15 @@
               const map = new Map(filesBag.map(f => [keyOf(f), f]));
               arr.forEach(f => map.set(keyOf(f), f));
 
-              filesBag = Array.from(map.values()).slice(0, 10); // กันเกิน 10
+              const existingCount = {{ isset($attachments) && is_iterable($attachments) ? count($attachments) : 0 }};
+              const maxAllowed = Math.max(0, 3 - existingCount);
+
+              if (map.size > maxAllowed) {
+                window.dispatchEvent(new CustomEvent('app:toast', {
+                  detail: { type: 'warning', message: 'สามารถแนบไฟล์เพิ่มได้อีก ' + maxAllowed + ' ไฟล์ (สูงสุด 3 ไฟล์ต่อใบงาน)' }
+                }));
+              }
+              filesBag = Array.from(map.values()).slice(0, maxAllowed); // กันเกินโควต้า
               syncToInputs();
               render();
             };
@@ -357,4 +402,17 @@
     </div>
 
   </div>
+</div>
+
+<div class="flex justify-end gap-2 pt-4 mt-6 border-t {{ $line }}">
+  <a href="{{ route('maintenance.requests.index') }}"
+     class="inline-flex items-center justify-center h-10 px-4 rounded-lg border {{ $line }} bg-white
+            text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+    ยกเลิก
+  </a>
+  <button type="submit"
+          class="inline-flex items-center justify-center h-10 px-4 rounded-lg bg-emerald-600
+                 text-sm font-medium text-white hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-200 transition-all">
+    {{ $isEdit ? 'บันทึกการแก้ไข' : 'บันทึก' }}
+  </button>
 </div>

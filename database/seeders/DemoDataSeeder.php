@@ -22,7 +22,7 @@ class DemoDataSeeder extends Seeder
         $assetCount   = (int) env('DEMO_ASSET_COUNT', 120);
         $techCount    = (int) env('DEMO_TECH_COUNT', 6);
         $staffCount   = (int) env('DEMO_MEMBER_COUNT', 18);
-        $requestCount = (int) env('DEMO_SEED_COUNT', 300);
+        $requestCount = (int) env('DEMO_SEED_COUNT', 150);
         $chunkSize    = (int) env('DEMO_CHUNK', 500);
 
         $adminCitizenId = env('DEMO_ADMIN_CITIZEN_ID', '1000000000001');
@@ -142,6 +142,18 @@ class DemoDataSeeder extends Seeder
         $hasPriority     = $has('priority');
         $hasStatusCol    = $has('status');
 
+        // ================== TRUNCATE (Optional but suggested for exact numbers) ==================
+        if (Schema::hasTable('maintenance_operation_logs')) DB::table('maintenance_operation_logs')->truncate();
+        if (Schema::hasTable('maintenance_log_attachments')) DB::table('maintenance_log_attachments')->truncate(); // if exists
+        if (Schema::hasTable('maintenance_assignments')) DB::table('maintenance_assignments')->truncate();
+        if (Schema::hasTable('maintenance_logs')) DB::table('maintenance_logs')->truncate();
+        if (Schema::hasTable('sla_configs')) DB::table('sla_configs')->truncate();
+        if (Schema::hasTable($mrTable)) {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+            DB::table($mrTable)->truncate();
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        }
+
         $hasReporterName     = $has('reporter_name');
         $hasReporterPhone    = $has('reporter_phone');
         $hasReporterEmail    = $has('reporter_email');
@@ -154,6 +166,8 @@ class DemoDataSeeder extends Seeder
         $hasAssignedDate  = $has('assigned_date');
         $hasCompletedDate = $has('completed_date');
         $hasAcceptedAt    = $has('accepted_at');
+        $hasAcknowledgedAt = $has('acknowledged_at');
+        $hasPausedDuration = $has('paused_duration_minutes');
         $hasStartedAt     = $has('started_at');
         $hasOnHoldAt      = $has('on_hold_at');
         $hasResolvedAt    = $has('resolved_at');
@@ -168,17 +182,7 @@ class DemoDataSeeder extends Seeder
         $hasCreatedAt      = $has('created_at');
         $hasUpdatedAt      = $has('updated_at');
 
-        // statuses/priorities from your model
-        $statuses = [
-            MR::STATUS_PENDING,
-            MR::STATUS_ACKNOWLEDGED,
-            MR::STATUS_ACCEPTED,
-            MR::STATUS_IN_PROGRESS,
-            MR::STATUS_ON_HOLD,
-            MR::STATUS_RESOLVED,
-            MR::STATUS_CLOSED,
-            MR::STATUS_CANCELLED,
-        ];
+        $hasSlaDueDate     = $has('sla_due_date');
 
         $priorities = [
             MR::PRIORITY_LOW,
@@ -189,32 +193,74 @@ class DemoDataSeeder extends Seeder
 
         $now = Carbon::now();
 
-        $makeTimeline = function (string $status, Carbon $base) {
-            $assigned = $accepted = $started = $onHold = $resolved = $closed = $completedDate = null;
+        // 8) Fetch SLA configs for calculation
+        $slaConfigs = Schema::hasTable('sla_configs') 
+            ? DB::table('sla_configs')->where('is_active', true)->get()->keyBy('priority_level')
+            : collect();
+
+        $makeTimeline = function (string $status, Carbon $base, string $priority) use ($slaConfigs) {
+            $assigned = $acknowledged = $accepted = $started = $onHold = $resolved = $closed = $completedDate = $slaDueDate = null;
+            $pausedDuration = 0;
+
+            // Get SLA targets
+            $config = $slaConfigs->get($priority) ?? $slaConfigs->get('default');
+            $resTarget = $config ? (int)$config->resolution_time_minutes : 2880; // default 48h
+            $respTarget = $config ? (int)$config->response_time_minutes : 120; // default 2h
+
+            if (in_array($status, ['acknowledged','accepted','in_progress','on_hold','resolved','closed'], true)) {
+                $assigned = (clone $base)->addMinutes(random_int(10, 120));
+                
+                // Response Time Compliance: 85% compliant, 15% breached
+                $isRespCompliant = random_int(1, 100) <= 85;
+                if ($isRespCompliant) {
+                    $acknowledged = (clone $assigned)->addMinutes(random_int(5, max(6, $respTarget - 5)));
+                } else {
+                    $acknowledged = (clone $assigned)->addMinutes($respTarget + random_int(10, 180));
+                }
+            }
 
             if (in_array($status, ['accepted','in_progress','on_hold','resolved','closed'], true)) {
-                $assigned = (clone $base)->addDays(random_int(0, 3));
-                $accepted = (clone $assigned)->addHours(random_int(0, 36));
+                $accepted = (clone $acknowledged ?? $assigned ?? $base)->addMinutes(random_int(30, 240));
+                
+                // Calculate initial SLA due date
+                $slaDueDate = (clone $accepted)->addMinutes($resTarget);
             }
 
             if (in_array($status, ['in_progress','on_hold','resolved','closed'], true)) {
-                $started = (clone ($accepted ?? $base))->addHours(random_int(1, 24));
+                $started = (clone ($accepted ?? $base))->addMinutes(random_int(15, 120));
             }
 
-            if ($status === 'on_hold') {
-                $onHold = (clone ($started ?? $accepted ?? $base))->addHours(random_int(2, 48));
+            // On Hold logic
+            $hasOnHold = ($status === 'on_hold' || (in_array($status, ['resolved','closed'], true) && random_int(1, 100) <= 30));
+            if ($hasOnHold) {
+                $onHold = (clone ($started ?? $accepted ?? $base))->addHours(random_int(1, 24));
+                $pausedDuration = random_int(120, 2880); // 2h to 48h
+                
+                // Extend SLA due date
+                if ($slaDueDate) {
+                    $slaDueDate->addMinutes($pausedDuration);
+                }
             }
 
             if (in_array($status, ['resolved','closed'], true)) {
-                $resolved = (clone ($onHold ?? $started ?? $accepted ?? $base))->addHours(random_int(2, 72));
+                // Resolution Time Compliance: 85% compliant, 15% breached
+                $isResCompliant = random_int(1, 100) <= 85;
+                $resBase = $onHold ? (clone $onHold)->addMinutes($pausedDuration) : (clone ($started ?? $accepted ?? $base));
+                
+                if ($isResCompliant) {
+                    $maxMins = (int) $resBase->diffInMinutes($slaDueDate ?? $resBase->copy()->addMinutes(60));
+                    $resolved = (clone $resBase)->addMinutes(random_int(30, max(31, $maxMins - 10)));
+                } else {
+                    $resolved = (clone ($slaDueDate ?? $resBase))->addMinutes(random_int(60, 1440));
+                }
             }
 
             if ($status === 'closed') {
-                $closed = (clone ($resolved ?? $base))->addHours(random_int(1, 24));
+                $closed = (clone ($resolved ?? $base))->addHours(random_int(1, 48));
                 $completedDate = $closed;
             }
 
-            return [$assigned, $accepted, $started, $onHold, $resolved, $closed, $completedDate];
+            return [$assigned, $acknowledged, $accepted, $started, $onHold, $resolved, $closed, $completedDate, $pausedDuration, $slaDueDate];
         };
 
         // request_no generator (กันชน)
@@ -261,7 +307,7 @@ class DemoDataSeeder extends Seeder
             $mrTable,
             $requestCount, $chunkSize, $now,
             $assetIds, $staffIds, $techIds, $departmentIds,
-            $statuses, $priorities,
+            $priorities,
             $makeTimeline, $makeRequestNo,
 
             $hasAssetId, $hasReporterId, $hasTechnicianId,
@@ -269,7 +315,7 @@ class DemoDataSeeder extends Seeder
             $hasTitle, $hasDescription, $hasPriority, $hasStatusCol,
             $hasReporterName, $hasReporterPhone, $hasReporterEmail, $hasReporterPosition,
             $hasLegacyPayload, $hasLocationText,
-            $hasRequestDate, $hasAssignedDate, $hasCompletedDate, $hasAcceptedAt, $hasStartedAt, $hasOnHoldAt, $hasResolvedAt, $hasClosedAt,
+            $hasRequestDate, $hasAssignedDate, $hasCompletedDate, $hasAcceptedAt, $hasAcknowledgedAt, $hasPausedDuration, $hasStartedAt, $hasOnHoldAt, $hasResolvedAt, $hasClosedAt, $hasSlaDueDate,
             $hasRemark, $hasResolutionNote, $hasCost, $hasSource, $hasExtra,
             $hasCreatedAt, $hasUpdatedAt,
 
@@ -278,6 +324,7 @@ class DemoDataSeeder extends Seeder
             $insertCols = [];
 
             if ($hasAcceptedAt)       $insertCols[] = 'accepted_at';
+            if ($hasAcknowledgedAt)   $insertCols[] = 'acknowledged_at';
             if ($hasAssetId)          $insertCols[] = 'asset_id';
             if ($hasAssignedDate)     $insertCols[] = 'assigned_date';
             if ($hasClosedAt)         $insertCols[] = 'closed_at';
@@ -290,6 +337,7 @@ class DemoDataSeeder extends Seeder
             if ($hasLegacyPayload)    $insertCols[] = 'legacy_payload';
             if ($hasLocationText)     $insertCols[] = 'location_text';
             if ($hasOnHoldAt)         $insertCols[] = 'on_hold_at';
+            if ($hasPausedDuration)   $insertCols[] = 'paused_duration_minutes';
             if ($hasPriority)         $insertCols[] = 'priority';
             if ($hasRemark)           $insertCols[] = 'remark';
             if ($hasReporterEmail)    $insertCols[] = 'reporter_email';
@@ -301,6 +349,7 @@ class DemoDataSeeder extends Seeder
             if ($hasRequestNo)        $insertCols[] = 'request_no';
             if ($hasResolutionNote)   $insertCols[] = 'resolution_note';
             if ($hasResolvedAt)       $insertCols[] = 'resolved_at';
+            if ($hasSlaDueDate)       $insertCols[] = 'sla_due_date';
             if ($hasSource)           $insertCols[] = 'source';
             if ($hasStartedAt)        $insertCols[] = 'started_at';
             if ($hasStatusCol)        $insertCols[] = 'status';
@@ -311,12 +360,50 @@ class DemoDataSeeder extends Seeder
             $rows = [];
 
             for ($i = 1; $i <= $requestCount; $i++) {
-                $createdAt = (clone $now)
-                    ->subMonths(random_int(0, 11))
-                    ->subDays(random_int(0, 28))
-                    ->setTime(random_int(8, 17), random_int(0, 59));
+                $allStatuses = [
+                    MR::STATUS_PENDING,
+                    MR::STATUS_ACKNOWLEDGED,
+                    MR::STATUS_ACCEPTED,
+                    MR::STATUS_IN_PROGRESS,
+                    MR::STATUS_ON_HOLD,
+                    MR::STATUS_RESOLVED,
+                    MR::STATUS_CLOSED,
+                    MR::STATUS_CANCELLED,
+                    MR::STATUS_REJECTED,
+                ];
 
-                $status   = $statuses[array_rand($statuses)];
+                // Distribute statuses somewhat evenly
+                $statusIdx = ($i - 1) % count($allStatuses);
+                $status = $allStatuses[$statusIdx];
+
+                $isActive = in_array($status, [
+                    MR::STATUS_PENDING,
+                    MR::STATUS_ACKNOWLEDGED,
+                    MR::STATUS_ACCEPTED,
+                    MR::STATUS_IN_PROGRESS,
+                    MR::STATUS_ON_HOLD
+                ], true);
+
+                if ($isActive) {
+                    // Active tickets: 15% chance to be old (overdue), 85% chance to be recent
+                    $isOld = random_int(1, 100) <= 15;
+                    if ($isOld) {
+                        $createdAt = (clone $now)
+                            ->subDays(random_int(3, 7))
+                            ->setTime(random_int(8, 17), random_int(0, 51));
+                    } else {
+                        $createdAt = (clone $now)
+                            ->subDays(random_int(0, 1))
+                            ->setTime(random_int(8, 17), random_int(0, 51));
+                    }
+                } else {
+                    // Finished tickets: can be older
+                    $createdAt = (clone $now)
+                        ->subMonths(random_int(0, 11))
+                        ->subDays(random_int(0, 28))
+                        ->setTime(random_int(8, 17), random_int(0, 59));
+                }
+                
                 $priority = $priorities[array_rand($priorities)];
                 $assetId  = $assetIds ? $assetIds[array_rand($assetIds)] : null;
                 $reporter = $staffIds ? $staffIds[array_rand($staffIds)] : null;
@@ -325,13 +412,13 @@ class DemoDataSeeder extends Seeder
                 $isExternal = random_int(1, 100) <= 10;
                 if ($isExternal) $reporter = null;
 
-                // มีช่างเฉพาะงานที่พ้น acknowledged/pending/cancelled ไปแล้ว
+                // มีช่างเฉพาะงานที่พ้น pending/cancelled ไปแล้ว
                 $techId = null;
-                if (!in_array($status, ['pending','acknowledged','cancelled'], true)) {
+                if (!in_array($status, ['pending','cancelled'], true)) {
                     $techId = $techIds ? $techIds[array_rand($techIds)] : null;
                 }
 
-                [$assigned,$accepted,$started,$onHold,$resolved,$closed,$completedDate] = $makeTimeline($status, $createdAt);
+                [$assigned,$acknowledged,$accepted,$started,$onHold,$resolved,$closed,$completedDate,$pausedDuration,$slaDueDate] = $makeTimeline($status, $createdAt, $priority);
 
                 $row = array_fill_keys($insertCols, null);
 
@@ -379,23 +466,27 @@ class DemoDataSeeder extends Seeder
 
                 if ($hasRequestDate)   $row['request_date']   = $createdAt;
                 if ($hasAssignedDate)  $row['assigned_date']  = $assigned;
+                if ($hasAcknowledgedAt)$row['acknowledged_at']= $acknowledged;
                 if ($hasAcceptedAt)    $row['accepted_at']    = $accepted;
                 if ($hasStartedAt)     $row['started_at']     = $started;
                 if ($hasOnHoldAt)      $row['on_hold_at']     = $onHold;
                 if ($hasResolvedAt)    $row['resolved_at']    = $resolved;
                 if ($hasClosedAt)      $row['closed_at']      = $closed;
                 if ($hasCompletedDate) $row['completed_date'] = $completedDate;
+                if ($hasPausedDuration)$row['paused_duration_minutes'] = $pausedDuration;
+                if ($hasSlaDueDate)    $row['sla_due_date'] = $slaDueDate;
 
                 if ($hasRemark) {
                     $row['remark'] = match ($status) {
                         'pending'       => null,
                         'acknowledged'  => 'รับทราบแล้ว รอช่างรับเรื่อง',
-                        'accepted'      => 'รับเรื่องแล้ว',
-                        'in_progress'   => 'กำลังดำเนินการ',
-                        'on_hold'       => 'รอชิ้นส่วน/ช่างเฉพาะทาง',
-                        'resolved'      => 'แก้เสร็จ รอปิดงาน',
-                        'closed'        => 'ปิดงานเรียบร้อย',
-                        'cancelled'     => 'ผู้แจ้งยกเลิก',
+                        'accepted'      => 'รับเรื่องแล้ว กำลังเตรียมเครื่องมือ',
+                        'in_progress'   => 'กำลังดำเนินการซ่อมบำรุง',
+                        'on_hold'       => fake()->randomElement(['รอชิ้นส่วนอะไหล่จากบริษัทภายนอก', 'รอช่างเทคนิคเฉพาะทาง', 'ติดงานเร่งด่วนอื่น']),
+                        'resolved'      => 'แก้ไขเรียบร้อยแล้ว ทดสอบการใช้งานผ่าน',
+                        'closed'        => 'ผู้แจ้งตรวจสอบและปิดงานเรียบร้อย',
+                        'cancelled'     => 'ผู้แจ้งขอยกเลิกรายการ',
+                        'rejected'      => 'เนื่องจากไม่อยู่ในขอบเขตงานซ่อมพื้นฐาน',
                         default         => null,
                     };
                 }
@@ -662,7 +753,72 @@ class DemoDataSeeder extends Seeder
             $this->warn('maintenance_operation_logs table not found, skip operation logs.');
         }
 
+        // ================== 8) SLA Configs ==================
+        $this->seedSlaConfigs();
+
         $this->done('DemoDataSeeder DONE');
+    }
+
+    private function seedSlaConfigs(): void
+    {
+        if (!Schema::hasTable('sla_configs')) return;
+
+        $now = now();
+        $configs = [
+            [
+                'priority_level' => 'urgent',
+                'name' => 'เร่งด่วนมาก (Urgent)',
+                'response_time_minutes' => 30,
+                'resolution_time_minutes' => 240, // 4 hours
+                'is_active' => true,
+                'description' => 'กรณีฉุกเฉิน / กระทบต่อความปลอดภัยชีวิตและทรัพย์สินอย่างร้ายแรง',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+            [
+                'priority_level' => 'high',
+                'name' => 'เร่งด่วน (High)',
+                'response_time_minutes' => 60,
+                'resolution_time_minutes' => 480, // 8 hours
+                'is_active' => true,
+                'description' => 'งานด่วนที่มีผลกระทบต่อการบริการผู้ป่วยในวงกว้าง',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+            [
+                'priority_level' => 'medium',
+                'name' => 'ปกติ (Medium)',
+                'response_time_minutes' => 120,
+                'resolution_time_minutes' => 1440, // 24 hours
+                'is_active' => true,
+                'description' => 'งานทั่วไปที่กระทบต่อการทำงานตามปกติ แต่ยังสามารถให้บริการได้',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+            [
+                'priority_level' => 'low',
+                'name' => 'ทั่วไป/ไม่เร่งด่วน (Low)',
+                'response_time_minutes' => 480,
+                'resolution_time_minutes' => 4320, // 72 hours
+                'is_active' => true,
+                'description' => 'งานปรับปรุงเล็กน้อย หรือแผนงานบำรุงรักษาเชิงป้องกัน',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+            [
+                'priority_level' => 'default',
+                'name' => 'ค่าเริ่มต้น (Default)',
+                'response_time_minutes' => 120,
+                'resolution_time_minutes' => 2880, // 48 hours
+                'is_active' => true,
+                'description' => 'สำหรับงานที่ไม่ได้ระบุความสำคัญเป็นอย่างอื่น',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+        ];
+
+        DB::table('sla_configs')->insert($configs);
+        $this->ok('SLA configurations seeded', ['count' => (string) count($configs)]);
     }
 
 
