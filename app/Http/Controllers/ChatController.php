@@ -75,10 +75,14 @@ class ChatController extends Controller
             'body' => 'required|string|max:3000',
         ]);
 
-        $thread->messages()->create([
+        $message = $thread->messages()->create([
             'user_id' => Auth::id(),
             'body'    => $data['body'],
         ]);
+
+        $message->load('user:id,name');
+
+        broadcast(new \App\Events\ChatMessageSent($message));
 
         return back();
     }
