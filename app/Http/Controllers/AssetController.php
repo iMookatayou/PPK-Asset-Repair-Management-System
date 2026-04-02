@@ -3,14 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Models\Asset;
+use App\Models\Attachment;
+use App\Models\File as FileModel;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Support\Toast;
+use App\Services\HisAssetSyncService;
 
 class AssetController extends Controller
 {
@@ -115,9 +120,17 @@ class AssetController extends Controller
             'serial_number'   => ['nullable', 'string', 'max:100', 'unique:assets,serial_number'],
             'location'        => ['nullable', 'string', 'max:255'],
             'department_id'   => ['nullable', 'integer', 'exists:departments,id'],
+            'his_asset_id'    => ['nullable', 'string', 'max:100', 'unique:assets,his_asset_id'],
             'purchase_date'   => ['nullable', 'date'],
-            'warranty_expire' => ['nullable', 'date', 'after_or_equal:purchase_date'],
-            'status'          => ['nullable', Rule::in(['active', 'in_repair', 'disposed'])],
+            'warranty_start'  => ['nullable', 'date'],
+            'warranty_expire' => ['nullable', 'date', 'after_or_equal:warranty_start'],
+            'vendor_name'     => ['nullable', 'string', 'max:255'],
+            'vendor_phone'    => ['nullable', 'string', 'max:50'],
+            'price'           => ['nullable', 'numeric', 'min:0'],
+            'hero_image'      => ['nullable', 'image', 'max:5120'],
+            'files'           => ['nullable', 'array'],
+            'files.*'         => ['file', 'max:10240'],
+            'status'          => ['nullable', Rule::in([Asset::STATUS_ACTIVE, Asset::STATUS_IN_REPAIR, Asset::STATUS_DISPOSED])],
         ];
 
         $validator = Validator::make($request->all(), $rules);
@@ -200,9 +213,17 @@ class AssetController extends Controller
             'serial_number'   => ['nullable', 'string', 'max:100', 'unique:assets,serial_number,' . $asset->id],
             'location'        => ['nullable', 'string', 'max:255'],
             'department_id'   => ['nullable', 'integer', 'exists:departments,id'],
+            'his_asset_id'    => ['nullable', 'string', 'max:100', 'unique:assets,his_asset_id,' . $asset->id],
             'purchase_date'   => ['nullable', 'date'],
-            'warranty_expire' => ['nullable', 'date', 'after_or_equal:purchase_date'],
-            'status'          => ['nullable', Rule::in(['active', 'in_repair', 'disposed'])],
+            'warranty_start'  => ['nullable', 'date'],
+            'warranty_expire' => ['nullable', 'date', 'after_or_equal:warranty_start'],
+            'vendor_name'     => ['nullable', 'string', 'max:255'],
+            'vendor_phone'    => ['nullable', 'string', 'max:50'],
+            'price'           => ['nullable', 'numeric', 'min:0'],
+            'hero_image'      => ['nullable', 'image', 'max:5120'],
+            'files'           => ['nullable', 'array'],
+            'files.*'         => ['file', 'max:10240'],
+            'status'          => ['nullable', Rule::in([Asset::STATUS_ACTIVE, Asset::STATUS_IN_REPAIR, Asset::STATUS_DISPOSED])],
         ];
 
         $validator = Validator::make($request->all(), $rules);
@@ -243,8 +264,32 @@ class AssetController extends Controller
 
         $data = $validator->validated();
 
+        // ป้องกันการเปลี่ยนสถานะกลับเป็น active ดัวยมือ หากยังมีใบแจ้งซ่อมค้างอยู่
+        if (isset($data['status']) && $data['status'] === Asset::STATUS_ACTIVE && $asset->status !== Asset::STATUS_ACTIVE) {
+            $hasActiveRequests = $asset->maintenanceRequests()
+                ->whereIn('status', [
+                    \App\Models\MaintenanceRequest::STATUS_PENDING,
+                    \App\Models\MaintenanceRequest::STATUS_ACKNOWLEDGED,
+                    \App\Models\MaintenanceRequest::STATUS_ACCEPTED,
+                    \App\Models\MaintenanceRequest::STATUS_IN_PROGRESS,
+                    \App\Models\MaintenanceRequest::STATUS_ON_HOLD,
+                ])->exists();
+
+            if ($hasActiveRequests) {
+                $msg = 'ไม่สามารถเปลี่ยนสถานะเป็น "ใช้งานปกติ" ได้ เนื่องจากยังมีใบแจ้งซ่อมที่ยังไม่แล้วเสร็จค้างอยู่';
+                if (!$request->expectsJson()) {
+                    return redirect()->back()->withInput()->with('toast', Toast::warning($msg, 3000));
+                }
+                return response()->json([
+                    'errors' => ['status' => [$msg]],
+                    'toast'  => Toast::warning($msg, 3000),
+                ], Response::HTTP_UNPROCESSABLE_ENTITY, [], $this->jsonOptions($request));
+            }
+        }
+
         $before = $asset->only(['asset_code', 'name', 'status', 'department_id', 'category_id']);
         $asset->update($data);
+        $this->syncAttachments($request, $asset);
 
         Log::info('[Asset::update] API updated', [
             'asset_id'   => $asset->id,
@@ -310,17 +355,17 @@ class AssetController extends Controller
             ->when($location !== '', fn($s) => $s->where('location', $location));
 
         if ($q !== '') {
-            $qEsc = str_replace("'", "''", $q);
             $assetsQ->orderByRaw("
                 CASE
-                    WHEN assets.asset_code = '{$qEsc}' THEN 0
-                    WHEN assets.asset_code LIKE '{$qEsc}%' THEN 1
-                    WHEN assets.asset_code LIKE '%{$qEsc}%' THEN 2
-                    WHEN assets.serial_number LIKE '%{$qEsc}%' THEN 3
-                    WHEN assets.name LIKE '%{$qEsc}%' THEN 4
+                    WHEN assets.asset_code = ? THEN 0
+                    WHEN assets.his_asset_id = ? THEN 1
+                    WHEN assets.asset_code LIKE ? THEN 2
+                    WHEN assets.his_asset_id LIKE ? THEN 3
+                    WHEN assets.name LIKE ? THEN 4
+                    WHEN assets.serial_number LIKE ? THEN 5
                     ELSE 9
                 END
-            ");
+            ", [$q, $q, "{$q}%", "{$q}%", "%{$q}%", "%{$q}%"]);
         }
 
         if ($sortCol === 'category') {
@@ -341,6 +386,12 @@ class AssetController extends Controller
                 'id'           => $d->id,
                 'display_name' => $d->display_name,
             ]);
+
+        if ($q !== '' && $assets->total() > 0) {
+            session()->flash('toast', Toast::success("ค้นหาพบ {$assets->total()} รายการ", 1600));
+        } elseif ($q !== '' && $assets->total() === 0) {
+            session()->flash('toast', Toast::warning('ไม่พบข้อมูลตามคำค้นหา', 2000));
+        }
 
         return view('assets.index', compact(
             'assets', 'categories', 'departments',
@@ -380,9 +431,17 @@ class AssetController extends Controller
             'serial_number'   => ['nullable', 'string', 'max:100', 'unique:assets,serial_number'],
             'location'        => ['nullable', 'string', 'max:255'],
             'department_id'   => ['nullable', 'integer', 'exists:departments,id'],
+            'his_asset_id'    => ['nullable', 'string', 'max:100', 'unique:assets,his_asset_id'],
             'purchase_date'   => ['nullable', 'date'],
-            'warranty_expire' => ['nullable', 'date', 'after_or_equal:purchase_date'],
-            'status'          => ['nullable', Rule::in(['active', 'in_repair', 'disposed'])],
+            'warranty_start'  => ['nullable', 'date'],
+            'warranty_expire' => ['nullable', 'date', 'after_or_equal:warranty_start'],
+            'vendor_name'     => ['nullable', 'string', 'max:255'],
+            'vendor_phone'    => ['nullable', 'string', 'max:50'],
+            'price'           => ['nullable', 'numeric', 'min:0'],
+            'hero_image'      => ['nullable', 'image', 'max:5120'],
+            'files'           => ['nullable', 'array'],
+            'files.*'         => ['file', 'max:10240'],
+            'status'          => ['nullable', Rule::in([Asset::STATUS_ACTIVE, Asset::STATUS_IN_REPAIR, Asset::STATUS_DISPOSED])],
         ]);
 
         if ($validator->fails()) {
@@ -409,11 +468,18 @@ class AssetController extends Controller
             return redirect()->back()
                 ->withErrors($validator)
                 ->withInput()
-                ->with('toast', Toast::error($msg, 2600));
+                ->with('toast', Toast::warning($msg, 3000));
         }
 
-        $data  = $validator->validated();
+        $data = $validator->validated();
+
+        // Sanitize price: remove commas if any
+        if (isset($data['price'])) {
+            $data['price'] = str_replace(',', '', (string)$data['price']);
+        }
+
         $asset = Asset::create($data);
+        $this->syncAttachments($request, $asset);
 
         Log::info('[Asset::storePage] created', [
             'asset_id'   => $asset->id,
@@ -426,26 +492,23 @@ class AssetController extends Controller
 
         return redirect()
             ->route('assets.show', $asset)
-            ->with('toast', Toast::success('สร้างทรัพย์สินเรียบร้อยแล้ว'));
+            ->with('toast', Toast::success("สร้างครุภัณฑ์ {$asset->asset_code} ({$asset->name}) เรียบร้อยแล้ว", 2500));
     }
 
     public function showPage(Asset $asset)
     {
-        $asset->load(['categoryRef', 'department'])
+        $asset->load(['categoryRef', 'department', 'maintenanceRequests.reporter'])
             ->loadCount([
                 'maintenanceRequests as maintenance_requests_count',
                 'requestAttachments as attachments_count',
             ]);
 
         $logs = $asset->requestLogs()
+            ->with(['user', 'request'])
             ->select('maintenance_logs.*')
-            ->orderBy(
-                Schema::hasColumn('maintenance_logs', 'created_at')
-                    ? 'maintenance_logs.created_at'
-                    : 'maintenance_logs.id',
-                'desc'
-            )
-            ->limit(10)
+            ->orderBy('maintenance_logs.created_at', 'desc')
+            ->orderBy('maintenance_logs.id', 'desc')
+            ->limit(20)
             ->get();
 
         $attQuery = $asset->requestAttachments()->select('attachments.*');
@@ -464,16 +527,15 @@ class AssetController extends Controller
             'actor_id'   => request()->user()?->id,
         ]);
 
-        if (session('status') && !session()->has('toast')) {
-            session()->flash('toast', Toast::success(session('status')));
-        }
+
+
 
         return view('assets.show', compact('asset', 'logs', 'attachments'));
     }
 
     public function editPage(Asset $asset)
     {
-        $asset->load(['categoryRef', 'department']);
+        $asset->load(['categoryRef', 'department', 'maintenanceRequests.reporter']);
 
         $departments = \App\Models\Department::query()
             ->select(['id', 'code', 'name_th', 'name_en'])
@@ -489,7 +551,15 @@ class AssetController extends Controller
             session()->flash('toast', Toast::info('ยังไม่มีหมวดหมู่ทรัพย์สิน กรุณา seed หรือเพิ่มใหม่ก่อน', 3200));
         }
 
-        return view('assets.edit', compact('asset', 'departments', 'categories'));
+        $logs = $asset->requestLogs()
+            ->with(['user', 'request'])
+            ->select('maintenance_logs.*')
+            ->orderBy('maintenance_logs.created_at', 'desc')
+            ->orderBy('maintenance_logs.id', 'desc')
+            ->limit(20)
+            ->get();
+
+        return view('assets.edit', compact('asset', 'departments', 'categories', 'logs'));
     }
 
     public function updatePage(Request $request, Asset $asset)
@@ -504,9 +574,17 @@ class AssetController extends Controller
             'serial_number'   => ['nullable', 'string', 'max:100', 'unique:assets,serial_number,' . $asset->id],
             'location'        => ['nullable', 'string', 'max:255'],
             'department_id'   => ['nullable', 'integer', 'exists:departments,id'],
+            'his_asset_id'    => ['nullable', 'string', 'max:100', 'unique:assets,his_asset_id,' . $asset->id],
             'purchase_date'   => ['nullable', 'date'],
-            'warranty_expire' => ['nullable', 'date', 'after_or_equal:purchase_date'],
-            'status'          => ['nullable', Rule::in(['active', 'in_repair', 'disposed'])],
+            'warranty_start'  => ['nullable', 'date'],
+            'warranty_expire' => ['nullable', 'date', 'after_or_equal:warranty_start'],
+            'vendor_name'     => ['nullable', 'string', 'max:255'],
+            'vendor_phone'    => ['nullable', 'string', 'max:50'],
+            'price'           => ['nullable', 'numeric', 'min:0'],
+            'hero_image'      => ['nullable', 'image', 'max:5120'],
+            'files'           => ['nullable', 'array'],
+            'files.*'         => ['file', 'max:10240'],
+            'status'          => ['nullable', Rule::in([Asset::STATUS_ACTIVE, Asset::STATUS_IN_REPAIR, Asset::STATUS_DISPOSED])],
         ]);
 
         if ($validator->fails()) {
@@ -533,13 +611,38 @@ class AssetController extends Controller
             return redirect()->back()
                 ->withErrors($validator)
                 ->withInput()
-                ->with('toast', Toast::error($msg, 2600));
+                ->with('toast', Toast::warning($msg, 3000));
         }
 
         $data   = $validator->validated();
+
+        // Sanitize price: remove commas if any
+        if (isset($data['price'])) {
+            $data['price'] = str_replace(',', '', (string)$data['price']);
+        }
+
+        // ป้องกันการเปลี่ยนสถานะกลับเป็น active ดัวยมือ หากยังมีใบแจ้งซ่อมค้างอยู่
+        if (isset($data['status']) && $data['status'] === Asset::STATUS_ACTIVE && $asset->status !== Asset::STATUS_ACTIVE) {
+            $hasActiveRequests = $asset->maintenanceRequests()
+                ->whereIn('status', [
+                    \App\Models\MaintenanceRequest::STATUS_PENDING,
+                    \App\Models\MaintenanceRequest::STATUS_ACKNOWLEDGED,
+                    \App\Models\MaintenanceRequest::STATUS_ACCEPTED,
+                    \App\Models\MaintenanceRequest::STATUS_IN_PROGRESS,
+                    \App\Models\MaintenanceRequest::STATUS_ON_HOLD,
+                ])->exists();
+
+            if ($hasActiveRequests) {
+                return redirect()->back()
+                    ->withInput()
+                    ->with('toast', Toast::warning('ไม่สามารถเปลี่ยนสถานะเป็น "ใช้งานปกติ" ได้ เนื่องจากยังมีใบแจ้งซ่อมที่ยังไม่แล้วเสร็จค้างอยู่', 4000));
+            }
+        }
+
         $before = $asset->only(['asset_code', 'name', 'status', 'department_id', 'category_id', 'location']);
 
         $asset->update($data);
+        $this->syncAttachments($request, $asset);
 
         Log::info('[Asset::updatePage] updated', [
             'asset_id'   => $asset->id,
@@ -551,7 +654,7 @@ class AssetController extends Controller
 
         return redirect()
             ->route('assets.show', $asset)
-            ->with('toast', Toast::success('อัปเดตรายการทรัพย์สินแล้ว'));
+            ->with('toast', Toast::success("อัปเดตข้อมูล {$asset->asset_code} ({$asset->name}) เรียบร้อยแล้ว", 2500));
     }
 
     public function destroyPage(Asset $asset)
@@ -571,7 +674,7 @@ class AssetController extends Controller
 
         return redirect()
             ->route('assets.index')
-            ->with('toast', Toast::success('ลบทรัพย์สินเรียบร้อยแล้ว'));
+            ->with('toast', Toast::success("ลบข้อมูลครุภัณฑ์ {$assetCode} ({$assetName}) เรียบร้อยแล้ว"));
     }
 
     public function printPage(Request $request, Asset $asset)
@@ -603,6 +706,60 @@ class AssetController extends Controller
         return $pdf->stream('asset-' . $asset->asset_code . '.pdf');
     }
 
+    /**
+     * GET /assets/fetch-his?his_id=xxx
+     * ดึงข้อมูลครุภัณฑ์จาก HIS (Mock) เพื่อ auto-fill form
+     *
+     * Validation: his_id required|string|max:50
+     * Response: { status: 'found'|'not_found', data: {...} }
+     */
+    public function fetchHisData(Request $request)
+    {
+        $validated = $request->validate([
+            'his_id' => ['required', 'string', 'max:50'],
+        ]);
+
+        $hisId = trim($validated['his_id']);
+
+        $mockData = app(HisAssetSyncService::class)->getMockHisData($hisId);
+
+        if ($mockData === null) {
+            return response()->json([
+                'status'  => 'not_found',
+                'message' => 'ไม่พบข้อมูล HIS สำหรับเลขนี้',
+                'toast'   => Toast::warning('ไม่พบข้อมูล HIS สำหรับเลขนี้', 2200),
+            ], 404, [], $this->jsonOptions($request));
+        }
+
+        Log::info('[AssetController] fetchHisData (mock)', [
+            'his_id'   => $hisId,
+            'actor_id' => $request->user()?->id,
+        ]);
+
+        return response()->json([
+            'status' => 'found',
+            'data'   => [
+                'name'           => $mockData['name']            ?? null,
+                'asset_code'     => $mockData['asset_no']        ?? null,
+                'type'           => $mockData['type']            ?? 'เครื่องมือแพทย์',
+                'brand'          => $mockData['brand']           ?? null,
+                'model'          => $mockData['model']           ?? null,
+                'serial_number'  => $mockData['serial']          ?? null,
+                'vendor_name'    => $mockData['vendor_name']     ?? null,
+                'vendor_phone'   => $mockData['vendor_phone']    ?? null,
+                'internal_phone' => $mockData['internal_phone']  ?? null,
+                'price'          => $mockData['price']           ?? null,
+                'purchase_date'  => $mockData['warranty_start']  ?? null,
+                'warranty_expire'=> $mockData['warranty_expire'] ?? null,
+                'category_id'    => $mockData['category_id']     ?? null,
+                'department_id'  => $mockData['department_id']   ?? null,
+                'status'         => $mockData['status']          ?? null,
+                'note'           => $mockData['note']            ?? null,
+            ],
+            'toast' => Toast::success('ดึงข้อมูล HIS สำเร็จ', 1600),
+        ], 200, [], $this->jsonOptions($request));
+    }
+
     protected function resolveAssetSort(Request $request, array $allowedKeys): array
     {
         $user   = $request->user();
@@ -629,5 +786,69 @@ class AssetController extends Controller
         }
 
         return [$sortBy, $sortDir];
+    }
+
+    private function syncAttachments(Request $request, Asset $asset)
+    {
+        // 1. Handle Hero Image (Strict Replacement)
+        if ($request->hasFile('hero_image')) {
+            // Find existing hero image (order_column = -1)
+            $oldHero = $asset->attachments()
+                ->where('order_column', Attachment::HERO_ORDER)
+                ->first();
+
+            if ($oldHero) {
+                // Delete physical file and DB records safely
+                $oldHero->deleteAndCleanup(true);
+            }
+
+            $file = $request->file('hero_image');
+            $path = $file->store('assets/hero', 'public');
+            $fileModel = FileModel::create([
+                'path' => $path,
+                'disk' => 'public',
+                'mime' => $file->getMimeType(),
+                'size' => $file->getSize(),
+            ]);
+
+            $asset->attachments()->create([
+                'file_id' => $fileModel->id,
+                'original_name' => $file->getClientOriginalName(),
+                'extension' => $file->getClientOriginalExtension(),
+                'order_column' => Attachment::HERO_ORDER,
+                'uploaded_by' => Auth::id(),
+            ]);
+        }
+
+        // 2. Handle Multiple Files
+        if ($request->hasFile('files')) {
+            foreach ($request->file('files') as $file) {
+                $path = $file->store('assets/attachments', 'public');
+                $fileModel = FileModel::create([
+                    'path' => $path,
+                    'mime' => $file->getMimeType(),
+                    'size' => $file->getSize(),
+                ]);
+                $asset->attachments()->create([
+                    'file_id' => $fileModel->id,
+                    'original_name' => $file->getClientOriginalName(),
+                    'extension' => $file->getClientOriginalExtension(),
+                    'uploaded_by' => Auth::id(),
+                ]);
+            }
+        }
+
+        // 3. Handle Removal
+        if ($request->has('remove_attachments')) {
+            $toRemove = Attachment::whereIn('id', $request->remove_attachments)
+                ->where('attachable_type', Asset::class)
+                ->where('attachable_id', $asset->id)
+                ->get();
+
+            foreach ($toRemove as $att) {
+                // This will also cleanup physical files if no other attachment points to same file_id
+                $att->deleteAndCleanup(true);
+            }
+        }
     }
 }

@@ -46,20 +46,8 @@
 HTML;
 };
 
-  // ===== สี/ชื่อสถานะทรัพย์สิน (ไม่ทำกรอบ) =====
-  $statusTextClass = fn(?string $s) => match(strtolower((string)$s)) {
-    'active'    => 'text-emerald-700',
-    'in_repair' => 'text-amber-700',
-    'disposed'  => 'text-rose-700',
-    default     => 'text-slate-700',
-  };
+  // ===== สี/ชื่อสถานะทรัพย์สินถูกจัดการโดย Asset Model แล้ว =====
 
-  $statusLabel = fn(?string $s) => match(strtolower((string)$s)) {
-    'active'    => 'พร้อมใช้งาน',
-    'in_repair' => 'อยู่ระหว่างซ่อม',
-    'disposed'  => 'จำหน่ายแล้ว',
-    default     => 'ไม่ทราบสถานะ',
-  };
 
   // ค่าจาก Controller (fallback เป็น request ถ้าไม่ได้ส่งมา)
   $q          = $q          ?? request('q');
@@ -69,12 +57,7 @@ HTML;
   $type       = $type       ?? request('type');
   $location   = $location   ?? request('location');
 
-  $statuses = [
-    ''          => 'ทั้งหมด',
-    'active'    => 'พร้อมใช้งาน',
-    'in_repair' => 'อยู่ระหว่างซ่อม',
-    'disposed'  => 'จำหน่ายแล้ว',
-  ];
+  $statuses = ['' => 'ทั้งหมด'] + \App\Models\Asset::statusLabels();
 
   $hasQ        = ($q ?? '') !== '';
   $hasStatus   = ($status ?? '') !== '';
@@ -141,6 +124,16 @@ HTML;
         </div>
 
         <div class="md:col-span-2 flex items-end justify-end gap-2">
+          {{-- Toggle button for advanced filters (Matching the clear/search button styles) --}}
+          <button type="button" 
+                  onclick="document.getElementById('advanced-filters').classList.toggle('hidden');"
+                  class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-[#f8fafc] text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0F2D5C]/30 focus:ring-offset-1"
+                  title="ตัวกรองเพิ่มเติม" aria-label="ตัวกรองเพิ่มเติม">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+          </button>
+
           <a href="{{ route('assets.index') }}"
              onclick="showLoader()"
              class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0F2D5C]/30 focus:ring-offset-1"
@@ -160,38 +153,46 @@ HTML;
           </button>
         </div>
 
-        <div class="md:col-span-3">
-          <label class="mb-1 block text-[12px] text-slate-600">ประเภททรัพย์สิน</label>
-          <input name="type" value="{{ $type }}"
-                 class="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0F2D5C]/35 focus:border-[#0F2D5C]/35">
-        </div>
+        {{-- Advanced Filters Container --}}
+        @php
+            $isAdvancedActive = $hasCategory || $hasDept || $hasType || $hasLocation;
+        @endphp
+        <div id="advanced-filters" class="md:col-span-12 grid grid-cols-1 gap-3 md:grid-cols-12 {{ $isAdvancedActive ? '' : 'hidden' }}">
+          
+          <div class="md:col-span-3">
+            <label class="mb-1 block text-[12px] text-slate-600">ประเภททรัพย์สิน</label>
+            <input name="type" value="{{ $type }}"
+                   class="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0F2D5C]/35 focus:border-[#0F2D5C]/35">
+          </div>
 
-        <div class="md:col-span-3">
-          <label class="mb-1 block text-[12px] text-slate-600">ที่ตั้ง / ห้อง</label>
-          <input name="location" value="{{ $location }}"
-                 class="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0F2D5C]/35 focus:border-[#0F2D5C]/35">
-        </div>
+          <div class="md:col-span-3">
+            <label class="mb-1 block text-[12px] text-slate-600">ที่ตั้ง / ห้อง</label>
+            <input name="location" value="{{ $location }}"
+                   class="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0F2D5C]/35 focus:border-[#0F2D5C]/35">
+          </div>
 
-        <div class="md:col-span-3">
-          <label class="mb-1 block text-[12px] text-slate-600">หมวดหมู่ทรัพย์สิน</label>
-          <select name="category_id"
-                  class="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0F2D5C]/35 focus:border-[#0F2D5C]/35">
-            <option value="">ทั้งหมด</option>
-            @foreach($categories as $c)
-              <option value="{{ $c->id }}" @selected(($categoryId ?? null) == $c->id)>{{ $c->name }}</option>
-            @endforeach
-          </select>
-        </div>
+          <div class="md:col-span-3">
+            <label class="mb-1 block text-[12px] text-slate-600">หมวดหมู่ทรัพย์สิน</label>
+            <select name="category_id"
+                    class="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0F2D5C]/35 focus:border-[#0F2D5C]/35">
+              <option value="">ทั้งหมด</option>
+              @foreach($categories as $c)
+                <option value="{{ $c->id }}" @selected(($categoryId ?? null) == $c->id)>{{ $c->name }}</option>
+              @endforeach
+            </select>
+          </div>
 
-        <div class="md:col-span-3">
-          <label class="mb-1 block text-[12px] text-slate-600">หน่วยงานเจ้าของทรัพย์สิน</label>
-          <select name="department_id"
-                  class="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0F2D5C]/35 focus:border-[#0F2D5C]/35">
-            <option value="">ทั้งหมด</option>
-            @foreach($departments as $d)
-              <option value="{{ $d['id'] }}" @selected(($deptId ?? null) == $d['id'])>{{ $d['display_name'] }}</option>
-            @endforeach
-          </select>
+          <div class="md:col-span-3">
+            <label class="mb-1 block text-[12px] text-slate-600">หน่วยงานเจ้าของทรัพย์สิน</label>
+            <select name="department_id"
+                    class="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0F2D5C]/35 focus:border-[#0F2D5C]/35">
+              <option value="">ทั้งหมด</option>
+              @foreach($departments as $d)
+                <option value="{{ $d['id'] }}" @selected(($deptId ?? null) == $d['id'])>{{ $d['display_name'] }}</option>
+              @endforeach
+            </select>
+          </div>
+
         </div>
       </form>
     </div>
@@ -229,11 +230,20 @@ HTML;
       @forelse($assets as $a)
         <tr class="hover:bg-slate-50/60 border-b border-slate-100">
           <td class="p-3 text-center align-middle whitespace-nowrap font-semibold text-slate-900">{{ $a->id }}</td>
-          <td class="p-3 text-center align-middle whitespace-nowrap font-semibold text-slate-900">{{ $a->asset_code }}</td>
+          <td class="p-3 text-center align-middle whitespace-nowrap">
+            @if($a->his_asset_id)
+              <div class="font-semibold text-blue-700" title="เลข รพจ">{{ $a->his_asset_id }}</div>
+              @if(!$a->has_duplicate_codes)
+                <div class="text-[10px] text-slate-500 mt-0.5" title="รหัสภายใน">รหัสภายใน: {{ $a->asset_code }}</div>
+              @endif
+            @else
+              <div class="font-semibold text-slate-900">{{ $a->asset_code }}</div>
+            @endif
+          </td>
 
-          <td class="p-3 align-middle">
+          <td class="p-3 text-center align-middle">
             <a href="{{ route('assets.show',$a) }}"
-               class="block max-w-full truncate font-semibold text-slate-900 hover:underline"
+               class="block max-w-full truncate text-center font-semibold text-slate-900 hover:underline"
                onclick="showLoader()">
               {{ $a->name }}
             </a>
@@ -249,8 +259,8 @@ HTML;
           </td>
 
           <td class="p-3 text-center align-middle whitespace-nowrap">
-            <span class="text-[12px] font-semibold {{ $statusTextClass($a->status) }}">
-              {{ $statusLabel($a->status) }}
+            <span class="text-[12px] font-semibold {{ $a->status_color }}">
+              {{ $a->status_label }}
             </span>
           </td>
 
@@ -302,7 +312,17 @@ HTML;
       <div class="rounded-lg border border-slate-200 bg-white p-4">
         <div class="flex justify-between gap-3">
           <div class="min-w-0">
-            <div class="text-[11px] text-slate-500">#{{ $a->id }} — {{ $a->asset_code }}</div>
+            <div class="text-[11px] flex flex-wrap gap-1 items-center">
+              <span class="text-slate-500">#{{ $a->id }} —</span>
+              @if($a->his_asset_id)
+                <span class="font-semibold text-blue-700" title="เลข รพจ">{{ $a->his_asset_id }}</span>
+                @if(!$a->has_duplicate_codes)
+                  <span class="text-slate-400" title="รหัสภายใน">({{ $a->asset_code }})</span>
+                @endif
+              @else
+                <span class="font-medium text-slate-700">{{ $a->asset_code }}</span>
+              @endif
+            </div>
             <a class="block truncate font-semibold text-slate-900 hover:underline"
                href="{{ route('assets.show',$a) }}"
                onclick="showLoader()">
@@ -310,8 +330,8 @@ HTML;
             </a>
             <div class="text-[11px] text-slate-500">S/N: {{ $a->serial_number ?? '—' }}</div>
           </div>
-          <span class="text-[12px] font-semibold {{ $statusTextClass($a->status) }}">
-            {{ $statusLabel($a->status) }}
+          <span class="text-[12px] font-semibold {{ $a->status_color }}">
+            {{ $a->status_label }}
           </span>
         </div>
 

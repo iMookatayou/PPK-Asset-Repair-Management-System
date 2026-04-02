@@ -380,14 +380,23 @@ class MaintenanceRequestController extends Controller
         $actorId      = $user?->id;
         $departmentId = $data['department_id'] ?? null;
 
-        if (empty($departmentId) && !empty($data['asset_id'])) {
-            $departmentId = Asset::whereKey($data['asset_id'])->value('department_id');
+        if (!empty($data['asset_id'])) {
+            $asset = Asset::find($data['asset_id']);
+            if ($asset && $asset->status === 'disposed') {
+                return redirect()->back()
+                    ->withInput()
+                    ->with('toast', \App\Support\Toast::warning('ไม่สามารถแจ้งซ่อมทรัพย์สินที่จำหน่ายออกแล้วได้', 3000));
+            }
 
-            Log::info('[MaintenanceRequest::store] auto-fill department_id from asset', [
-                'asset_id'      => $data['asset_id'],
-                'department_id' => $departmentId,
-                'actor_id'      => $actorId,
-            ]);
+            if (empty($departmentId)) {
+                $departmentId = $asset->department_id;
+
+                Log::info('[MaintenanceRequest::store] auto-fill department_id from asset', [
+                    'asset_id'      => $data['asset_id'],
+                    'department_id' => $departmentId,
+                    'actor_id'      => $actorId,
+                ]);
+            }
         }
 
         $req = null;
@@ -3168,45 +3177,8 @@ class MaintenanceRequestController extends Controller
 
             $locked->save();
 
-            // อัปเดตสถานะเครื่องจักร (Asset) เมื่อเปลี่ยนสถานะใบงาน
-            if ($isStatusChange && !empty($locked->asset_id)) {
-                if ($locked->status === MR::STATUS_IN_PROGRESS) {
-                    \App\Models\Asset::whereKey($locked->asset_id)
-                        ->where('status', 'active')
-                        ->update(['status' => 'in_repair']);
-                    
-                    Log::info('[applyTransition] asset set to in_repair', [
-                        'asset_id'   => $locked->asset_id,
-                        'request_id' => $locked->id,
-                        'actor_id'   => $actorId,
-                    ]);
-                }
-
-                if (in_array($locked->status, [MR::STATUS_RESOLVED, MR::STATUS_CLOSED, MR::STATUS_CANCELLED], true)) {
-                    $stillInRepair = MR::where('asset_id', $locked->asset_id)
-                        ->where('id', '!=', $locked->id)
-                        ->whereIn('status', [MR::STATUS_IN_PROGRESS, MR::STATUS_ACCEPTED, MR::STATUS_ON_HOLD])
-                        ->exists();
-
-                    if (!$stillInRepair) {
-                        \App\Models\Asset::whereKey($locked->asset_id)
-                            ->where('status', 'in_repair')
-                            ->update(['status' => 'active']);
-
-                        Log::info('[applyTransition] asset restored to active', [
-                            'asset_id'   => $locked->asset_id,
-                            'request_id' => $locked->id,
-                            'to_status'  => $locked->status,
-                            'actor_id'   => $actorId,
-                        ]);
-                    } else {
-                        Log::info('[applyTransition] asset kept in_repair (other MR still active)', [
-                            'asset_id'   => $locked->asset_id,
-                            'request_id' => $locked->id,
-                        ]);
-                    }
-                }
-            }
+            // หมายเหตุ: การอัปเดตสถานะ Asset ย้ายไปจัดการที่ Model Layer (MaintenanceRequest::syncAssetStatus)
+            // เพื่อความเป็นระเบียบและรองรับการอัปเดตจากหลายช่องทาง
 
             $newTechId   = (int) ($locked->technician_id ?? 0);
             $techChanged = ($originalTechId !== $newTechId);

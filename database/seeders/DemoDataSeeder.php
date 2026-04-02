@@ -153,6 +153,11 @@ class DemoDataSeeder extends Seeder
             DB::table($mrTable)->truncate();
             DB::statement('SET FOREIGN_KEY_CHECKS=1;');
         }
+        
+        // Reset asset statuses from previous runs to prevent dangling 'in_repair' state
+        if (Schema::hasTable('assets')) {
+            DB::table('assets')->where('status', 'in_repair')->update(['status' => 'active']);
+        }
 
         $hasReporterName     = $has('reporter_name');
         $hasReporterPhone    = $has('reporter_phone');
@@ -302,6 +307,7 @@ class DemoDataSeeder extends Seeder
 
         // --- Insert MR in a transaction ---
         $insertedMR = 0;
+        $insertedLogs = 0;
 
         DB::transaction(function () use (
             $mrTable,
@@ -319,7 +325,7 @@ class DemoDataSeeder extends Seeder
             $hasRemark, $hasResolutionNote, $hasCost, $hasSource, $hasExtra,
             $hasCreatedAt, $hasUpdatedAt,
 
-            &$insertedMR
+            &$insertedMR, &$insertedLogs
         ) {
             $insertCols = [];
 
@@ -357,8 +363,6 @@ class DemoDataSeeder extends Seeder
             if ($hasTitle)            $insertCols[] = 'title';
             if ($hasUpdatedAt)        $insertCols[] = 'updated_at';
 
-            $rows = [];
-
             for ($i = 1; $i <= $requestCount; $i++) {
                 $allStatuses = [
                     MR::STATUS_PENDING,
@@ -385,34 +389,29 @@ class DemoDataSeeder extends Seeder
                 ], true);
 
                 if ($isActive) {
-                    // Active tickets: 15% chance to be old (overdue), 85% chance to be recent
                     $isOld = random_int(1, 100) <= 15;
                     if ($isOld) {
-                        $createdAt = (clone $now)
-                            ->subDays(random_int(3, 7))
-                            ->setTime(random_int(8, 17), random_int(0, 51));
+                        $createdAt = (clone $now)->subDays(random_int(3, 7))->setTime(random_int(8, 17), random_int(0, 51));
                     } else {
-                        $createdAt = (clone $now)
-                            ->subDays(random_int(0, 1))
-                            ->setTime(random_int(8, 17), random_int(0, 51));
+                        $createdAt = (clone $now)->subDays(random_int(0, 1))->setTime(random_int(8, 17), random_int(0, 51));
                     }
                 } else {
-                    // Finished tickets: can be older
-                    $createdAt = (clone $now)
-                        ->subMonths(random_int(0, 11))
-                        ->subDays(random_int(0, 28))
-                        ->setTime(random_int(8, 17), random_int(0, 59));
+                    $createdAt = (clone $now)->subMonths(random_int(0, 11))->subDays(random_int(0, 28))->setTime(random_int(8, 17), random_int(0, 59));
                 }
                 
                 $priority = $priorities[array_rand($priorities)];
-                $assetId  = $assetIds ? $assetIds[array_rand($assetIds)] : null;
+                
+                // Guarantee first 20 assets have 3-5 requests each
+                if ($i <= 80 && count($assetIds) >= 20) {
+                    $assetId = $assetIds[($i - 1) % 20];
+                } else {
+                    $assetId = $assetIds ? $assetIds[array_rand($assetIds)] : null;
+                }
+                
                 $reporter = $staffIds ? $staffIds[array_rand($staffIds)] : null;
-
-                // ผู้แจ้งภายนอก 10%
                 $isExternal = random_int(1, 100) <= 10;
                 if ($isExternal) $reporter = null;
 
-                // มีช่างเฉพาะงานที่พ้น pending/cancelled ไปแล้ว
                 $techId = null;
                 if (!in_array($status, ['pending','cancelled'], true)) {
                     $techId = $techIds ? $techIds[array_rand($techIds)] : null;
@@ -421,49 +420,23 @@ class DemoDataSeeder extends Seeder
                 [$assigned,$acknowledged,$accepted,$started,$onHold,$resolved,$closed,$completedDate,$pausedDuration,$slaDueDate] = $makeTimeline($status, $createdAt, $priority);
 
                 $row = array_fill_keys($insertCols, null);
-
                 if ($hasAssetId)      $row['asset_id'] = $assetId;
                 if ($hasReporterId)   $row['reporter_id'] = $reporter;
                 if ($hasTechnicianId) $row['technician_id'] = $techId;
-
-                if ($hasRequestNo) $row['request_no'] = $makeRequestNo($createdAt);
-
-                if ($hasTitle)       $row['title']       = 'แจ้งซ่อม #'.$i;
-                if ($hasDescription) $row['description'] = 'รายละเอียดปัญหาเบื้องต้น';
-
-                if ($hasPriority)  $row['priority'] = $priority;
-                if ($hasStatusCol) $row['status']   = $status;
-
-                if ($hasDeptMR && $departmentIds) {
-                    $row['department_id'] = $departmentIds[array_rand($departmentIds)];
-                }
-
-                if ($hasLocationText) {
-                    $row['location_text'] = fake()->randomElement([
-                        'ตึก A ชั้น 2',
-                        'ตึก B ห้อง IT',
-                        'หน้า ER',
-                        'Ward 3',
-                        'OPD 5',
-                    ]);
-                }
-
+                if ($hasRequestNo)    $row['request_no'] = $makeRequestNo($createdAt);
+                if ($hasTitle)        $row['title']       = 'แจ้งซ่อมไอเทม #'.$i;
+                if ($hasDescription)  $row['description'] = 'รายละเอียดการแจ้งซ่อม: ปัญหาที่พบจากการใช้งานเบื้องต้น';
+                if ($hasPriority)     $row['priority'] = $priority;
+                if ($hasStatusCol)    $row['status']   = $status;
+                if ($hasDeptMR && $departmentIds) $row['department_id'] = $departmentIds[array_rand($departmentIds)];
+                if ($hasLocationText) $row['location_text'] = fake()->randomElement(['ตึก A ชั้น 2', 'ตึก B ห้อง IT', 'หน้า ER', 'Ward 3', 'OPD 5']);
                 if ($isExternal) {
                     if ($hasReporterName)     $row['reporter_name']  = fake()->name();
                     if ($hasReporterPhone)    $row['reporter_phone'] = fake()->numerify('08########');
                     if ($hasReporterEmail)    $row['reporter_email'] = fake()->safeEmail();
                     if ($hasReporterPosition) $row['reporter_position'] = fake()->jobTitle();
                 }
-
-                if ($hasLegacyPayload) {
-                    $row['legacy_payload'] = json_encode([
-                        'ua'       => fake()->randomElement(['Chrome','Edge','Firefox']),
-                        'tz'       => 'Asia/Bangkok',
-                        'seed'     => true,
-                        'external' => $isExternal,
-                    ]);
-                }
-
+                if ($hasLegacyPayload) $row['legacy_payload'] = json_encode(['ua'=>fake()->randomElement(['Chrome','Edge','Firefox']),'tz'=>'Asia/Bangkok','seed'=>true,'external'=>$isExternal]);
                 if ($hasRequestDate)   $row['request_date']   = $createdAt;
                 if ($hasAssignedDate)  $row['assigned_date']  = $assigned;
                 if ($hasAcknowledgedAt)$row['acknowledged_at']= $acknowledged;
@@ -482,47 +455,117 @@ class DemoDataSeeder extends Seeder
                         'acknowledged'  => 'รับทราบแล้ว รอช่างรับเรื่อง',
                         'accepted'      => 'รับเรื่องแล้ว กำลังเตรียมเครื่องมือ',
                         'in_progress'   => 'กำลังดำเนินการซ่อมบำรุง',
-                        'on_hold'       => fake()->randomElement(['รอชิ้นส่วนอะไหล่จากบริษัทภายนอก', 'รอช่างเทคนิคเฉพาะทาง', 'ติดงานเร่งด่วนอื่น']),
+                        'on_hold'       => 'รออะไหล่ทดแทน',
                         'resolved'      => 'แก้ไขเรียบร้อยแล้ว ทดสอบการใช้งานผ่าน',
                         'closed'        => 'ผู้แจ้งตรวจสอบและปิดงานเรียบร้อย',
-                        'cancelled'     => 'ผู้แจ้งขอยกเลิกรายการ',
-                        'rejected'      => 'เนื่องจากไม่อยู่ในขอบเขตงานซ่อมพื้นฐาน',
                         default         => null,
                     };
                 }
-
-                if ($hasResolutionNote && in_array($status, ['resolved','closed'], true)) {
-                    $row['resolution_note'] = fake()->sentence(8);
-                }
-
-                if ($hasCost && in_array($status, ['resolved','closed'], true)) {
-                    $row['cost'] = fake()->randomFloat(2, 200, 8000);
-                }
-
+                if ($hasResolutionNote && in_array($status, ['resolved','closed'], true)) $row['resolution_note'] = fake()->sentence(8);
+                if ($hasCost && in_array($status, ['resolved','closed'], true)) $row['cost'] = fake()->randomFloat(2, 200, 8000);
                 if ($hasSource) $row['source'] = 'web';
-                if ($hasExtra)  $row['extra']  = null;
-
                 $updatedAt = $closed ?? $resolved ?? $onHold ?? $started ?? $accepted ?? $assigned ?? $createdAt;
                 if ($hasCreatedAt) $row['created_at'] = $createdAt;
                 if ($hasUpdatedAt) $row['updated_at'] = $updatedAt;
 
-                $rows[] = $row;
+                $requestId = DB::table($mrTable)->insertGetId($row);
+                $insertedMR++;
 
-                if (count($rows) >= $chunkSize) {
-                    DB::table($mrTable)->insert($rows);
-                    $insertedMR += count($rows);
-                    $rows = [];
+                // Sync asset status: if request is active, set asset to in_repair
+                if ($hasAssetId && $assetId && in_array($status, [
+                    MR::STATUS_PENDING,
+                    MR::STATUS_ACKNOWLEDGED,
+                    MR::STATUS_ACCEPTED,
+                    MR::STATUS_IN_PROGRESS,
+                    MR::STATUS_ON_HOLD
+                ], true)) {
+                    DB::table('assets')->where('id', $assetId)->update(['status' => 'in_repair']);
                 }
-            }
 
-            if ($rows) {
-                DB::table($mrTable)->insert($rows);
-                $insertedMR += count($rows);
+                // --- Generate Activity Logs (Step 8) ---
+                $logEntries = [];
+                $adminId = User::where('role', 'admin')->value('id') ?: ($staffIds[0] ?? null);
+
+                // 1. Creation Log
+                $logEntries[] = [
+                    'request_id' => $requestId,
+                    'user_id'    => $reporter ?: $adminId,
+                    'action'     => \App\Models\MaintenanceLog::ACTION_CREATE,
+                    'note'       => 'สร้างใบแจ้งซ่อมใหม่เข้าระบบ',
+                    'created_at' => $createdAt,
+                    'updated_at' => $createdAt,
+                ];
+
+                // 2. Transition Logs
+                if ($acknowledged) {
+                    $logEntries[] = [
+                        'request_id' => $requestId,
+                        'user_id'    => $adminId,
+                        'action'     => \App\Models\MaintenanceLog::ACTION_TRANSITION,
+                        'note'       => '[pending -> acknowledged] รับทราบรายการแจ้งซ่อม',
+                        'created_at' => $acknowledged,
+                        'updated_at' => $acknowledged,
+                    ];
+                }
+                if ($accepted) {
+                    $logEntries[] = [
+                        'request_id' => $requestId,
+                        'user_id'    => $techId ?: $adminId,
+                        'action'     => \App\Models\MaintenanceLog::ACTION_TRANSITION,
+                        'note'       => '[acknowledged -> accepted] ช่างรับเรื่องและกำลังเข้าดำเนินการ',
+                        'created_at' => $accepted,
+                        'updated_at' => $accepted,
+                    ];
+                }
+                if ($started) {
+                    $logEntries[] = [
+                        'request_id' => $requestId,
+                        'user_id'    => $techId ?: $adminId,
+                        'action'     => \App\Models\MaintenanceLog::ACTION_START,
+                        'note'       => '[accepted -> in_progress] เริ่มดำเนินการซ่อมบำรุง',
+                        'created_at' => $started,
+                        'updated_at' => $started,
+                    ];
+                }
+                if ($onHold) {
+                    $logEntries[] = [
+                        'request_id' => $requestId,
+                        'user_id'    => $techId ?: $adminId,
+                        'action'     => \App\Models\MaintenanceLog::ACTION_TRANSITION,
+                        'note'       => '[in_progress -> on_hold] พักงานชั่วคราว: รออะไหล่',
+                        'created_at' => $onHold,
+                        'updated_at' => $onHold,
+                    ];
+                }
+                if ($resolved) {
+                    $logEntries[] = [
+                        'request_id' => $requestId,
+                        'user_id'    => $techId ?: $adminId,
+                        'action'     => \App\Models\MaintenanceLog::ACTION_TRANSITION,
+                        'note'       => '[in_progress -> resolved] ซ่อมบำรุงเสร็จสิ้น ทดสอบการใช้งานปกติ',
+                        'created_at' => $resolved,
+                        'updated_at' => $resolved,
+                    ];
+                }
+                if ($closed) {
+                    $logEntries[] = [
+                        'request_id' => $requestId,
+                        'user_id'    => $reporter ?: $adminId,
+                        'action'     => \App\Models\MaintenanceLog::ACTION_TRANSITION,
+                        'note'       => '[resolved -> closed] ผู้แจ้งตรวจสอบและปิดงาน',
+                        'created_at' => $closed,
+                        'updated_at' => $closed,
+                    ];
+                }
+
+                DB::table('maintenance_logs')->insert($logEntries);
+                $insertedLogs += count($logEntries);
             }
         });
 
         $this->ok('maintenance_requests seeded', [
             'inserted' => (string) $insertedMR,
+            'logs'     => (string) $insertedLogs,
         ]);
 
         // ================== 7) Assignments ==================
@@ -981,6 +1024,11 @@ class DemoDataSeeder extends Seeder
         $hasStatus       = Schema::hasColumn('assets', 'status');
         $hasAssetCode    = Schema::hasColumn('assets', 'asset_code');
         $hasName         = Schema::hasColumn('assets', 'name');
+        $hasVendorName   = Schema::hasColumn('assets', 'vendor_name');
+        $hasVendorPhone  = Schema::hasColumn('assets', 'vendor_phone');
+        $hasPrice        = Schema::hasColumn('assets', 'price');
+        $hasWarrantyStart = Schema::hasColumn('assets', 'warranty_start');
+        $hasInternalPhone = Schema::hasColumn('assets', 'internal_phone');
 
         $assetRows = [];
         $nowTs     = now();
@@ -1010,11 +1058,16 @@ class DemoDataSeeder extends Seeder
             if ($hasDeptId && $departmentIds)   $row['department_id'] = $departmentIds[array_rand($departmentIds)];
             if ($hasCategoryId && $categoryIds) $row['category_id']   = $categoryIds[array_rand($categoryIds)];
             if ($hasPurchaseDate) $row['purchase_date']   = $purchaseAt;
+            if ($hasWarrantyStart) $row['warranty_start'] = (clone $purchaseAt)->addDays(random_int(1, 14));
             if ($hasWarranty)     $row['warranty_expire'] = $warrantyAt;
 
+            if ($hasVendorName)   $row['vendor_name']     = fake()->company();
+            if ($hasInternalPhone) $row['internal_phone']  = '02-' . random_int(100, 999) . '-' . random_int(1000, 9999);
+            if ($hasVendorPhone)  $row['vendor_phone']    = '08' . random_int(1, 9) . '-' . random_int(100, 999) . '-' . random_int(1000, 9999);
+            if ($hasPrice)        $row['price']           = fake()->randomFloat(2, 5000, 500000);
+
             if ($hasStatus) {
-                $roll          = mt_rand(1, 100);
-                $row['status'] = $roll <= 75 ? 'active' : ($roll <= 95 ? 'in_repair' : 'disposed');
+                $row['status'] = 'active'; // Default to active, let maintenance seeders update to in_repair if needed
             }
 
             $assetRows[] = $row;
