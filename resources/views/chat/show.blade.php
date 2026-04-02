@@ -11,80 +11,88 @@
 @endphp
 
 @section('page-header')
-  <style>
-    :root {
-      --app-top: 64px; /* กำหนดความสูงของ header */
-    }
-  </style>
+  {{-- Header มาตรฐานเดียวกับหน้าอื่น --}}
+  <div class="w-full bg-slate-50 border-b border-slate-200">
+    <div class="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8 py-5">
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 
-  {{-- Header แบบ Sticky --}}
-  <div class="sticky z-30 border-b border-slate-200 bg-white/90 backdrop-blur"
-       style="top: var(--app-top, 0px)">
-    <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-      <div class="py-2.5 sm:py-3">
-        <div class="flex items-center justify-between gap-3">
-          <div class="min-w-0">
-            <div class="flex items-center gap-2 text-[11px] text-slate-500">
-              <a href="{{ route('chat.index') }}" class="hover:underline">ห้องแชต</a>
-              <span>›</span>
-              <span class="truncate" title="{{ $thread->title }}">รายละเอียด</span>
-            </div>
-            <h1 class="mt-0.5 truncate text-base font-semibold text-slate-900 sm:text-lg" title="{{ $thread->title }}">
-              {{ $thread->title }}
-            </h1>
-            <div class="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-              <span>สร้างเมื่อ {{ $thread->created_at->format('Y-m-d H:i') }}</span>
-              <span class="select-none">·</span>
-              <span>อัปเดตล่าสุด {{ $lastAt->format('Y-m-d H:i') }}</span>
-              <span class="select-none">·</span>
-              <span>{{ number_format($totalMessages) }} ข้อความ</span>
-              @if($thread->is_locked)
-                <span class="select-none">·</span>
-                <span id="threadStatusBadge" class="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-amber-700">
-                  ล็อกแล้ว
+        {{-- LEFT --}}
+        <div class="min-w-0">
+          <div class="flex items-start gap-2.5">
+            <span class="mt-1 text-[#0F2D5C]">
+              <svg class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M4 5a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3H9.83l-3.9 3.9A1 1 0 0 1 4 20.9V5z"/>
+              </svg>
+            </span>
+
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <span class="truncate">รายละเอียดกระทู้ / Thread Detail</span>
+              </div>
+              <h1 class="mt-1 truncate text-[20px] sm:text-[22px] font-semibold text-slate-900 leading-tight" title="{{ $thread->title }}">
+                {{ $thread->title }}
+              </h1>
+
+              <div class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-[13px] text-slate-600">
+                <span class="flex items-center gap-1">
+                  <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  อัปเดต: <span class="font-medium text-slate-900">{{ $lastAt->format('Y-m-d H:i') }}</span>
                 </span>
-              @else
-                <span class="select-none">·</span>
-                <span id="threadStatusBadge" class="inline-flex items-center rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-emerald-700">
-                  เปิดรับข้อความ
+                <span class="flex items-center gap-1">
+                  <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  {{ number_format($totalMessages) }} ข้อความ
                 </span>
-              @endif
-            </div>
-          </div>
-
-          <div class="flex items-center gap-2">
-            <a href="{{ route('chat.index') }}"
-               class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
-              <svg viewBox="0 0 24 24" class="h-4 w-4"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              Back
-            </a>
-
-            <button id="btnHeaderRefresh" type="button"
-               class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-               title="โหลดข้อความใหม่">
-              <svg viewBox="0 0 24 24" class="h-4 w-4"><path d="M21 12a9 9 0 1 1-2.64-6.36" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 3v6h-6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              Refresh
-            </button>
-
-            @if($canManageLock)
-              <button
-                id="btnToggleLock"
-                type="button"
-                data-locked="{{ $thread->is_locked ? '1' : '0' }}"
-                class="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium
-                       {{ $thread->is_locked
-                          ? 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                          : 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100' }}">
                 @if($thread->is_locked)
-                  <svg viewBox="0 0 24 24" class="h-4 w-4"><path d="M5 11h14v10H5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                  ปลดล็อก
+                  <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                    ล็อกแล้ว
+                  </span>
                 @else
-                  <svg viewBox="0 0 24 24" class="h-4 w-4"><path d="M5 11h14v10H5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 16v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M8 11V8a4 4 0 0 1 8 0v0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                  ล็อกกระทู้
+                  <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                    ปกติ
+                  </span>
                 @endif
-              </button>
-            @endif
+              </div>
+            </div>
           </div>
+        </div>
+
+        {{-- RIGHT --}}
+        <div class="flex flex-wrap items-center justify-start sm:justify-end gap-2">
+          <button id="btnHeaderRefresh" type="button"
+             class="inline-flex items-center h-9 gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+             title="โหลดข้อความใหม่">
+            <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+            รีเฟรช
+          </button>
+
+          @if($canManageLock)
+            <button
+              id="btnToggleLock"
+              type="button"
+              data-locked="{{ $thread->is_locked ? '1' : '0' }}"
+              class="inline-flex items-center h-9 gap-2 rounded-lg border px-4 text-sm font-medium transition-all
+                     {{ $thread->is_locked
+                        ? 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                        : 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100' }}">
+              @if($thread->is_locked)
+                <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 11h14v10H5z"/><path d="M8 11V8a4 4 0 0 1 8 0v3" stroke-linecap="round"/></svg>
+                ปลดล็อก
+              @else
+                <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 11h14v10H5z"/><path d="M12 16v2" stroke-linecap="round"/><path d="M8 11V8a4 4 0 0 1 8 0v0" stroke-linecap="round"/></svg>
+                ล็อกกระทู้
+              @endif
+            </button>
+          @endif
+
+          <a href="{{ route('chat.index') }}"
+             class="inline-flex items-center h-9 gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+            <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            กลับสู่รายการกระทู้
+          </a>
         </div>
       </div>
     </div>
@@ -131,18 +139,25 @@
           </div>
         @else
           {{-- Message List --}}
-          <div class="space-y-3">
+          <div class="space-y-4">
             @foreach($messages as $m)
-              <div class="flex gap-2">
-                <div class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-200 text-xs">
+              @php $isMe = ($me && $m->user_id === $me->id); @endphp
+              <div class="flex {{ $isMe ? 'flex-row-reverse' : 'flex-row' }} items-start gap-2.5">
+                {{-- Avatar --}}
+                <div class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100 text-sm font-semibold text-slate-600 border border-slate-200">
                   {{ strtoupper(mb_substr($m->user->name,0,1)) }}
                 </div>
-                <div>
-                  <div class="text-sm">
-                    <span class="font-medium">{{ $m->user->name }}</span>
-                    <span class="text-xs text-gray-500">• {{ $m->created_at->format('Y-m-d H:i') }}</span>
+                
+                {{-- Bubble Content --}}
+                <div class="flex flex-col {{ $isMe ? 'items-end' : 'items-start' }} max-w-[75%] sm:max-w-[70%]">
+                  <div class="flex items-center gap-2 mb-1 px-1">
+                    <span class="text-xs font-bold text-slate-700">{{ $isMe ? 'คุณ' : $m->user->name }}</span>
+                    <span class="text-[10px] text-slate-400 capitalize">{{ $m->created_at->diffForHumans() }}</span>
                   </div>
-                  <div class="whitespace-pre-line text-[15px] leading-snug">{{ $m->body }}</div>
+                  
+                  <div class="px-4 py-2.5 {{ $isMe ? 'bg-[#0F2D5C] text-white rounded-l-2xl rounded-tr-2xl' : 'bg-slate-100 text-slate-800 rounded-r-2xl rounded-tl-2xl' }} border {{ $isMe ? 'border-[#0F2D5C]' : 'border-slate-200' }} shadow-sm">
+                    <div class="whitespace-pre-line text-[14.5px] leading-relaxed">{{ $m->body }}</div>
+                  </div>
                 </div>
               </div>
             @endforeach
@@ -188,28 +203,34 @@
   const btnScrollBottom = document.getElementById('btnScrollBottom');
   const btnHeaderRefresh = document.getElementById('btnHeaderRefresh');
 
+  const myId = {{ $me->id ?? 0 }};
+
+  function appendMessage(m){
+    const isMe = (parseInt(m.user_id) === myId);
+    const row = document.createElement('div');
+    row.className = `flex ${isMe ? 'flex-row-reverse' : 'flex-row'} items-start gap-2.5`;
+    
+    row.innerHTML = `
+      <div class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100 text-sm font-semibold text-slate-600 border border-slate-200">
+        ${(m.user?.name || '?').slice(0,1).toUpperCase()}
+      </div>
+      <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[75%] sm:max-w-[70%]">
+        <div class="flex items-center gap-2 mb-1 px-1">
+          <span class="text-xs font-bold text-slate-700">${isMe ? 'คุณ' : (m.user?.name || 'Unknown')}</span>
+          <span class="text-[10px] text-slate-400 capitalize">เมื่อสักครู่</span>
+        </div>
+        <div class="px-4 py-2.5 ${isMe ? 'bg-[#0F2D5C] text-white rounded-l-2xl rounded-tr-2xl' : 'bg-slate-100 text-slate-800 rounded-r-2xl rounded-tl-2xl'} border ${isMe ? 'border-[#0F2D5C]' : 'border-slate-200'} shadow-sm">
+          <div class="whitespace-pre-line text-[14.5px] leading-relaxed"></div>
+        </div>
+      </div>`;
+      
+    row.querySelector('.leading-relaxed').textContent = m.body;
+    box.appendChild(row);
+  }
+
   const threadId = {{ $thread->id }};
   let lastId = {{ $messages->last()?->id ?? 0 }};
   let autoScroll = true;
-  let polling = null;
-
-  function appendMessage(m){
-    const row = document.createElement('div');
-    row.className = 'flex gap-2';
-    row.innerHTML = `
-      <div class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-200 text-xs">
-        ${(m.user?.name || '?').slice(0,1).toUpperCase()}
-      </div>
-      <div>
-        <div class="text-sm">
-          <span class="font-medium">${m.user?.name || 'Unknown'}</span>
-          <span class="text-xs text-gray-500">• ${new Date(m.created_at).toLocaleString()}</span>
-        </div>
-        <div class="text-[15px] leading-snug whitespace-pre-line"></div>
-      </div>`;
-    row.querySelector('.leading-snug').textContent = m.body;
-    box.appendChild(row);
-  }
 
   async function poll(){
     try{
@@ -251,13 +272,30 @@
     btnHeaderRefresh.addEventListener('click', () => { poll(); });
   }
 
-  window.addEventListener('pageshow', () => {
+  window.addEventListener('load', () => {
     box.style.maxHeight = `calc(100vh - (getComputedStyle(document.documentElement).getPropertyValue('--app-top') || '0px') - 240px)`;
     box.scrollTop = box.scrollHeight;
-    polling = setInterval(poll, 2000);
-  });
-  window.addEventListener('pagehide', () => {
-    if (polling) clearInterval(polling);
+    
+    if (window.Echo) {
+      window.Echo.channel('chat.' + threadId)
+        .listen('.message.sent', (e) => {
+          if (e.message && e.message.id > lastId) {
+            const emptyState = box.querySelector('.grid.place-items-center');
+            if (emptyState) emptyState.remove();
+
+            appendMessage(e.message);
+            lastId = Math.max(lastId, e.message.id);
+
+            if (autoScroll) {
+              box.scrollTop = box.scrollHeight;
+            } else if (btnScrollBottom) {
+              btnScrollBottom.classList.remove('hidden');
+            }
+          }
+        });
+    } else {
+      console.warn("Laravel Echo is not initialized. Fast real-time updates may be disabled.");
+    }
   });
 
   const input = document.getElementById('msgInput');
