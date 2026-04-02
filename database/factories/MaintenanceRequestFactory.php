@@ -92,4 +92,18 @@ class MaintenanceRequestFactory extends Factory
                 : null,
         ];
     }
+    public function configure()
+    {
+        return $this->afterCreating(function (MaintenanceRequest $mr) {
+            if (in_array($mr->status, [
+                MaintenanceRequest::STATUS_PENDING,
+                MaintenanceRequest::STATUS_ACKNOWLEDGED,
+                MaintenanceRequest::STATUS_ACCEPTED,
+                MaintenanceRequest::STATUS_IN_PROGRESS,
+                MaintenanceRequest::STATUS_ON_HOLD
+            ], true)) {
+                $mr->asset()->update(['status' => \App\Models\Asset::STATUS_IN_REPAIR]);
+            }
+        });
+    }
 }

@@ -142,6 +142,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/chat/threads/{thread}/unlock', [ChatController::class, 'unlock'])->name('chat.unlock');
 
     // Assets
+    // NOTE: /assets/fetch-his ต้องอยู่ก่อน /assets/{asset} เพื่อป้องกัน wildcard ชน
+    Route::get('/assets/fetch-his', [AssetController::class, 'fetchHisData'])->name('assets.fetch-his');
     Route::get('/assets', [AssetController::class, 'indexPage'])->name('assets.index');
     Route::get('/assets/create', [AssetController::class, 'createPage'])->name('assets.create');
     Route::post('/assets', [AssetController::class, 'storePage'])->name('assets.store');

@@ -29,6 +29,9 @@ class Attachment extends Model
 {
     use SoftDeletes;
 
+    const HERO_ORDER = -1;
+
+
     protected $fillable = [
         // polymorphic target
         'attachable_type',
