@@ -279,6 +279,20 @@ class MaintenanceRequest extends Model
                 $model->status_updated_at = now();
             }
         });
+
+        static::created(function (self $model) {
+            $model->syncAssetStatus();
+        });
+
+        static::updated(function (self $model) {
+            if ($model->isDirty(['status', 'asset_id'])) {
+                $model->syncAssetStatus();
+            }
+        });
+
+        static::deleted(function (self $model) {
+            $model->syncAssetStatus();
+        });
     }
 
     public function scopeStatus($q, ?string $s)
@@ -478,6 +492,73 @@ class MaintenanceRequest extends Model
     public function type()
     {
         return $this->belongsTo(\App\Models\MaintenanceRequestType::class, 'type_id');
+    }
+
+    /**
+     * ซิงค์สถานะของ Asset ตามสถานะของใบแจ้งซ่อม
+     */
+    public function syncAssetStatus(): void
+    {
+        if (empty($this->asset_id)) {
+            return;
+        }
+
+        $asset = $this->asset;
+        if (!$asset) {
+            return;
+        }
+
+        // สถานะที่ถือว่า "กำลังซ่อม/รอซ่อม" (ทำให้ Asset เป็น in_repair)
+        $activeStatuses = [
+            self::STATUS_PENDING,
+            self::STATUS_ACKNOWLEDGED,
+            self::STATUS_ACCEPTED,
+            self::STATUS_IN_PROGRESS,
+            self::STATUS_ON_HOLD,
+        ];
+
+        // สถานะที่ถือว่า "จบงาน" (ทำให้ Asset กลับเป็น active ถ้าไม่มีใบงานอื่นค้าง)
+        $resolvedStatuses = [
+            self::STATUS_RESOLVED,
+            self::STATUS_CLOSED,
+            self::STATUS_CANCELLED,
+            self::STATUS_REJECTED,
+        ];
+
+        if (in_array((string) $this->status, $activeStatuses, true)) {
+            // ถ้าใบงานนี้กำลังดำเนินการอยู่ ให้ Asset เป็น in_repair
+            if ($asset->status !== 'in_repair' && $asset->status !== 'disposed') {
+                $asset->update(['status' => 'in_repair']);
+                \Illuminate\Support\Facades\Log::info('[MaintenanceRequest::syncAssetStatus] Asset set to in_repair', [
+                    'asset_id' => $asset->id,
+                    'request_id' => $this->id,
+                    'status' => $this->status,
+                ]);
+            }
+        } elseif (in_array((string) $this->status, $resolvedStatuses, true)) {
+            // ถ้าใบงานนี้จบแล้ว ให้เช็คว่ามีใบงานอื่นที่ยังค้างอยู่ไหมสำหรับ Asset นี้
+            $hasOtherActive = static::query()
+                ->where('asset_id', $this->asset_id)
+                ->where('id', '!=', $this->id)
+                ->whereIn('status', $activeStatuses)
+                ->exists();
+
+            if (!$hasOtherActive) {
+                if ($asset->status === 'in_repair') {
+                    $asset->update(['status' => 'active']);
+                    \Illuminate\Support\Facades\Log::info('[MaintenanceRequest::syncAssetStatus] Asset restored to active', [
+                        'asset_id' => $asset->id,
+                        'request_id' => $this->id,
+                        'status' => $this->status,
+                    ]);
+                }
+            } else {
+                \Illuminate\Support\Facades\Log::info('[MaintenanceRequest::syncAssetStatus] Asset kept in_repair (other MR still active)', [
+                    'asset_id' => $asset->id,
+                    'request_id' => $this->id,
+                ]);
+            }
+        }
     }
 
 }

@@ -69,10 +69,33 @@ class AssetSeeder extends Seeder
         foreach ($rows as $r) {
             $r['department_id']   = $dept[$r['department_code']] ?? null;
             $r['category_id']     = $cat[$r['category_slug']] ?? null;
-            $r['purchase_date']   = $now->copy()->subYears(1)->toDateString();
+            
+            $purchaseAt = $now->copy()->subYears(1);
+            $r['purchase_date']   = $purchaseAt->toDateString();
+            $r['warranty_start']  = $purchaseAt->copy()->addDays(7)->toDateString();
             $r['warranty_expire'] = $now->copy()->addYear()->toDateString();
-            $roll = mt_rand(1, 100);
-            $r['status'] = $roll <= 80 ? 'active' : ($roll <= 95 ? 'in_repair' : 'disposed');
+            
+            $r['vendor_name']     = fake()->company();
+            $r['internal_phone']  = '02-' . mt_rand(100, 999) . '-' . mt_rand(1000, 9999);
+            $r['vendor_phone']    = '08' . mt_rand(1, 9) . '-' . mt_rand(100, 999) . '-' . mt_rand(1000, 9999);
+            $r['price']           = fake()->randomFloat(2, 5000, 500000);
+
+            $r['status'] = 'active'; // Default to active, let maintenance seeders update to in_repair if needed
+            
+            // Randomly assign HIS ID (about 70% chance)
+            if (mt_rand(1, 100) <= 70) {
+                // For a few edge cases, make his_asset_id EXACTLY the same as asset_code
+                if (mt_rand(1, 10) <= 2) {
+                    $r['his_asset_id'] = $r['asset_code'];
+                } else {
+                    $r['his_asset_id'] = fake()->unique()->numerify('HIS-####');
+                }
+                $r['his_synced_at'] = $now;
+            } else {
+                $r['his_asset_id'] = null;
+                $r['his_synced_at'] = null;
+            }
+
             $r['created_at']      = $now;
             $r['updated_at']      = $now;
 
@@ -84,7 +107,12 @@ class AssetSeeder extends Seeder
         DB::table('assets')->upsert(
             $insert,
             ['asset_code'],
-            ['name','type','brand','model','serial_number','location','department_id','category_id','purchase_date','warranty_expire','status','updated_at']
+            [
+                'name','type','brand','model','serial_number','location',
+                'department_id','category_id','purchase_date','warranty_start','warranty_expire',
+                'vendor_name','vendor_phone','internal_phone','price',
+                'status','his_asset_id','updated_at'
+            ]
         );
     }
 }

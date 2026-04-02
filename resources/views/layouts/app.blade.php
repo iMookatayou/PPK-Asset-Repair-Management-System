@@ -464,13 +464,9 @@
         <div class="sticky-under-topbar @yield('header-wrap-class')">@yield('page-header')</div>
       @endif
 
-      @if (session('ok'))
-        <div class="mb-4 p-3 rounded border border-emerald-200 bg-emerald-50 text-emerald-800">
-          {{ session('ok') }}
-        </div>
-      @endif
 
       @yield('content')
+
 
       @yield('after-content')
 

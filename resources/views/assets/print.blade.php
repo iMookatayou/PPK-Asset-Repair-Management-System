@@ -244,7 +244,12 @@
     <table class="meta">
         <tr>
             <td class="label">รหัสครุภัณฑ์</td>
-            <td>{{ $f($asset->asset_code) }}</td>
+            <td>
+                {{ $f($asset->asset_code) }}
+                @if($asset->his_asset_id)
+                    <div style="font-size: 10px; color: #0f4c81;">(เลข รพจ: {{ $asset->his_asset_id }})</div>
+                @endif
+            </td>
             <td class="label">หมวดหมู่</td>
             <td>{{ $f($categoryName) }}</td>
         </tr>
