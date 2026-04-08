@@ -207,7 +207,7 @@ import Chart from 'chart.js/auto';
       const statusEl = safeGet('statusDonut');
       if (statusEl) {
         const statusChart = new Chart(statusEl.getContext('2d'), donutConfig(
-          ['รอดำเนินการ', 'กำลังดำเนินการ', 'เสร็จสิ้นแล้ว', 'ยกเลิก/ปฏิเสธ'],
+          ['รอดำเนินการ', 'กำลังดำเนินการ', 'ซ่อมบำรุงเสร็จสิ้น', 'อนุมัติแล้ว', 'ยกเลิกซ่อม/ไม่รับเรื่อง'],
           [
             Number(statusEl.dataset.pending || 0),
             Number(statusEl.dataset.progress || 0),

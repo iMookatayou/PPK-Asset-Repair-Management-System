@@ -174,13 +174,27 @@
         <label class="block text-sm font-medium text-slate-700 mt-4">
           ระดับความสำคัญ <span class="text-rose-600">*</span>
         </label>
-        @php $priority = $v('priority', 'medium'); @endphp
-        <select name="priority" class="{{ $input }}" required>
-          <option value="low"    @selected($priority === 'low')>ต่ำ</option>
-          <option value="medium" @selected($priority === 'medium')>ปานกลาง</option>
-          <option value="high"   @selected($priority === 'high')>สูง</option>
-          <option value="urgent" @selected($priority === 'urgent')>เร่งด่วน</option>
-        </select>
+        @php 
+          $priority = $v('priority', 'medium'); 
+          $isTeam   = $user && ($user->isAdmin() || $user->isSupervisor() || $user->isTechnician());
+        @endphp
+
+        @if($isTeam)
+          <select name="priority" class="{{ $input }}" required>
+            <option value="low"    @selected($priority === 'low')>ต่ำ</option>
+            <option value="medium" @selected($priority === 'medium')>ปานกลาง</option>
+            <option value="high"   @selected($priority === 'high')>สูง</option>
+            <option value="urgent" @selected($priority === 'urgent')>เร่งด่วน</option>
+          </select>
+        @else
+          <div class="mt-2 h-11 rounded-md border {{ $line }} bg-slate-50 px-3 flex items-center text-sm text-slate-700">
+            @php
+              $pLabels = ['low' => 'ต่ำ', 'medium' => 'ปานกลาง', 'high' => 'สูง', 'urgent' => 'เร่งด่วน'];
+            @endphp
+            {{ $pLabels[$priority] ?? 'ปานกลาง' }}
+          </div>
+          <input type="hidden" name="priority" value="{{ $priority }}">
+        @endif
       </section>
 
       <section>
@@ -196,32 +210,86 @@
         @php $attachments = is_iterable($attachments ?? null) ? $attachments : []; @endphp
 
         @if($isEdit && !empty($attachments) && count($attachments))
-          <div class="mb-4">
-            <div class="text-xs font-medium text-slate-600">ไฟล์ที่มีอยู่แล้ว</div>
-            <div class="mt-2 divide-y divide-slate-200 rounded-md border {{ $line }}">
+          <div class="mb-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
+            <p class="text-[13px] font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                <svg class="h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                </svg>
+                ไฟล์ที่มีอยู่แล้ว ({{ count($attachments) }})
+            </p>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               @foreach($attachments as $att)
-                <label class="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                  <span class="truncate text-slate-700">{{ $att->original_name }}</span>
-                  <span class="inline-flex items-center gap-2 text-rose-600">
-                    <input type="checkbox" name="remove_attachments[]" value="{{ $att->id }}">
-                    ลบ
-                  </span>
-                </label>
+                @php
+                    $file = $att->file;
+                    $name = $att->original_name ?? ($file?->path ?? 'file');
+                    $isPrivate = (bool) ($att->is_private ?? false);
+                    $mime = $file?->mime ?? '';
+                    $isImg = $mime && str_starts_with($mime, 'image/');
+                    $publicUrl = null;
+                    if ($file && ($file->disk ?? null) && ($file->path ?? null)) {
+                        try {
+                            $disk = \Illuminate\Support\Facades\Storage::disk($file->disk);
+                            $publicUrl = $disk->url($file->path);
+                        } catch (\Throwable $e) { $publicUrl = null; }
+                    }
+                    $canOpenPrivate = auth()->check() && auth()->user()->can('update', $req ?? null);
+                    $canOpen = !$isPrivate || $canOpenPrivate;
+                    $openUrl = $publicUrl;
+                    try { $openUrl = route('attachments.show', $att); } catch (\Throwable $e) { $openUrl = $publicUrl; }
+                @endphp
+                <figure class="overflow-hidden rounded-lg border {{ $line }} bg-white text-xs flex flex-col shadow-sm hover:shadow-md transition">
+                    @if ($canOpen && $openUrl)
+                        <a href="{{ $openUrl }}" target="_blank" rel="noopener" class="block overflow-hidden group border-b border-slate-100">
+                            @if ($isImg)
+                                <img src="{{ $openUrl }}" alt="{{ $att->alt_text ?? $name }}"
+                                    class="h-24 w-full object-cover transition-transform duration-300 group-hover:scale-105">
+                            @else
+                                <div class="grid h-24 w-full place-items-center bg-slate-50 text-slate-500 text-[15px] font-bold group-hover:bg-slate-100 transition-colors">
+                                    {{ strtoupper(pathinfo($name, PATHINFO_EXTENSION) ?: 'FILE') }}
+                                </div>
+                            @endif
+                        </a>
+                    @else
+                        <div class="grid h-24 w-full place-items-center bg-slate-50 text-slate-400 text-[13px] font-bold border-b border-slate-100">
+                            LOCKED
+                        </div>
+                    @endif
+                    <figcaption class="px-3 py-2 space-y-1.5 flex-1 flex flex-col justify-between">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-1.5">
+                                <span class="inline-flex items-center rounded-md px-1 py-0.5 text-[8.5px] font-bold uppercase tracking-wide {{ $isPrivate ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600' }}">
+                                    {{ $isPrivate ? 'Private' : 'Public' }}
+                                </span>
+                            </div>
+                            <div class="text-[11px] font-medium text-slate-700 line-clamp-1" title="{{ $name }}">{{ $name }}</div>
+                        </div>
+                        <div class="pt-2 mt-2 border-t border-slate-50 flex items-center justify-end">
+                            <label class="inline-flex items-center gap-1.5 cursor-pointer bg-rose-50 px-2 py-1 rounded-md border border-rose-100 hover:bg-rose-100 transition">
+                                <input type="checkbox" name="remove_attachments[]" value="{{ $att->id }}" class="w-3.5 h-3.5 rounded border-slate-300 text-rose-600 focus:ring-rose-200">
+                                <span class="text-[10px] font-semibold text-rose-700">เลือกลบ</span>
+                            </label>
+                        </div>
+                    </figcaption>
+                </figure>
               @endforeach
             </div>
           </div>
         @endif
 
-        <input id="mr_files_any"
+        <input id="mr_files_submit"
                type="file"
                name="files[]"
+               multiple
+               class="hidden">
+
+        <input id="mr_files_any"
+               type="file"
                multiple
                accept="image/*,application/pdf"
                class="hidden">
 
         <input id="mr_files_camera"
                type="file"
-               name="files[]"
                accept="image/*"
                capture="environment"
                class="hidden">
@@ -295,10 +363,10 @@
             const keyOf = (f) => `${f.name}|${f.size}|${f.type}|${f.lastModified || 0}`;
 
             const syncToInputs = () => {
-              // สร้าง FileList ใหม่ให้ anyInput เพื่อ submit ทีเดียว (รวมทั้งจากกล้องด้วย)
+              // สร้าง FileList ใหม่ให้ mr_files_submit เพื่อ submit ทีเดียว (รวมทั้งจากกล้องด้วย)
               const dt = new DataTransfer();
               filesBag.forEach(f => dt.items.add(f));
-              anyInput.files = dt.files;
+              document.getElementById('mr_files_submit').files = dt.files;
             };
 
             const render = () => {
@@ -311,46 +379,18 @@
 
               filesBag.forEach((f, idx) => {
                 const card = document.createElement('div');
-                card.className = 'p-3 rounded-lg border border-slate-200 bg-slate-50 space-y-2';
-
-                const top = document.createElement('div');
-                top.className = 'flex items-center justify-between gap-3';
-
-                const left = document.createElement('div');
-                left.className = 'min-w-0';
-
-                const name = document.createElement('div');
-                name.className = 'truncate text-[13px] font-medium text-slate-700';
-                name.textContent = f.name;
-
-                const meta = document.createElement('div');
-                meta.className = 'text-[11px] text-slate-500';
-                meta.textContent = (f.type || 'file') + ' • ' + Math.round(f.size / 1024) + ' KB';
-
-                left.appendChild(name);
-                left.appendChild(meta);
-
-                const del = document.createElement('button');
-                del.type = 'button';
-                del.className = 'shrink-0 text-rose-600 hover:text-rose-700 text-xs font-medium';
-                del.textContent = 'ลบ';
-                del.addEventListener('click', () => {
+                card.className = 'p-2.5 rounded-lg border border-slate-200 bg-white flex justify-between items-center shadow-sm';
+                card.innerHTML = `<div class="flex items-center gap-2 min-w-0 transition-all">
+                    <span class="truncate text-[12px] font-medium text-slate-700">${f.name}</span>
+                    <span class="text-[10px] text-slate-400">${(f.size/1024).toFixed(1)}KB</span>
+                </div>
+                <button type="button" class="text-rose-600 hover:text-rose-700 text-[11px] font-semibold">ลบ</button>`;
+                
+                card.querySelector('button').addEventListener('click', () => {
                   filesBag.splice(idx, 1);
                   syncToInputs();
                   render();
                 });
-
-                top.appendChild(left);
-                top.appendChild(del);
-                card.appendChild(top);
-
-                // Caption Input
-                const capInput = document.createElement('input');
-                capInput.type = 'text';
-                capInput.name = 'captions[]';
-                capInput.placeholder = 'เพิ่มคำอธิบายภาพ...';
-                capInput.className = 'w-full h-8 px-2 py-1 text-[12px] rounded border border-slate-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-100 outline-none transition';
-                card.appendChild(capInput);
 
                 list.appendChild(card);
               });

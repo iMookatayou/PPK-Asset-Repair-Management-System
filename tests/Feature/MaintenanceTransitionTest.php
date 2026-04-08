@@ -22,6 +22,13 @@ class MaintenanceTransitionTest extends TestCase
 
         Sanctum::actingAs($tech);
 
+        // Acknowledge the job
+        $respAck = $this->postJson("/api/repair-requests/{$req->id}/transition", [
+            'status' => MaintenanceRequest::STATUS_ACKNOWLEDGED,
+        ]);
+        $respAck->assertOk();
+        $this->assertSame(MaintenanceRequest::STATUS_ACKNOWLEDGED, $respAck->json('data.status'));
+
         // Accept the job
         $resp1 = $this->postJson("/api/repair-requests/{$req->id}/transition", [
             'status' => MaintenanceRequest::STATUS_ACCEPTED,

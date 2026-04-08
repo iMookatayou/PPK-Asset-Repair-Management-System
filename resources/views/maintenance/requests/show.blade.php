@@ -55,10 +55,8 @@
 
         $canAcknowledge = $status === MR::STATUS_PENDING && \Gate::allows('acknowledge', $req);
         $canAccept = $status === MR::STATUS_ACKNOWLEDGED && \Gate::allows('accept', $req);
-        $canReject = $status === MR::STATUS_ACKNOWLEDGED && \Gate::allows('reject', $req);
-        $canCancel =
-            in_array($status, [MR::STATUS_ACCEPTED, MR::STATUS_IN_PROGRESS, MR::STATUS_ON_HOLD], true) &&
-            (\Gate::allows('cancelByReporter', $req) || \Gate::allows('cancelByTech', $req));
+        $canReject = in_array($status, [MR::STATUS_PENDING, MR::STATUS_ACKNOWLEDGED], true) && \Gate::allows('reject', $req);
+        $canCancel = in_array($status, [MR::STATUS_ACCEPTED, MR::STATUS_IN_PROGRESS, MR::STATUS_ON_HOLD], true) && \Gate::allows('cancel', $req);
         $canStart = $status === MR::STATUS_ACCEPTED && \Gate::allows('startWork', $req);
         $canHold =
             in_array($status, [MR::STATUS_ACCEPTED, MR::STATUS_IN_PROGRESS], true) && \Gate::allows('hold', $req);
@@ -185,14 +183,11 @@
                     @endif
 
                     @if ($canResolve)
-                        <form method="POST" action="{{ route('maintenance.requests.resolve', $req->id) }}">
-                            @csrf
-                            <button
-                                class="{{ $btnBase }} bg-emerald-700 text-white hover:bg-emerald-800 focus:ring-emerald-200">
-                                <span class="material-symbols-outlined ms text-[16px] leading-none">task_alt</span>
-                                ซ่อมเสร็จ
-                            </button>
-                        </form>
+                        <button type="button" id="openResolveModalBtn"
+                            class="{{ $btnBase }} bg-emerald-700 text-white hover:bg-emerald-800 focus:ring-emerald-200">
+                            <span class="material-symbols-outlined ms text-[16px] leading-none">task_alt</span>
+                            ซ่อมบำรุงเสร็จสิ้น
+                        </button>
                     @endif
 
                     @if ($canClose)
@@ -201,14 +196,14 @@
                             <button
                                 class="{{ $btnBase }} bg-slate-700 text-white hover:bg-slate-800 focus:ring-slate-300">
                                 <span class="material-symbols-outlined ms text-[16px] leading-none">done_all</span>
-                                ปิดงาน
+                                อนุมัติ
                             </button>
                         </form>
                     @endif
 
                     @if ($req->status === \App\Models\MaintenanceRequest::STATUS_CLOSED)
                         @can('rate', $req)
-                            <a href="{{ route('maintenance.ratings.create', $req->id) }}"
+                            <a href="{{ route('maintenance.requests.rating.create', $req->id) }}"
                                 class="{{ $btnBase }} bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-200">
                                 <span class="material-symbols-outlined ms text-[16px] leading-none">star</span>
                                 ประเมินความพึงพอใจ
@@ -225,15 +220,11 @@
                     @endif
 
                     @if ($canCancel)
-                        <form method="POST" action="{{ route('maintenance.requests.cancel', $req->id) }}"
-                            onsubmit="return confirm('ยืนยันการยกเลิก?');">
-                            @csrf
-                            <button
-                                class="{{ $btnBase }} bg-slate-500 text-white hover:bg-slate-600 focus:ring-slate-300">
-                                <span class="material-symbols-outlined ms text-[16px] leading-none">cancel</span>
-                                ยกเลิกซ่อม
-                            </button>
-                        </form>
+                        <button type="button" id="openCancelModalBtn"
+                            class="{{ $btnBase }} bg-slate-500 text-white hover:bg-slate-600 focus:ring-slate-300">
+                            <span class="material-symbols-outlined ms text-[16px] leading-none">cancel</span>
+                            ยกเลิกซ่อม
+                        </button>
                     @endif
 
                     {{-- Divider: แสดงเฉพาะเมื่อมี workflow button --}}
@@ -430,637 +421,26 @@
             <div class="relative grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div class="hidden lg:block absolute inset-y-0 left-1/2 w-px bg-slate-200"></div>
 
-                <section>
-                    <div class="{{ $headCls }}">
-                        <div class="{{ $noCls }}">1</div>
-                        <div class="{{ $accentWrap }}">
-                            <span class="{{ $accentBar }}"></span>
-                            <div class="{{ $titleCls }}">ข้อมูลหลัก</div>
-                            <div class="{{ $subCls }}">ทรัพย์สิน / หน่วยงาน / สถานที่</div>
-                        </div>
-                    </div>
+                                    @include('maintenance.requests.partials._asset_info')
 
-                    <div class="space-y-4 text-sm">
-                        <div>
-                            <div class="text-sm font-medium text-slate-700">ทรัพย์สิน</div>
-                            <div class="mt-2 rounded-md border {{ $line }} bg-white px-3 py-2">
-                                <div class="font-semibold text-slate-900">{{ $assetName }}</div>
-                                @if ($assetCode)
-                                    <div class="mt-1 text-xs text-slate-500">รหัสครุภัณฑ์: {{ $assetCode }}</div>
-                                @endif
-                            </div>
-                        </div>
-
-                        <div>
-                            <div class="text-sm font-medium text-slate-700">หน่วยงาน</div>
-                            <div class="mt-2 rounded-md border {{ $line }} bg-white px-3 py-2">
-                                <div class="font-semibold text-slate-900">
-                                    {{ $req->department?->name_th ?? ($req->department?->name_en ?? '—') }}
-                                </div>
-                                @if ($req->department?->code)
-                                    <div class="mt-1 text-xs text-slate-500">รหัสหน่วยงาน: {{ $req->department->code }}
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-
-                        <div>
-                            <div class="text-sm font-medium text-slate-700">สถานที่ / ตำแหน่งงาน</div>
-                            <div class="mt-2 rounded-md border {{ $line }} bg-white px-3 py-2">
-                                <div class="font-semibold text-slate-900">{{ $location }}</div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <section>
-                    <div class="{{ $headCls }}">
-                        <div class="{{ $noCls }}">2</div>
-                        <div class="{{ $accentWrap }}">
-                            <span class="{{ $accentBar }}"></span>
-                            <div class="{{ $titleCls }}">รายละเอียดปัญหา</div>
-                            <div class="{{ $subCls }}">หัวข้อและอาการเสีย</div>
-                        </div>
-                    </div>
-
-                    <div class="space-y-4 text-sm">
-                        @php
-                            $types = collect($types ?? []);
-                            $select = "w-full h-9 rounded-md border $line bg-white px-3 text-sm
-                        focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
-                        @endphp
-
-                        <div>
-                            <div class="flex items-center justify-between">
-                                <div class="text-sm font-medium text-slate-700">ประเภทงาน (Report Type)</div>
-                                @cannot('setType', $req)
-                                    <span class="text-[12px] text-slate-400">* เฉพาะเจ้าหน้าที่/ช่างเท่านั้น</span>
-                                @endcannot
-                            </div>
-
-                            @can('setType', $req)
-                                <form method="POST" action="{{ route('maintenance.requests.type.update', $req->id) }}"
-                                    class="mt-2 flex gap-2 items-center">
-                                    @csrf
-                                    <select name="type_id" class="{{ $select }}">
-                                        <option value="">— ยังไม่ระบุประเภท —</option>
-                                        @foreach ($types as $t)
-                                            <option value="{{ $t->id }}" @selected((int) $req->type_id === (int) $t->id)>
-                                                {{ $t->name }}</option>
-                                        @endforeach
-                                    </select>
-                                    <button type="submit"
-                                        class="inline-flex items-center justify-center h-9 w-9 rounded-md bg-emerald-600 text-white
-                               hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
-                                        title="บันทึกประเภท">
-                                        <span class="material-symbols-outlined ms text-[18px] leading-none">save</span>
-                                    </button>
-                                </form>
-                            @else
-                                <div
-                                    class="mt-2 rounded-md border {{ $line }} bg-white px-3 py-2 text-sm text-slate-700 min-h-[44px] flex items-center">
-                                    {{ $req->type?->name ?? '— ยังไม่ระบุประเภท —' }}
-                                </div>
-                            @endcan
-                        </div>
-
-                        <div>
-                            <div class="text-sm font-medium text-slate-700">หัวข้อ <span class="text-rose-600">*</span>
-                            </div>
-                            <div
-                                class="mt-2 rounded-md border {{ $line }} bg-white px-3 py-2 font-semibold text-slate-900 min-h-[44px]">
-                                {{ $req->title ?: '-' }}
-                            </div>
-                        </div>
-
-                        <div>
-                            <div class="text-sm font-medium text-slate-700">รายละเอียด / อาการเสีย</div>
-                            <div
-                                class="mt-2 rounded-md border {{ $line }} bg-white px-3 py-2 text-slate-800 whitespace-pre-line min-h-[120px]">
-                                {{ $req->description ?: '—' }}
-                            </div>
-                        </div>
-                    </div>
-                </section>
+                                    @include('maintenance.requests.partials._issue_details')
             </div>
 
             <div class="border-t {{ $line }}"></div>
 
-            <section>
-                <div class="{{ $headCls }}">
-                    <div class="{{ $noCls }}">3</div>
-                    <div class="{{ $accentWrap }}">
-                        <span class="{{ $accentBar }}"></span>
-                        <div class="{{ $titleCls }}">ผู้แจ้ง &amp; ความเร่งด่วน</div>
-                        <div class="{{ $subCls }}">ข้อมูลผู้แจ้ง / ระดับความเร่งด่วน</div>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="space-y-4 text-sm">
-                        <div>
-                            <div class="text-sm font-medium text-slate-700">ผู้แจ้ง</div>
-                            <div class="mt-2 rounded-md border {{ $line }} bg-white px-3 py-2">
-                                <div class="font-semibold text-slate-900">
-                                    {{ $req->reporter?->name ?? ($req->reporter_name ?? '-') }}
-                                </div>
-                                @if (($req->reporter?->email ?? $req->reporter_email) || $req->reporter_phone)
-                                    <div class="mt-1 text-xs text-slate-500 space-y-0.5">
-                                        @if ($req->reporter?->email ?? $req->reporter_email)
-                                            <div>{{ $req->reporter?->email ?? $req->reporter_email }}</div>
-                                        @endif
-                                        @if ($req->reporter_phone)
-                                            <div>โทร. {{ $req->reporter_phone }}</div>
-                                        @endif
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="space-y-4 text-sm">
-                        <div>
-                            <div class="text-sm font-medium text-slate-700">ระดับความเร่งด่วน</div>
-                            <div class="mt-2 text-[15px] font-semibold {{ $prioTextTone }}">
-                                {{ $prioLabel }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
+                                @include('maintenance.requests.partials._reporter_info')
 
             <div class="border-t {{ $line }}"></div>
 
-            <section>
-                <div class="{{ $headCls }}">
-                    <div class="{{ $noCls }}">4</div>
-                    <div class="{{ $accentWrap }}">
-                        <span class="{{ $accentBar }}"></span>
-                        <div class="{{ $titleCls }}">ไฟล์แนบ</div>
-                        <div class="{{ $subCls }}">รูป / เอกสารประกอบ</div>
-                    </div>
-                </div>
-
-                @can('attach', $req)
-                    <form method="post" enctype="multipart/form-data" action="{{ $attachUploadUrl }}" class="space-y-4"
-                        novalidate>
-                        @csrf
-                        <input id="mr_files_any" type="file" name="files[]" multiple accept="image/*,application/pdf"
-                            class="hidden">
-                        <input id="mr_files_camera" type="file" name="files[]" accept="image/*" capture="environment"
-                            class="hidden">
-
-                        <div class="flex items-center gap-2">
-                            <button type="button" id="mr_files_any_btn"
-                                class="inline-flex items-center justify-center h-10 px-4 rounded-md border {{ $line }} bg-white
-                                       text-sm font-medium text-slate-700 hover:bg-slate-50
-                                       focus:outline-none focus:ring-2 focus:ring-emerald-100">
-                                <svg class="h-4 w-4 mr-2 text-slate-600" viewBox="0 0 24 24" fill="none"
-                                    aria-hidden="true">
-                                    <path
-                                        d="M21 11.5l-8.5 8.5a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.7-8.7"
-                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                        stroke-linejoin="round" />
-                                </svg>
-                                เลือกไฟล์เพิ่ม
-                            </button>
-
-                            <button type="button" id="mr_files_camera_btn"
-                                class="inline-flex items-center justify-center h-10 w-11 rounded-md border {{ $line }} bg-white
-                                       hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100">
-                                <svg class="h-5 w-5 text-emerald-700" viewBox="0 0 24 24" fill="none"
-                                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path
-                                        d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                                    <circle cx="12" cy="13" r="4" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        <div class="mt-3 p-3 rounded-md bg-amber-50 border border-amber-200">
-                            <div class="flex gap-2">
-                                <svg class="h-5 w-5 text-amber-600 shrink-0" viewBox="0 0 24 24" fill="none"
-                                    stroke="currentColor" stroke-width="2">
-                                    <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round"
-                                        stroke-linejoin="round" />
-                                </svg>
-                                <div class="text-xs text-amber-800">
-                                    <p class="font-bold">เงื่อนไขการแนบไฟล์:</p>
-                                    <p>จำกัดสูงสุด 3 ไฟล์ต่อใบงาน และสามารถเพิ่ม/ลบได้ตามสิทธิ์และสถานะของใบงานเท่านั้น</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- Preview list --}}
-                        <div id="mr_files_preview" class="mt-3 hidden">
-                            <div class="text-xs font-medium text-slate-600">ไฟล์ที่เลือก</div>
-                            <div id="mr_files_list"
-                                class="mt-2 divide-y divide-slate-200 rounded-md border {{ $line }} bg-white"></div>
-                        </div>
-
-                        <div class="flex justify-end pt-2">
-                            <button type="submit"
-                                class="inline-flex items-center justify-center h-10 px-4 rounded-lg bg-emerald-600 text-sm font-medium text-white hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-200">
-                                แนบไฟล์
-                            </button>
-                        </div>
-                    </form>
-
-                    <script>
-                        (function() {
-                            const anyInput = document.getElementById('mr_files_any');
-                            const camInput = document.getElementById('mr_files_camera');
-                            const anyBtn = document.getElementById('mr_files_any_btn');
-                            const camBtn = document.getElementById('mr_files_camera_btn');
-                            const preview = document.getElementById('mr_files_preview');
-                            const list = document.getElementById('mr_files_list');
-                            if (!anyInput || !camInput || !anyBtn || !camBtn || !preview || !list) return;
-
-                            let filesBag = [];
-                            const keyOf = (f) => `${f.name}|${f.size}|${f.type}|${f.lastModified || 0}`;
-                            const syncToInputs = () => {
-                                const dt = new DataTransfer();
-                                filesBag.forEach(f => dt.items.add(f));
-                                anyInput.files = dt.files;
-                            };
-                            const escapeHtml = (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g,
-                                '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-                            const render = () => {
-                                list.innerHTML = '';
-                                if (!filesBag.length) {
-                                    preview.classList.add('hidden');
-                                    return;
-                                }
-                                preview.classList.remove('hidden');
-                                filesBag.forEach((f, idx) => {
-                                    const card = document.createElement('div');
-                                    card.className = 'p-3 rounded-lg border border-slate-200 bg-slate-50 space-y-2';
-
-                                    const top = document.createElement('div');
-                                    top.className = 'flex items-center justify-between gap-3';
-
-                                    const left = document.createElement('div');
-                                    left.className = 'min-w-0';
-                                    const name = document.createElement('div');
-                                    name.className = 'truncate text-[13px] font-medium text-slate-700';
-                                    name.textContent = f.name;
-                                    const meta = document.createElement('div');
-                                    meta.className = 'text-[11px] text-slate-500';
-                                    meta.textContent = (f.type || 'file') + ' • ' + Math.round(f.size / 1024) + ' KB';
-                                    left.appendChild(name);
-                                    left.appendChild(meta);
-
-                                    const del = document.createElement('button');
-                                    del.type = 'button';
-                                    del.className = 'shrink-0 text-rose-600 hover:text-rose-700 text-xs font-medium';
-                                    del.textContent = 'ลบ';
-                                    del.addEventListener('click', () => {
-                                        filesBag.splice(idx, 1);
-                                        syncToInputs();
-                                        render();
-                                    });
-
-                                    top.appendChild(left);
-                                    top.appendChild(del);
-                                    card.appendChild(top);
-
-                                    // Caption Input
-                                    const capInput = document.createElement('input');
-                                    capInput.type = 'text';
-                                    capInput.name = 'captions[]';
-                                    capInput.placeholder = 'เพิ่มคำอธิบายภาพ...';
-                                    capInput.className =
-                                        'w-full h-8 px-2 py-1 text-[12px] rounded border border-slate-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-100 outline-none transition';
-                                    card.appendChild(capInput);
-
-                                    list.appendChild(card);
-                                });
-                            };
-                            const addFiles = (files) => {
-                                const arr = Array.from(files || []);
-                                if (!arr.length) return;
-                                const map = new Map(filesBag.map(f => [keyOf(f), f]));
-                                arr.forEach(f => map.set(keyOf(f), f));
-                                const currentCount = {{ $atts->count() }};
-                                const maxAllowed = Math.max(0, 3 - currentCount);
-
-                                if (map.size > maxAllowed) {
-                                    window.dispatchEvent(new CustomEvent('app:toast', {
-                                        detail: { type: 'warning', message: 'สามารถแนบไฟล์เพิ่มได้อีก ' + maxAllowed + ' ไฟล์ (สูงสุด 3 ไฟล์ต่อใบงาน)' }
-                                    }));
-                                }
-                                filesBag = Array.from(map.values()).slice(0, maxAllowed);
-                                syncToInputs();
-                                render();
-                            };
-                            anyBtn.addEventListener('click', () => anyInput.click());
-                            camBtn.addEventListener('click', () => camInput.click());
-                            anyInput.addEventListener('change', () => {
-                                addFiles(anyInput.files);
-                                anyInput.value = '';
-                            });
-                            camInput.addEventListener('change', () => {
-                                addFiles(camInput.files);
-                                camInput.value = '';
-                            });
-                        })();
-                    </script>
-                @else
-                    <div class="rounded-md border {{ $line }} bg-white px-3 py-2 text-sm text-slate-600">
-                        คุณไม่มีสิทธิ์แนบไฟล์ในใบงานนี้
-                    </div>
-                @endcan
-
-                <div class="mt-6 border-t {{ $line }} pt-4">
-                    @if ($atts->count())
-                        <div class="mb-2 text-sm font-medium text-slate-700">
-                            ไฟล์ที่แนบไว้แล้ว ({{ $atts->count() }} ไฟล์)
-                        </div>
-                        <div class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-                            @foreach ($atts as $att)
-                                @php
-                                    $file = $att->file;
-                                    $name = $att->original_name ?? ($file?->path ?? 'file');
-                                    $isPrivate = (bool) ($att->is_private ?? false);
-                                    $mime = $file?->mime ?? '';
-                                    $isImg = $mime && str_starts_with($mime, 'image/');
-                                    $publicUrl = null;
-                                    if ($file && ($file->disk ?? null) && ($file->path ?? null)) {
-                                        try {
-                                            /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
-                                            $disk = Storage::disk($file->disk);
-                                            $publicUrl = $disk->url($file->path);
-                                        } catch (\Throwable $e) {
-                                            $publicUrl = null;
-                                        }
-                                    }
-                                    $canOpenPrivate = auth()->check() && auth()->user()->can('update', $req);
-                                    $canOpen = !$isPrivate || $canOpenPrivate;
-                                    $openUrl = $publicUrl;
-                                    try {
-                                        $openUrl = route('attachments.show', $att);
-                                    } catch (\Throwable $e) {
-                                        $openUrl = $publicUrl;
-                                    }
-                                    $deleteUrl = null;
-                                    try {
-                                        $deleteUrl = route('maintenance.requests.attachments.destroy', [
-                                            'maintenanceRequest' => $req->id,
-                                            'attachment' => $att->id,
-                                        ]);
-                                    } catch (\Throwable $e) {
-                                        $deleteUrl = null;
-                                    }
-                                @endphp
-                                <figure class="overflow-hidden rounded-lg border {{ $line }} bg-white text-xs">
-                                    @if ($isImg && !$isPrivate && $openUrl)
-                                        <a href="{{ $openUrl }}" target="_blank" rel="noopener">
-                                            <img src="{{ $openUrl }}" alt="{{ $att->alt_text ?? $name }}"
-                                                class="h-32 w-full object-cover">
-                                        </a>
-                                    @else
-                                        <div class="grid h-32 w-full place-items-center text-slate-500 text-[13px]">
-                                            {{ strtoupper(pathinfo($name, PATHINFO_EXTENSION) ?: 'FILE') }}
-                                        </div>
-                                    @endif
-                                    <figcaption class="px-3 py-2 space-y-2">
-                                        <div class="flex items-center justify-between gap-2">
-                                            <span
-                                                class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium
-                                 {{ $isPrivate ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-slate-200 bg-slate-50 text-slate-700' }}">
-                                                {{ $isPrivate ? 'private' : 'public' }}
-                                            </span>
-                                            <span class="truncate text-slate-600 text-[12px]"
-                                                title="{{ $name }}">{{ $name }}</span>
-                                        </div>
-                                        @if ($att->caption)
-                                            <div class="text-[12px] text-slate-800 font-medium line-clamp-2 italic"
-                                                title="{{ $att->caption }}">
-                                                "{{ $att->caption }}"
-                                            </div>
-                                        @endif
-                                        <div class="flex items-center justify-between gap-2">
-                                            @if ($canOpen && $openUrl)
-                                                <a href="{{ $openUrl }}" target="_blank" rel="noopener"
-                                                    class="inline-flex items-center rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-medium text-sky-800 hover:bg-sky-100">
-                                                    เปิด
-                                                </a>
-                                            @else
-                                                <span
-                                                    class="inline-flex items-center rounded-md border {{ $line }} bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-500">
-                                                    ไม่อนุญาต
-                                                </span>
-                                            @endif
-                                            @can('deleteAttachment', $req)
-                                                @if ($deleteUrl)
-                                                    <form method="POST" action="{{ $deleteUrl }}"
-                                                        onsubmit="return confirm('ยืนยันลบไฟล์แนบนี้?');">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit"
-                                                            class="inline-flex items-center rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-100">
-                                                            ลบ
-                                                        </button>
-                                                    </form>
-                                                @endif
-                                            @endcan
-                                        </div>
-                                    </figcaption>
-                                </figure>
-                            @endforeach
-                        </div>
-                    @else
-                        <p class="text-sm text-slate-500">ยังไม่มีไฟล์แนบในใบงานนี้</p>
-                    @endif
-                </div>
-            </section>
+                                @include('maintenance.requests.partials._attachments')
 
             <div class="border-t {{ $line }}"></div>
 
             <div class="relative grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div class="hidden lg:block absolute inset-y-0 left-1/2 w-px bg-slate-200"></div>
-                <section>
-                    <div class="{{ $headCls }}">
-                        <div class="{{ $noCls }}">5</div>
-                        <div class="{{ $accentWrap }}">
-                            <span class="{{ $accentBar }}"></span>
-                            <div class="{{ $titleCls }}">รายงานการปฏิบัติงานและค่าใช้จ่าย <span
-                                    class="text-slate-500 text-[13px] font-normal">(บันทึกภายหลังได้)</span></div>
-                            <div class="{{ $subCls }}">สำหรับทีมช่าง: ระบุวิธีคิดค่าใช้จ่าย, รพจ.
-                                และรายละเอียดประกอบ</div>
-                        </div>
-                    </div>
+                                    @include('maintenance.requests.partials._operation_log')
 
-                    @can('updateOperationLog', $req)
-                        <form method="post" action="{{ $opLogUrl }}" class="space-y-4" novalidate>
-                            @csrf
-                            <div>
-                                <label for="operation_date"
-                                    class="block text-sm font-medium text-slate-700">รายการซ่อมสำหรับวันที่</label>
-                                <input id="operation_date" type="date" name="operation_date"
-                                    value="{{ old('operation_date', optional($opLog?->operation_date)->format('Y-m-d')) }}"
-                                    class="{{ $input }}">
-                            </div>
-                            <div>
-                                <div class="block text-sm font-medium text-slate-700">วิธีการปฏิบัติ / การคิดค่าใช้จ่าย</div>
-                                @php $method = old('operation_method', $opLog->operation_method ?? null); @endphp
-                                <div class="mt-2 space-y-2 text-sm">
-                                    <label class="inline-flex items-center gap-2">
-                                        <input type="radio" name="operation_method" value="requisition"
-                                            @checked($method === 'requisition')
-                                            class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
-                                        <span>ตามใบเบิกครุภัณฑ์ / วัสดุ</span>
-                                    </label>
-                                    <label class="inline-flex items-center gap-2">
-                                        <input type="radio" name="operation_method" value="service_fee"
-                                            @checked($method === 'service_fee')
-                                            class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
-                                        <span>ค่าบริการ / ค่าแรงช่าง</span>
-                                    </label>
-                                    <label class="inline-flex items-center gap-2">
-                                        <input type="radio" name="operation_method" value="other"
-                                            @checked($method === 'other')
-                                            class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
-                                        <span>อื่น ๆ</span>
-                                    </label>
-                                </div>
-                            </div>
-                            <div>
-                                <label for="property_code" class="block text-sm font-medium text-slate-700">ระบุรพจ.
-                                    (รหัสครุภัณฑ์)</label>
-                                <input id="property_code" type="text" name="property_code"
-                                    value="{{ old('property_code', $opLog->property_code ?? ($assetCode ?? '')) }}"
-                                    class="{{ $input }}" placeholder="เช่น 68101068718">
-                            </div>
-                            <label class="inline-flex items-center gap-2 text-sm text-slate-700">
-                                <input type="checkbox" name="require_precheck" value="1" @checked(old('require_precheck', $opLog->require_precheck ?? false))
-                                    class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
-                                ยืนยันว่าได้แจ้งผู้ใช้งาน / หน่วยงาน และขออนุญาตก่อนปฏิบัติงาน/ปิดเครื่อง
-                            </label>
-                            <div>
-                                <div class="text-sm font-medium text-slate-700">ประเภทงานที่ปฏิบัติ</div>
-                                <div class="mt-2 space-y-2 text-sm">
-                                    <label class="inline-flex items-center gap-2">
-                                        <input type="checkbox" name="issue_software" value="1"
-                                            @checked(old('issue_software', $opLog->issue_software ?? false))
-                                            class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
-                                        <span>Software</span>
-                                    </label>
-                                    <label class="inline-flex items-center gap-2">
-                                        <input type="checkbox" name="issue_hardware" value="1"
-                                            @checked(old('issue_hardware', $opLog->issue_hardware ?? false))
-                                            class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
-                                        <span>Hardware</span>
-                                    </label>
-                                </div>
-                            </div>
-                            <div>
-                                <label for="remark" class="block text-sm font-medium text-slate-700">หมายเหตุ /
-                                    รายละเอียดประกอบ</label>
-                                <textarea id="remark" name="remark" rows="4" class="{{ $textarea }}"
-                                    placeholder="เช่น ตรวจเช็คแล้วพบว่า..., ผู้ใช้ทดสอบแล้วเรียบร้อย">{{ old('remark', $opLog->remark ?? '') }}</textarea>
-                            </div>
-                            <div class="flex justify-end">
-                                <button type="submit"
-                                    class="inline-flex items-center justify-center h-10 px-4 rounded-lg bg-emerald-600 text-sm font-medium text-white hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-200">
-                                    บันทึกรายงานการปฏิบัติงาน
-                                </button>
-                            </div>
-                        </form>
-                    @else
-                        <div
-                            class="rounded-md border {{ $line }} bg-white px-4 py-3 text-sm text-slate-600 shadow-sm italic">
-                            <div class="flex items-center gap-2 text-rose-600 font-semibold mb-1">
-                                <span class="material-symbols-outlined text-[18px]">lock</span>
-                                สิทธิ์การบันทึกรายงานถูกระงับ
-                            </div>
-                            เนื่องจากใบงานอยู่ในสถานะ "{{ $req->status_label }}"
-                            ซึ่งไม่ได้รับอนุญาตให้แก้ไขรายงานการปฏิบัติงานในขณะนี้
-                        </div>
-                    @endcan
-
-                    @if ($opLog)
-                        <p class="mt-3 text-xs text-slate-500">
-                            บันทึกล่าสุดโดย {{ $opLog->user?->name ?? 'ไม่ระบุผู้บันทึก' }}
-                            เมื่อ {{ $opLog->updated_at?->format('Y-m-d H:i') ?? '-' }}
-                        </p>
-                    @endif
-                </section>
-
-                <section>
-                    <div class="{{ $headCls }}">
-                        <div class="{{ $noCls }}">6</div>
-                        <div class="{{ $accentWrap }}">
-                            <span class="{{ $accentBar }}"></span>
-                            <div class="{{ $titleCls }}">ทีมช่างที่รับผิดชอบ</div>
-                            <div class="{{ $subCls }}">ผู้ปฏิบัติงาน</div>
-                        </div>
-                    </div>
-
-                    <div class="space-y-4">
-                        <div class="flex items-center justify-between">
-                            <div class="text-[14px] font-semibold text-slate-800">รายชื่อทีมช่าง</div>
-                            <div class="text-[12px] text-slate-500">{{ $workers->count() }} คน</div>
-                        </div>
-
-                        <div
-                            class="rounded-lg border {{ $line }} bg-white max-h-72 overflow-y-auto divide-y divide-slate-200">
-                            @if ($workers->isEmpty())
-                                <div class="px-4 py-3 text-[13px] text-slate-500">ยังไม่ได้มอบหมายงานให้ทีมช่าง</div>
-                            @else
-                                @foreach ($workers as $worker)
-                                    @php
-                                        $assign = $assignments->firstWhere('user_id', $worker->id);
-                                        if (
-                                            !$assign ||
-                                            $assign->status === \App\Models\MaintenanceAssignment::STATUS_CANCELLED
-                                        ) {
-                                            continue;
-                                        }
-                                        $isLead = (bool) ($assign->is_lead ?? false);
-                                        $avatar = $worker->avatar_thumb_url ?? null;
-                                    @endphp
-                                    <div class="flex items-center justify-between gap-3 px-4 py-3">
-                                        <div class="flex min-w-0 items-center gap-3">
-                                            <div
-                                                class="h-9 w-9 flex-shrink-0 overflow-hidden rounded-full border {{ $line }} bg-white">
-                                                @if ($avatar)
-                                                    <img src="{{ $avatar }}" alt="{{ $worker->name }}"
-                                                        class="h-full w-full object-cover">
-                                                @else
-                                                    <div
-                                                        class="grid h-full w-full place-items-center text-[11px] text-slate-500 bg-slate-50">
-                                                        —</div>
-                                                @endif
-                                            </div>
-                                            <div class="min-w-0 flex-1">
-                                                <div class="truncate text-[14px] font-semibold text-slate-900"
-                                                    title="{{ $worker->name }}">
-                                                    {{ $worker->name }}
-                                                </div>
-                                                <div class="truncate text-[12px] text-slate-500">
-                                                    {{ $worker->role_label ?? ($fallbackRoleLabels[$worker->role ?? 'unknown'] ?? ($worker->role ?? 'unknown')) }}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            @endif
-                        </div>
-
-                        @can('assign', $req)
-                            <div class="flex justify-end">
-                                <button type="button" id="openAssignModalBtn"
-                                    class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2 text-[13px] font-semibold
-                    text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 shadow-sm transition-all active:scale-95">
-                                    <img src="/icon/technical-support.avif" class="w-4 h-4 object-contain brightness-0 invert"
-                                        alt="Assign">
-                                    มอบหมายทีมช่าง
-                                </button>
-                            </div>
-                        @endcan
-                    </div>
-                </section>
+                                    @include('maintenance.requests.partials._assigned_team')
             </div>
         </div>
 
@@ -1282,6 +662,90 @@
             </div>
         @endcan
 
+        {{-- Reject Modal --}}
+        @if ($canReject)
+            <div id="rejectModal"
+                class="fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+                <div
+                    class="relative z-[10000] w-full max-w-xl rounded-2xl border {{ $line }} bg-white shadow-xl">
+                    <div class="flex items-center justify-between border-b {{ $line }} px-4 py-3">
+                        <div class="text-sm font-semibold text-rose-600">ไม่รับเรื่อง</div>
+                        <button type="button" id="closeRejectModalBtn"
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" />
+                            </svg>
+                        </button>
+                    </div>
+                    <form method="POST" action="{{ route('maintenance.requests.reject', $req->id) }}"
+                        class="px-4 py-4 space-y-4">
+                        @csrf
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">ระบุเหตุผลที่ไม่รับเรื่อง <span
+                                    class="text-rose-600">*</span></label>
+                            <textarea name="reject_reason" rows="4" required
+                                class="mt-2 w-full rounded-md border {{ $line }} bg-white px-3 py-2 text-sm
+                               focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
+                                placeholder="เช่น ข้อมูลไม่ครบถ้วน, แจ้งซ้ำ, หรือไม่ใช่หน้าที่ของทีมช่าง..."></textarea>
+                        </div>
+                        <div class="flex justify-end gap-2 pt-2">
+                            <button type="button" id="cancelRejectModalBtn"
+                                class="px-3 py-2 text-xs border {{ $line }} rounded-md bg-white hover:bg-slate-50">
+                                ยกเลิก
+                            </button>
+                            <button type="submit"
+                                class="px-3 py-2 text-xs bg-rose-600 text-white rounded-md hover:bg-rose-700 focus:ring-2 focus:ring-rose-200">
+                                ยืนยันการไม่รับเรื่อง
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        @endif
+
+        {{-- Cancel Modal --}}
+        @if ($canCancel)
+            <div id="cancelModal"
+                class="fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+                <div
+                    class="relative z-[10000] w-full max-w-xl rounded-2xl border {{ $line }} bg-white shadow-xl">
+                    <div class="flex items-center justify-between border-b {{ $line }} px-4 py-3">
+                        <div class="text-sm font-semibold text-slate-600">ยกเลิกซ่อม</div>
+                        <button type="button" id="closeCancelModalBtn"
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" />
+                            </svg>
+                        </button>
+                    </div>
+                    <form method="POST" action="{{ route('maintenance.requests.cancel', $req->id) }}"
+                        class="px-4 py-4 space-y-4">
+                        @csrf
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">ระบุเหตุผลการยกเลิก <span
+                                    class="text-rose-600">*</span></label>
+                            <textarea name="cancel_reason" rows="4" required
+                                class="mt-2 w-full rounded-md border {{ $line }} bg-white px-3 py-2 text-sm
+                               focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+                                placeholder="เช่น แจ้งผิดหน่วยงาน, ซ่อมเองได้แล้ว, หรือขอยกเลิกรายการนี้..."></textarea>
+                        </div>
+                        <div class="flex justify-end gap-2 pt-2">
+                            <button type="button" id="cancelCancelModalBtn"
+                                class="px-3 py-2 text-xs border {{ $line }} rounded-md bg-white hover:bg-slate-50">
+                                ปิด
+                            </button>
+                            <button type="submit"
+                                class="px-3 py-2 text-xs bg-slate-600 text-white rounded-md hover:bg-slate-700 focus:ring-2 focus:ring-slate-200">
+                                ยืนยันการยกเลิกซ่อม
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        @endif
+
         {{-- Hold Modal --}}
         @if ($canHold)
             <div id="holdModal"
@@ -1324,6 +788,48 @@
             </div>
         @endif
 
+        {{-- Resolve Modal --}}
+        @if ($canResolve)
+            <div id="resolveModal"
+                class="fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+                <div
+                    class="relative z-[10000] w-full max-w-xl rounded-2xl border {{ $line }} bg-white shadow-xl">
+                    <div class="flex items-center justify-between border-b {{ $line }} px-4 py-3">
+                        <div class="text-sm font-semibold text-slate-900">ซ่อมบำรุงเสร็จสิ้น</div>
+                        <button type="button" id="closeResolveModalBtn"
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" />
+                            </svg>
+                        </button>
+                    </div>
+                    <form method="POST" action="{{ route('maintenance.requests.resolve', $req->id) }}"
+                        class="px-4 py-4 space-y-4">
+                        @csrf
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">ระบุรายละเอียดการแก้ปัญหา <span
+                                    class="text-emerald-600">*</span></label>
+                            <textarea name="resolution_note" rows="4" required
+                                class="mt-2 w-full rounded-md border {{ $line }} bg-white px-3 py-2 text-sm
+                               focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                                placeholder="เช่น เปลี่ยนอะไหล่, ซ่อมแผงวงจรสำเร็จ, ผ่านการสอบเทียบแล้ว..."></textarea>
+                        </div>
+                        <div class="flex justify-end gap-2 pt-2">
+                            <button type="button" id="cancelResolveModalBtn"
+                                class="px-3 py-2 text-xs border {{ $line }} rounded-md bg-white hover:bg-slate-50">
+                                ยกเลิก
+                            </button>
+                            <button type="submit"
+                                class="px-3 py-2 text-xs bg-emerald-700 text-white rounded-md hover:bg-emerald-800 focus:ring-2 focus:ring-emerald-200">
+                                ยืนยันซ่อมบำรุงเสร็จสิ้น
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        @endif
+
         {{-- Post-Close Action Modal --}}
         @if (session('show_post_close_modal'))
             <div id="postCloseModal"
@@ -1337,7 +843,7 @@
                                 class="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 mb-4 shadow-inner">
                                 <span class="material-symbols-outlined text-[48px]">check_circle</span>
                             </div>
-                            <h3 class="text-xl font-bold text-slate-900">ปิดงานเรียบร้อยแล้ว!</h3>
+                            <h3 class="text-xl font-bold text-slate-900">อนุมัติเรียบร้อยแล้ว!</h3>
                             <p class="mt-2 text-sm text-slate-500">ขอบคุณที่ใช้บริการครับ คุณต้องการดำเนินการอย่างไรต่อ?
                             </p>
                         </div>
@@ -1345,7 +851,7 @@
                         {{-- Action Buttons --}}
                         <div class="p-6 space-y-3">
                             @can('rate', $req)
-                                <a href="{{ route('maintenance.ratings.create', $req->id) }}"
+                                <a href="{{ route('maintenance.requests.rating.create', $req->id) }}"
                                     class="flex w-full items-center justify-center gap-3 rounded-2xl bg-amber-500 py-4 text-[15px] font-bold text-white shadow-lg shadow-amber-200 hover:bg-amber-600 hover:scale-[1.02] active:scale-[0.98] transition-all">
                                     <span class="material-symbols-outlined text-[20px]">star</span>
                                     ประเมินความพึงพอใจ
@@ -1602,6 +1108,31 @@
                 });
             }
 
+            // --- 6.1 Cancel Modal Logic (หน้าต่างยกเลิกงาน) ---
+            const cancelModal = document.getElementById('cancelModal');
+            const openCancelBtn = document.getElementById('openCancelModalBtn');
+            const closeCancelBtn = document.getElementById('closeCancelModalBtn');
+            const cancelCancelBtn = document.getElementById('cancelCancelModalBtn');
+
+            if (cancelModal && openCancelBtn) {
+                const showCancel = () => {
+                    cancelModal.classList.remove('hidden');
+                    cancelModal.classList.add('flex');
+                    document.body.style.overflow = 'hidden';
+                };
+                const hideCancel = () => {
+                    cancelModal.classList.add('hidden');
+                    cancelModal.classList.remove('flex');
+                    document.body.style.overflow = '';
+                };
+                openCancelBtn.addEventListener('click', showCancel);
+                closeCancelBtn?.addEventListener('click', hideCancel);
+                cancelCancelBtn?.addEventListener('click', hideCancel);
+                cancelModal.addEventListener('click', e => {
+                    if (e.target === cancelModal) hideCancel();
+                });
+            }
+
             // --- 7. Hold Modal Logic ---
             const holdModal = document.getElementById('holdModal');
             const openHoldBtn = document.getElementById('openHoldModalBtn');
@@ -1624,6 +1155,31 @@
                 cancelHoldBtn?.addEventListener('click', hideHold);
                 holdModal.addEventListener('click', e => {
                     if (e.target === holdModal) hideHold();
+                });
+            }
+
+            // --- 8. Resolve Modal Logic ---
+            const resolveModal = document.getElementById('resolveModal');
+            const openResolveBtn = document.getElementById('openResolveModalBtn');
+            const closeResolveBtn = document.getElementById('closeResolveModalBtn');
+            const cancelResolveBtn = document.getElementById('cancelResolveModalBtn');
+
+            if (resolveModal && openResolveBtn) {
+                const showResolve = () => {
+                    resolveModal.classList.remove('hidden');
+                    resolveModal.classList.add('flex');
+                    document.body.style.overflow = 'hidden';
+                };
+                const hideResolve = () => {
+                    resolveModal.classList.add('hidden');
+                    resolveModal.classList.remove('flex');
+                    document.body.style.overflow = '';
+                };
+                openResolveBtn.addEventListener('click', showResolve);
+                closeResolveBtn?.addEventListener('click', hideResolve);
+                cancelResolveBtn?.addEventListener('click', hideResolve);
+                resolveModal.addEventListener('click', e => {
+                    if (e.target === resolveModal) hideResolve();
                 });
             }
         })();

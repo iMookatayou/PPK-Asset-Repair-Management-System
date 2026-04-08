@@ -111,7 +111,7 @@ class MaintenanceRequest extends Model
      * Transition map: สถานะปัจจุบัน => สถานะที่อนุญาตให้เปลี่ยนไปได้
      */
     public const ALLOWED_TRANSITIONS = [
-        self::STATUS_PENDING      => [self::STATUS_ACKNOWLEDGED, self::STATUS_CANCELLED],
+        self::STATUS_PENDING      => [self::STATUS_ACKNOWLEDGED, self::STATUS_CANCELLED, self::STATUS_REJECTED],
         self::STATUS_ACKNOWLEDGED => [self::STATUS_ACCEPTED, self::STATUS_CANCELLED, self::STATUS_REJECTED],
         self::STATUS_ACCEPTED     => [self::STATUS_IN_PROGRESS, self::STATUS_ON_HOLD, self::STATUS_CANCELLED],
         self::STATUS_IN_PROGRESS  => [self::STATUS_RESOLVED, self::STATUS_CANCELLED, self::STATUS_ON_HOLD],
@@ -130,10 +130,10 @@ class MaintenanceRequest extends Model
             self::STATUS_ACCEPTED     => 'รับเรื่องแล้ว',
             self::STATUS_IN_PROGRESS  => 'กำลังดำเนินการ',
             self::STATUS_ON_HOLD      => 'พักชั่วคราว',
-            self::STATUS_RESOLVED     => 'แก้ไขแล้ว',
-            self::STATUS_CLOSED       => 'ปิดงาน',
-            self::STATUS_CANCELLED    => 'ยกเลิก',
-            self::STATUS_REJECTED     => 'ปฏิเสธ',
+            self::STATUS_RESOLVED     => 'ซ่อมบำรุงเสร็จสิ้น',
+            self::STATUS_CLOSED       => 'อนุมัติ',
+            self::STATUS_CANCELLED    => 'ยกเลิกซ่อม',
+            self::STATUS_REJECTED     => 'ไม่รับเรื่อง',
             self::STATUS_COMPLETED    => 'เสร็จสิ้น (legacy)',
         ];
     }

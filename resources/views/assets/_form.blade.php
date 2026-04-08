@@ -453,7 +453,8 @@
                     @if (!$readonly)
                         <label class="{{ $labelCls }}">เลือกไฟล์เอกสารเพิ่มเติม</label>
                         <div class="flex items-center gap-2">
-                            <input id="att_files_any" type="file" name="files[]" multiple
+                            <input id="att_files_submit" type="file" name="files[]" multiple class="hidden">
+                            <input id="att_files_any" type="file" multiple
                                 accept="image/*,application/pdf" class="hidden">
                             <input id="att_files_camera" type="file" accept="image/*" capture="environment"
                                 class="hidden">
@@ -685,7 +686,14 @@
                 const sync = () => {
                     const dt = new DataTransfer();
                     filesBag.forEach(f => dt.items.add(f));
-                    anyInput.files = dt.files;
+                    
+                    // If it's the attachments section, submit via the dedicated input
+                    const submitInput = document.getElementById(anyId.replace('_any', '_submit'));
+                    if (submitInput) {
+                        submitInput.files = dt.files;
+                    } else {
+                        anyInput.files = dt.files;
+                    }
                 };
 
                 const renderSingle = () => {

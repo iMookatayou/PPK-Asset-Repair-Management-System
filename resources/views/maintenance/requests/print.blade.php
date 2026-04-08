@@ -203,9 +203,10 @@
         'accepted'    => 'รับงานแล้ว',
         'in_progress' => 'ระหว่างดำเนินการ',
         'on_hold'     => 'พักไว้',
-        'resolved'    => 'แก้ไขแล้ว',
-        'closed'      => 'ปิดงาน',
-        'cancelled'   => 'ยกเลิก',
+        'resolved'    => 'ซ่อมบำรุงเสร็จสิ้น',
+        'closed'      => 'อนุมัติ',
+        'cancelled'   => 'ยกเลิกซ่อม',
+        'rejected'    => 'ไม่รับเรื่อง',
     ][$status] ?? $status;
 
     $prio = strtolower((string) $req->priority);
@@ -358,7 +359,7 @@
                                 $aStatus = $assign?->status;
                                 $statusText = $aStatus === \App\Models\MaintenanceAssignment::STATUS_IN_PROGRESS ? 'กำลังดำเนินการ'
                                              : ($aStatus === \App\Models\MaintenanceAssignment::STATUS_DONE ? 'เสร็จสิ้น'
-                                             : ($aStatus === \App\Models\MaintenanceAssignment::STATUS_CANCELLED ? 'ยกเลิก' : 'ไม่ระบุ'));
+                                             : ($aStatus === \App\Models\MaintenanceAssignment::STATUS_CANCELLED ? 'ยกเลิกซ่อม' : 'ไม่ระบุ'));
                             @endphp
                             <tr>
                                 <td class="text-center">{{ $i + 1 }}</td>

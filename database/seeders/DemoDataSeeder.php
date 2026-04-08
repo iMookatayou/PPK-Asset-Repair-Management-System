@@ -19,10 +19,10 @@ class DemoDataSeeder extends Seeder
         DB::connection()->disableQueryLog();
 
         // ================== CONFIG ==================
-        $assetCount   = (int) env('DEMO_ASSET_COUNT', 120);
-        $techCount    = (int) env('DEMO_TECH_COUNT', 6);
-        $staffCount   = (int) env('DEMO_MEMBER_COUNT', 18);
-        $requestCount = (int) env('DEMO_SEED_COUNT', 150);
+        $assetCount   = (int) env('DEMO_ASSET_COUNT', 250);
+        $techCount    = (int) env('DEMO_TECH_COUNT', 8);
+        $staffCount   = (int) env('DEMO_MEMBER_COUNT', 25);
+        $requestCount = (int) env('DEMO_SEED_COUNT', 400);
         $chunkSize    = (int) env('DEMO_CHUNK', 500);
 
         $adminCitizenId = env('DEMO_ADMIN_CITIZEN_ID', '1000000000001');
@@ -141,6 +141,12 @@ class DemoDataSeeder extends Seeder
         $hasDescription  = $has('description');
         $hasPriority     = $has('priority');
         $hasStatusCol    = $has('status');
+        $hasTypeId       = $has('type_id');
+
+        $typeIds = [];
+        if ($hasTypeId) {
+            $typeIds = DB::table('maintenance_request_types')->where('is_active', true)->pluck('id')->all();
+        }
 
         // ================== TRUNCATE (Optional but suggested for exact numbers) ==================
         if (Schema::hasTable('maintenance_operation_logs')) DB::table('maintenance_operation_logs')->truncate();
@@ -323,7 +329,7 @@ class DemoDataSeeder extends Seeder
             $hasLegacyPayload, $hasLocationText,
             $hasRequestDate, $hasAssignedDate, $hasCompletedDate, $hasAcceptedAt, $hasAcknowledgedAt, $hasPausedDuration, $hasStartedAt, $hasOnHoldAt, $hasResolvedAt, $hasClosedAt, $hasSlaDueDate,
             $hasRemark, $hasResolutionNote, $hasCost, $hasSource, $hasExtra,
-            $hasCreatedAt, $hasUpdatedAt,
+            $hasCreatedAt, $hasUpdatedAt, $hasTypeId, $typeIds,
 
             &$insertedMR, &$insertedLogs
         ) {
@@ -361,6 +367,7 @@ class DemoDataSeeder extends Seeder
             if ($hasStatusCol)        $insertCols[] = 'status';
             if ($hasTechnicianId)     $insertCols[] = 'technician_id';
             if ($hasTitle)            $insertCols[] = 'title';
+            if ($hasTypeId)           $insertCols[] = 'type_id';
             if ($hasUpdatedAt)        $insertCols[] = 'updated_at';
 
             for ($i = 1; $i <= $requestCount; $i++) {
@@ -413,7 +420,7 @@ class DemoDataSeeder extends Seeder
                 if ($isExternal) $reporter = null;
 
                 $techId = null;
-                if (!in_array($status, ['pending','cancelled'], true)) {
+                if (!in_array($status, ['pending','acknowledged','accepted','cancelled'], true)) {
                     $techId = $techIds ? $techIds[array_rand($techIds)] : null;
                 }
 
@@ -428,6 +435,20 @@ class DemoDataSeeder extends Seeder
                 if ($hasDescription)  $row['description'] = 'รายละเอียดการแจ้งซ่อม: ปัญหาที่พบจากการใช้งานเบื้องต้น';
                 if ($hasPriority)     $row['priority'] = $priority;
                 if ($hasStatusCol)    $row['status']   = $status;
+                
+                // Assign type_id realistically: Early stages often have no type yet
+                if ($hasTypeId && !empty($typeIds)) {
+                    $shouldHaveType = true;
+                    if (in_array($status, [MR::STATUS_PENDING, MR::STATUS_ACKNOWLEDGED], true)) {
+                        $shouldHaveType = (random_int(1, 100) <= 20); // 20% chance for early stages
+                    } elseif ($status === MR::STATUS_ACCEPTED) {
+                        $shouldHaveType = (random_int(1, 100) <= 70); // 70% chance for accepted
+                    }
+                    
+                    if ($shouldHaveType) {
+                        $row['type_id'] = $typeIds[array_rand($typeIds)];
+                    }
+                }
                 if ($hasDeptMR && $departmentIds) $row['department_id'] = $departmentIds[array_rand($departmentIds)];
                 if ($hasLocationText) $row['location_text'] = fake()->randomElement(['ตึก A ชั้น 2', 'ตึก B ห้อง IT', 'หน้า ER', 'Ward 3', 'OPD 5']);
                 if ($isExternal) {
@@ -931,7 +952,7 @@ class DemoDataSeeder extends Seeder
         if ($hasCode && $hasNameTh && !DB::table('departments')->exists()) {
             $now = now();
             DB::table('departments')->insert([
-                ['code'=>'IT','name_th'=>'ฝ่าย IT & Support','name_en'=>'IT & Support','created_at'=>$now,'updated_at'=>$now],
+                ['code'=>'IT','name_th'=>'ฝ่าย IT & Hardware','name_en'=>'IT & Hardware','created_at'=>$now,'updated_at'=>$now],
                 ['code'=>'ER','name_th'=>'ห้องฉุกเฉิน','name_en'=>'Emergency Room','created_at'=>$now,'updated_at'=>$now],
                 ['code'=>'OPD','name_th'=>'ผู้ป่วยนอก','name_en'=>'OPD','created_at'=>$now,'updated_at'=>$now],
                 ['code'=>'WARD','name_th'=>'วอร์ดผู้ป่วยใน','name_en'=>'Ward','created_at'=>$now,'updated_at'=>$now],
