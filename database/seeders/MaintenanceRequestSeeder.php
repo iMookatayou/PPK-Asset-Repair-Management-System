@@ -79,24 +79,10 @@ class MaintenanceRequestSeeder extends Seeder
         $mrAccepted = MR::factory()->create([
             'request_no'    => $reqNo(),
             'status'        => MR::STATUS_ACCEPTED,
-            'technician_id' => $tech1->id,
+            'technician_id' => null, // ไม่มีช่างรับผิดชอบหลักเมื่องานอยู่ในสถานะ รับเรื่อง
             'acknowledged_at' => now()->subHours(9),
             'accepted_at' => now()->subHours(8),
             'sla_due_date' => now()->addDays(7),
-        ]);
-
-        MA::create([
-            'maintenance_request_id' => $mrAccepted->id,
-            'user_id'                => $tech1->id,
-            'role'                   => 'tech',
-            'is_lead'                => true,
-            'assigned_at'            => now()->subHours(8),
-
-            'response_status'        => MA::RESP_ACCEPTED,
-            'responded_at'           => now()->subHours(7),
-            'remark'                 => null,
-
-            'status'                 => MA::STATUS_IN_PROGRESS,
         ]);
 
         $mrInProgress = MR::factory()->create([

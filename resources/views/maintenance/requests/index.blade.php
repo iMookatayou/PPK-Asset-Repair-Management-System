@@ -23,9 +23,10 @@
     'accepted'    => 'รับเรื่องแล้ว',
     'in_progress' => 'กำลังดำเนินการ',
     'on_hold'     => 'พักไว้ชั่วคราว',
-    'resolved'    => 'แก้ไขเสร็จสิ้น',
-    'closed'      => 'ปิดงาน',
-    'cancelled'   => 'ยกเลิก',
+    'resolved'    => 'ซ่อมบำรุงเสร็จสิ้น',
+    'closed'      => 'อนุมัติ',
+    'cancelled'   => 'ยกเลิกซ่อม',
+    'rejected'    => 'ไม่รับเรื่อง',
   ][strtolower((string)$s)] ?? Str::of((string)$s)->replace('_',' ')->title();
 
   $statusTextClass = fn(?string $s) => match(strtolower((string)$s)) {
@@ -61,9 +62,10 @@
     'accepted'    => 'รับเรื่องแล้ว',
     'in_progress' => 'กำลังดำเนินการ',
     'on_hold'     => 'พักไว้ชั่วคราว',
-    'resolved'    => 'แก้ไขเสร็จสิ้น',
-    'closed'      => 'ปิดงาน',
-    'cancelled'   => 'ยกเลิก',
+    'resolved'    => 'ซ่อมบำรุงเสร็จสิ้น',
+    'closed'      => 'อนุมัติ',
+    'cancelled'   => 'ยกเลิกซ่อม',
+    'rejected'    => 'ไม่รับเรื่อง',
   ];
 
   $priorityOptions = [

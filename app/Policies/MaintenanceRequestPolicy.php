@@ -12,6 +12,14 @@ class MaintenanceRequestPolicy
 {
     use HandlesAuthorization;
 
+    public function before(User $user, string $ability)
+    {
+        if ($this->isAdminTeam($user)) {
+            return Response::allow();
+        }
+    }
+
+
     protected function isAdminTeam(User $user): bool
     {
         // admin/supervisor เป็นผู้ดูแล
@@ -52,7 +60,7 @@ class MaintenanceRequestPolicy
 
     protected function isOpenForReject(User $user, MR $req): bool
     {
-        if ($req->status !== MR::STATUS_ACKNOWLEDGED) return false;
+        if (!in_array($req->status, [MR::STATUS_PENDING, MR::STATUS_ACKNOWLEDGED], true)) return false;
 
         return empty($req->technician_id) || (int) $req->technician_id === (int) $user->id;
     }
@@ -62,8 +70,8 @@ class MaintenanceRequestPolicy
     {
         if ($this->isAdminTeam($user)) return Response::allow();
 
-        // เจ้าหน้าที่ดูได้กว้างขึ้น (อย่างน้อยดูได้เมื่อเข้าคิวรอรับทราบ)
-        if ($this->isWorker($user) && $this->isOpenForAcknowledge($req)) return Response::allow();
+        // เจ้าหน้าที่ดูได้กว้างขึ้น (ดูได้เมื่ออยู่ในคิวรอรับทราบ หรือ รอคนมาตอบรับ)
+        if ($this->isWorker($user) && ($this->isOpenForAcknowledge($req) || $this->isOpenForAccept($user, $req))) return Response::allow();
 
         // ผู้ที่ถูกมอบหมาย/รับผิดชอบ
         if ($this->isAssignedWorker($user, $req)) return Response::allow();
@@ -153,12 +161,11 @@ class MaintenanceRequestPolicy
     {
         if ($this->isAdminTeam($user)) return Response::allow();
 
+        // ต้องเป็นทีมงานช่าง/เจ้าหน้าที่
         if (!$this->isWorker($user)) return Response::deny('เฉพาะเจ้าหน้าที่เท่านั้น');
 
-        if (!$this->isAssignedWorker($user, $req)) {
-            return Response::deny('อนุญาตให้เริ่มดำเนินการเฉพาะผู้ที่ได้รับมอบหมายเท่านั้น');
-        }
-
+        // ปลดล็อค: ช่างทุกคนสามารถกด "เริ่มดำเนินการ" ได้เลย 
+        // โดยไม่ต้องถูกสั่งงานก่อน (เพื่อรองรับการจ่ายงานกันเอง)
         if ($req->status === MR::STATUS_ACCEPTED) return Response::allow();
 
         return Response::deny('ต้องอยู่สถานะรับเรื่องแล้วเท่านั้น');
@@ -247,13 +254,13 @@ class MaintenanceRequestPolicy
             return Response::deny('ใบงานนี้สิ้นสุดแล้ว ไม่สามารถแนบไฟล์เพิ่มได้');
         }
 
-        // ช่างแนบไฟล์ได้ตอนทำงาน
-        if ($this->isAssignedWorker($user, $req) && in_array((string) $req->status, [MR::STATUS_ACCEPTED, MR::STATUS_IN_PROGRESS, MR::STATUS_ON_HOLD], true)) {
+        // ช่างแนบไฟล์ได้ตอนทำงาน (รวมถึงตอนเพิ่งรับเรือง หรือตอนซ่อมเสร็จแล้วแต่ยังไม่ปิดงาน)
+        if ($this->isAssignedWorker($user, $req) && in_array((string) $req->status, [MR::STATUS_ACKNOWLEDGED, MR::STATUS_ACCEPTED, MR::STATUS_IN_PROGRESS, MR::STATUS_ON_HOLD, MR::STATUS_RESOLVED], true)) {
             return Response::allow();
         }
 
-        // ผู้แจ้งแนบไฟล์ได้ตอนแรกๆ
-        if ((int) $req->reporter_id === (int) $user->id && in_array((string) $req->status, [MR::STATUS_PENDING, MR::STATUS_ACKNOWLEDGED], true)) {
+        // ผู้แจ้งแนบไฟล์ได้จนกว่าช่างจะเริ่มงาน
+        if ((int) $req->reporter_id === (int) $user->id && in_array((string) $req->status, [MR::STATUS_PENDING, MR::STATUS_ACKNOWLEDGED, MR::STATUS_ACCEPTED], true)) {
             return Response::allow();
         }
 
@@ -271,12 +278,12 @@ class MaintenanceRequestPolicy
         }
 
         // ช่างลบไฟล์ได้ตอนทำงาน
-        if ($this->isAssignedWorker($user, $req) && in_array((string) $req->status, [MR::STATUS_ACCEPTED, MR::STATUS_IN_PROGRESS, MR::STATUS_ON_HOLD], true)) {
+        if ($this->isAssignedWorker($user, $req) && in_array((string) $req->status, [MR::STATUS_ACKNOWLEDGED, MR::STATUS_ACCEPTED, MR::STATUS_IN_PROGRESS, MR::STATUS_ON_HOLD, MR::STATUS_RESOLVED], true)) {
             return Response::allow();
         }
 
         // ผู้แจ้งลบไฟล์ได้ตอนแรกๆ
-        if ((int) $req->reporter_id === (int) $user->id && in_array((string) $req->status, [MR::STATUS_PENDING, MR::STATUS_ACKNOWLEDGED], true)) {
+        if ((int) $req->reporter_id === (int) $user->id && in_array((string) $req->status, [MR::STATUS_PENDING, MR::STATUS_ACKNOWLEDGED, MR::STATUS_ACCEPTED], true)) {
             return Response::allow();
         }
 
@@ -295,20 +302,31 @@ class MaintenanceRequestPolicy
         return Response::deny('อนุญาตให้มอบหมายทีมช่างเฉพาะผู้ดูแลหรือทีมเจ้าหน้าที่เท่านั้น');
     }
 
+    // cancel (รวมศูนย์การยกเลิก)
+    public function cancel(User $user, MR $req): Response
+    {
+        // 1. ตรวจสอบสถานะก่อน (เงื่อนไขบังคับ: ยกเลิกได้เฉพาะช่วงที่รับเรื่องหรือกำลังทำอยู่)
+        if (!in_array($req->status, [MR::STATUS_ACCEPTED, MR::STATUS_IN_PROGRESS, MR::STATUS_ON_HOLD], true)) {
+            return Response::deny('ยกเลิกได้เฉพาะงานที่รับเรื่องแล้วหรือกำลังดำเนินการเท่านั้น');
+        }
+
+        // 2. เช็คสิทธิ์รายกลุ่ม
+        if ($this->isAdminTeam($user)) return Response::allow();
+        if ($this->cancelByReporter($user, $req)->allowed()) return Response::allow();
+        if ($this->cancelByTech($user, $req)->allowed()) return Response::allow();
+
+        return Response::deny('คุณไม่มีสิทธิ์ยกเลิกใบงานซ่อมนี้');
+    }
+
     // cancelByReporter
     public function cancelByReporter(User $user, MR $req): Response
     {
-        if ($this->isAdminTeam($user)) return Response::allow();
-
-        if ((int) $req->reporter_id !== (int) $user->id) {
+        if ((int) $req->reporter_id !== (int) $user->id && !$this->isAdminTeam($user)) {
             return Response::deny('ไม่มีสิทธิ์ยกเลิกคำขอนี้');
         }
 
-        if ($req->status === MR::STATUS_ACKNOWLEDGED) {
-            return Response::deny('ช่วงรับทราบแล้วให้ทำได้แค่รับเรื่อง/ไม่รับเรื่อง');
-        }
-
-        if (in_array($req->status, [MR::STATUS_PENDING, MR::STATUS_ACCEPTED], true)) {
+        // อนุญาตให้ยกเลิกเฉพาะเมื่อรับเรื่องไปแล้ว หรือเริ่มดำเนินการไปแล้ว ตาม Workflow ที่ผู้ใช้ระบุ
+        if (in_array($req->status, [MR::STATUS_ACCEPTED, MR::STATUS_IN_PROGRESS, MR::STATUS_ON_HOLD], true)) {
             return Response::allow();
         }
 
@@ -374,9 +392,9 @@ class MaintenanceRequestPolicy
             return Response::deny('คุณไม่มีสิทธิ์ประเมิน เนื่องจากไม่ได้เป็นผู้แจ้งงานซ่อมนี้');
         }
 
-        // 2. งานต้องอยู่ในสถานะ "เสร็จสิ้น (resolved)" หรือ "ปิดงาน (closed)" เท่านั้น
-        if (!in_array($req->status, [MR::STATUS_RESOLVED, MR::STATUS_CLOSED], true)) {
-            return Response::deny('สามารถประเมินได้เมื่องานซ่อมเสร็จสิ้นแล้วเท่านั้น');
+        // 2. งานต้องอยู่ในสถานะ "ปิดงาน (closed)" เท่านั้น
+        if ($req->status !== MR::STATUS_CLOSED) {
+            return Response::deny('สามารถประเมินได้เมื่อปิดงานเรียบร้อยแล้วเท่านั้น');
         }
 
         // 3. อนุญาตให้ประเมินได้

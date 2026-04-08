@@ -2,12 +2,12 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\{
-    AssetController,
-    MaintenanceRequestController,
-    AttachmentController,
-    MaintenanceLogController
-};
+use App\Http\Controllers\AssetController;
+use App\Http\Controllers\MaintenanceRequestController;
+use App\Http\Controllers\MaintenanceTransitionController;
+use App\Http\Controllers\MaintenanceJobController;
+use App\Http\Controllers\AttachmentController;
+use App\Http\Controllers\MaintenanceLogController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\MetaController;
 use App\Http\Controllers\Api\StatsController;
@@ -53,7 +53,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{req}',              [MaintenanceRequestController::class, 'show'])->name('show');
         Route::put('/{req}',              [MaintenanceRequestController::class, 'update'])->name('update');
         Route::delete('/{req}',           [MaintenanceRequestController::class, 'destroy'])->name('destroy');
-        Route::post('/{req}/transition',  [MaintenanceRequestController::class, 'transition'])->name('transition');
+        Route::post('/{req}/transition',  [MaintenanceTransitionController::class, 'transition'])->name('transition');
         Route::get('/{req}/logs',         [MaintenanceLogController::class, 'index'])->name('logs');
 
         // GET /api/repair-requests/pending/evaluations
@@ -116,5 +116,5 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/assets/by-department',        [StatsController::class, 'assetsByDepartment'])->name('assets.by-department');
     });
 
-    Route::get('/repair-requests/my-jobs', [MaintenanceRequestController::class, 'myJobs'])->name('repair-requests.my-jobs');
+    Route::get('/repair-requests/my-jobs', [MaintenanceJobController::class, 'myJobs'])->name('repair-requests.my-jobs');
 });

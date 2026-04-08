@@ -79,9 +79,9 @@
             'accepted' => 'รับเรื่องแล้ว',
             'in_progress' => 'กำลังดำเนินการ',
             'on_hold' => 'พักงาน',
-            'resolved' => 'เสร็จสิ้น',
-            'closed' => 'ปิดงาน',
-            'cancelled' => 'ยกเลิก',
+            'resolved' => 'ซ่อมบำรุงเสร็จสิ้น',
+            'closed' => 'อนุมัติ',
+            'cancelled' => 'ยกเลิกซ่อม',
         ];
 
         $statusPill = fn($s) => match ($s) {
@@ -189,7 +189,7 @@
                             <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>รอดำเนินการ</option>
                             <option value="in_progress" {{ request('status') === 'in_progress' ? 'selected' : '' }}>กำลังดำเนินการ
                             </option>
-                            <option value="completed" {{ request('status') === 'completed' ? 'selected' : '' }}>เสร็จสิ้นแล้ว
+                             <option value="completed" {{ request('status') === 'completed' ? 'selected' : '' }}>อนุมัติแล้ว
                             </option>
                         </select>
                     </div>
@@ -277,7 +277,7 @@
                                     </div>
 
                                     <div class="plain-metric">
-                                        <div class="plain-label">ยกเลิกงาน</div>
+                                        <div class="plain-label">ยกเลิกซ่อม</div>
                                         <div class="plain-value is-blue">
                                             {{ number_format((int) ($stats['cancelled'] ?? 0)) }}
                                         </div>

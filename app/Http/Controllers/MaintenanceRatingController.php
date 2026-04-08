@@ -170,15 +170,14 @@ class MaintenanceRatingController extends Controller
     // ตรวจสอบสิทธิ์
     protected function guardRatingAccess(MaintenanceRequest $maintenanceRequest, User $user): ?RedirectResponse
     {
-        if ((int) $maintenanceRequest->reporter_id !== (int) $user->id) {
+        $isAdminTeam = $user->isAdmin() || $user->isSupervisor();
+        
+        if (! $isAdminTeam && (int) $maintenanceRequest->reporter_id !== (int) $user->id) {
             abort(403, 'คุณไม่มีสิทธิ์ให้คะแนนงานนี้');
         }
 
-        if (! in_array($maintenanceRequest->status, [
-            MaintenanceRequest::STATUS_RESOLVED,
-            MaintenanceRequest::STATUS_CLOSED,
-        ], true)) {
-            abort(403, 'สามารถให้คะแนนได้เฉพาะงานที่ปิดแล้วเท่านั้น');
+        if ($maintenanceRequest->status !== MaintenanceRequest::STATUS_CLOSED) {
+            abort(403, 'สามารถให้คะแนนได้เฉพาะงานที่ปิดเรียบร้อยแล้วเท่านั้น');
         }
 
         $alreadyRated = MaintenanceRating::query()
@@ -255,7 +254,7 @@ class MaintenanceRatingController extends Controller
         $assignment = $maintenanceRequest->assignments()
             // อนุญาตให้ทั้ง technician และ admin สามารถรับการประเมินได้
             ->whereHas('user', function ($q) {
-                $q->whereIn('role', ['technician', 'admin']);
+                $q->whereIn('role', \App\Models\User::teamRoles());
             })
             ->orderByDesc('is_lead')
             ->orderByRaw("CASE WHEN status = 'done' THEN 1 ELSE 0 END DESC")

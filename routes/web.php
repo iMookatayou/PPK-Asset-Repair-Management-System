@@ -9,6 +9,10 @@ use App\Http\Controllers\Auth\PasswordController;
 
 // App Modules (Web)
 use App\Http\Controllers\MaintenanceRequestController;
+use App\Http\Controllers\MaintenanceTransitionController;
+use App\Http\Controllers\MaintenanceJobController;
+use App\Http\Controllers\MaintenanceAttachmentController;
+use App\Http\Controllers\MaintenancePrintController;
 use App\Http\Controllers\Repair\DashboardController as RepairDashboardController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\AssetController;
@@ -67,7 +71,7 @@ Route::middleware(['auth'])->group(function () {
             Route::put('/{req}', [MaintenanceRequestController::class, 'update'])->name('update');
 
             // Work Order
-            Route::get('/{req}/work-order', [MaintenanceRequestController::class, 'printWorkOrder'])
+            Route::get('/{req}/work-order', [MaintenancePrintController::class, 'printWorkOrder'])
                 ->name('work-order');
 
             // Operation Log
@@ -75,10 +79,10 @@ Route::middleware(['auth'])->group(function () {
                 ->name('operation-log');
 
             // Attachments
-            Route::post('/{req}/attachments', [MaintenanceRequestController::class, 'uploadAttachmentFromBlade'])
+            Route::post('/{req}/attachments', [MaintenanceAttachmentController::class, 'uploadAttachmentFromBlade'])
                 ->name('attachments');
 
-            Route::delete('/{req}/attachments/{attachment}', [MaintenanceRequestController::class, 'destroyAttachment'])
+            Route::delete('/{req}/attachments/{attachment}', [MaintenanceAttachmentController::class, 'destroyAttachment'])
                 ->name('attachments.destroy');
 
             // Assignments
@@ -97,17 +101,17 @@ Route::middleware(['auth'])->group(function () {
             });
 
             // Status transitions
-            Route::post('/{req}/acknowledge', [MaintenanceRequestController::class, 'acknowledgeCase'])->name('acknowledge');
-            Route::post('/{req}/reject', [MaintenanceRequestController::class, 'rejectCase'])->name('reject');
-            Route::post('/{req}/accept', [MaintenanceRequestController::class, 'acceptCase'])->name('accept');
+            Route::post('/{req}/acknowledge', [MaintenanceTransitionController::class, 'acknowledgeCase'])->name('acknowledge');
+            Route::post('/{req}/reject', [MaintenanceTransitionController::class, 'rejectCase'])->name('reject');
+            Route::post('/{req}/accept', [MaintenanceTransitionController::class, 'acceptCase'])->name('accept');
 
-            Route::post('/{req}/start', [MaintenanceRequestController::class, 'startCase'])->name('start');
-            Route::post('/{req}/hold', [MaintenanceRequestController::class, 'holdCase'])->name('hold');
-            Route::post('/{req}/resume', [MaintenanceRequestController::class, 'resumeCase'])->name('resume');
-            Route::post('/{req}/resolve', [MaintenanceRequestController::class, 'resolveCase'])->name('resolve');
-            Route::post('/{req}/close', [MaintenanceRequestController::class, 'closeCase'])->name('close');
+            Route::post('/{req}/start', [MaintenanceTransitionController::class, 'startCase'])->name('start');
+            Route::post('/{req}/hold', [MaintenanceTransitionController::class, 'holdCase'])->name('hold');
+            Route::post('/{req}/resume', [MaintenanceTransitionController::class, 'resumeCase'])->name('resume');
+            Route::post('/{req}/resolve', [MaintenanceTransitionController::class, 'resolveCase'])->name('resolve');
+            Route::post('/{req}/close', [MaintenanceTransitionController::class, 'closeCase'])->name('close');
 
-            Route::post('/{req}/cancel', [MaintenanceRequestController::class, 'cancelCase'])->name('cancel');
+            Route::post('/{req}/cancel', [MaintenanceTransitionController::class, 'cancelCase'])->name('cancel');
 
             // Update report type on request
             Route::post('/{req}/type', [MaintenanceRequestController::class, 'updateType'])
@@ -125,8 +129,8 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // Repair views
-    Route::get('/repair/my-jobs', [MaintenanceRequestController::class, 'myJobsPage'])->name('repairs.my_jobs');
-    Route::get('/repair/queue', [MaintenanceRequestController::class, 'queuePage'])->name('repairs.queue');
+    Route::get('/repair/my-jobs', [MaintenanceJobController::class, 'myJobsPage'])->name('repairs.my_jobs');
+    Route::get('/repair/queue', [MaintenanceJobController::class, 'queuePage'])->name('repairs.queue');
 
     // Attachments (serve private files after auth)
     Route::get('/attachments/{attachment}', [AttachmentController::class, 'show'])->name('attachments.show');

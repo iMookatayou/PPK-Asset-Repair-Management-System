@@ -24,8 +24,8 @@ class RoleSeeder extends Seeder
             ],
             [
                 'code'       => 'it_support',
-                'name_th'    => 'เจ้าหน้าที่ IT',
-                'name_en'    => 'IT Support',
+                'name_th'    => 'เจ้าหน้าที่ Hardware',
+                'name_en'    => 'Hardware Support',
                 'sort_order' => 30,
             ],
             [

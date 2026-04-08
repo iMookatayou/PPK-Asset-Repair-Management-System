@@ -9,18 +9,16 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            DepartmentSeeder::class,
-            DevAdminSeeder::class,
-            MockUsersSeeder::class,
-            DemoDataSeeder::class,
-            MaintenanceRequestSeeder::class,
-            MaintenanceLogSeeder::class,
-            AssetCategorySeeder::class,
-            AssetSeeder::class,
-            ChatSeeder::class,
-            DemoRatingSeeder::class,
+            // 1. Metadata & Lookup Tables (Essential)
             RoleSeeder::class,
             MaintenanceRequestTypeSeeder::class,
+
+            // 2. Main Demo Architecture (Master Seeder)
+            DemoDataSeeder::class,
+
+            // 3. Optional Enrichment Data
+            ChatSeeder::class,
+            DemoRatingSeeder::class,
         ]);
     }
 }
