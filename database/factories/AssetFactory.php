@@ -11,14 +11,15 @@ class AssetFactory extends Factory
 {
     protected $model = Asset::class;
 
+    // กำหนดค่าเริ่มต้นให้กับ Model Asset
     public function definition(): array
     {
-        // หมวดหมู่ย่อย (string เดิม)
+        // รายการหมวดหมู่ย่อยและยี่ห้อสินค้าสำหรับสุ่มข้อมูล
         $cats   = ['คอมพิวเตอร์', 'เครื่องพิมพ์', 'เครือข่าย', 'ยานพาหนะ', 'เครื่องมือ', 'เฟอร์นิเจอร์'];
         $brands = ['HP','Dell','Lenovo','Acer','Canon','Brother','Cisco','MikroTik','Yamaha','3M'];
         $locs   = ['สำนักงานใหญ่', 'อาคาร A', 'อาคาร B', 'คลังสินค้า', 'สาขาเชียงใหม่', 'สาขาภูเก็ต'];
 
-        // map category → type คร่าว ๆ
+        // จับคู่หมวดหมู่ (Category) กับประเภทหลัก (Type)
         $typeMap = [
             'คอมพิวเตอร์'  => 'IT',
             'เครื่องพิมพ์' => 'IT',
@@ -31,7 +32,7 @@ class AssetFactory extends Factory
         $categoryName = fake()->randomElement($cats);
         $type         = $typeMap[$categoryName] ?? fake()->randomElement(['IT','Electrical','Office','Tool','Vehicle']);
 
-        // เลือก category_id จากตาราง asset_categories ถ้ามี (ถ้าไม่มีให้เป็น null ไปก่อน)
+        // ค้นหา ID ของหมวดหมู่จากตาราง asset_categories (ถ้าไม่พบจะสุ่มจากที่มีอยู่)
         $categoryId = AssetCategory::where('name', $categoryName)->inRandomOrder()->value('id')
             ?? AssetCategory::inRandomOrder()->value('id');
 

@@ -85,7 +85,7 @@ return Application::configure(basePath: dirname(__DIR__))
             |-----------------------------
             */
             if (
-                !$request->is('api/*') &&
+                !$request->expectsJson() && !$request->is('api/*') &&
                 (
                     $e instanceof \Illuminate\Auth\Access\AuthorizationException ||
                     $e instanceof \Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException
@@ -111,7 +111,7 @@ return Application::configure(basePath: dirname(__DIR__))
             | WEB: Session / CSRF Token expired (419)
             |-----------------------------
             */
-            if (!$request->is('api/*') && $e instanceof \Illuminate\Session\TokenMismatchException) {
+            if (!$request->expectsJson() && !$request->is('api/*') && $e instanceof \Illuminate\Session\TokenMismatchException) {
                 return redirect()->back()->withInput($request->except(['password', 'password_confirmation', '_token']))->with('toast', [
                     'type'     => 'warning',
                     'message'  => 'หน้าเว็บหมดอายุ (Page Expired) หรือเปิดหน้านี้ทิ้งไว้นานเกินไป กรุณาลองใหม่อีกครั้ง',
@@ -126,7 +126,7 @@ return Application::configure(basePath: dirname(__DIR__))
             | WEB: default handling
             |-----------------------------
             */
-            if (! $request->is('api/*')) {
+            if (!$request->expectsJson() && !$request->is('api/*')) {
                 return null;
             }
 

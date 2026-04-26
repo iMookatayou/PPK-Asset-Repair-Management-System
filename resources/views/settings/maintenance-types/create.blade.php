@@ -13,7 +13,7 @@
     $accentBar = "absolute left-0 top-[2px] w-[3px] h-9 rounded-full bg-emerald-600/90";
 @endphp
 
-@section('title', 'Add Maintenance Type')
+@section('title', 'เพิ่มประเภทการแจ้งซ่อม')
 
 @section('page-header')
   <div class="w-full bg-slate-50 border-b {{ $line }}">
@@ -37,10 +37,10 @@
           </div>
         </div>
         <div class="flex flex-wrap items-center justify-start sm:justify-end gap-2">
-          <a href="{{ route('settings.maintenance-types.index') }}"
-             class="inline-flex items-center gap-2 rounded-lg border {{ $line }} bg-white px-4 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50">
-            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none">
-              <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <a href="{{ url()->previous() !== url()->current() ? url()->previous() : route('settings.maintenance-types.index') }}"
+             class="inline-flex items-center h-9 gap-2 rounded-md border {{ $line }} bg-white px-4 text-[13px] font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 transition-all">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
             กลับ
           </a>
@@ -134,12 +134,45 @@
                 </div>
               </div>
             </section>
+
+            {{-- Section 3: SLA Targets --}}
+            <section>
+              <div class="{{ $headCls }}">
+                <div class="{{ $noCls }}">3</div>
+                <div class="{{ $accentWrap }}">
+                  <span class="{{ $accentBar }}"></span>
+                  <div class="{{ $titleCls }}">เป้าหมายเวลา (SLA Targets)</div>
+                  <div class="{{ $subCls }}">กำหนดเป้าหมายเวลาพื้นฐานของประเภทงานนี้</div>
+                </div>
+              </div>
+
+              <div class="space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                      <label for="default_response_minutes" class="block text-sm font-medium text-slate-700">เวลาตอบกลับพื้นฐาน (นาที)</label>
+                      <input type="number" name="default_response_minutes" id="default_response_minutes" value="{{ old('default_response_minutes') }}" min="0" class="{{ $input }}" placeholder="เช่น 60">
+                      <p class="mt-1 text-[11px] text-slate-500 font-normal">ใช้เป็นค่าเริ่มต้นในการรับทราบงาน (Acknowledged)</p>
+                  </div>
+  
+                  <div>
+                      <label for="default_resolution_minutes" class="block text-sm font-medium text-slate-700">เวลาซ่อมแซมพื้นฐาน (นาที)</label>
+                      <input type="number" name="default_resolution_minutes" id="default_resolution_minutes" value="{{ old('default_resolution_minutes') }}" min="0" class="{{ $input }}" placeholder="เช่น 1440">
+                      <p class="mt-1 text-[11px] text-slate-500 font-normal">ใช้เป็นค่าเริ่มต้นในการปิดงาน (Resolved)</p>
+                  </div>
+                </div>
+                <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                  <p class="text-[11px] text-emerald-800 leading-relaxed">
+                    <strong>คำแนะนำ:</strong> เวลาที่กำหนดหน้านี้จะเป็นตัวชี้วัด (Target) หลักสำหรับ SLA ของใบงานประเภทนี้ทั้งหมด
+                  </p>
+                </div>
+              </div>
+            </section>
           </div>
         </div>
       </div>
 
       <div class="flex justify-end gap-2 pt-4 border-t {{ $line }}">
-        <a href="{{ route('settings.maintenance-types.index') }}"
+        <a href="{{ url()->previous() !== url()->current() ? url()->previous() : route('settings.maintenance-types.index') }}"
            class="inline-flex items-center justify-center h-10 px-4 rounded-lg border {{ $line }} bg-white
                   text-sm font-medium text-slate-700 hover:bg-slate-50">
           ยกเลิก

@@ -5,99 +5,128 @@ namespace App\Http\Controllers;
 use App\Models\MaintenanceRequest;
 use App\Models\MaintenanceRating;
 use App\Models\User;
+use App\Services\MaintenanceTransitionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Log; // เพิ่มการเรียกใช้ Log
+use Illuminate\Support\Facades\Log;
 
 class MaintenanceRatingController extends Controller
 {
-    protected int $ratingDeadlineDays = 7;
+    protected int $ratingDeadlineDays = 30;
 
-    // หน้า "ให้คะแนนงาน"
     public function evaluateList()
     {
         /** @var User $user */
         $user = Auth::user();
 
+        $limitDate = now()->subDays($this->ratingDeadlineDays);
+
         $baseQuery = MaintenanceRequest::query()
             ->where('reporter_id', $user->id)
-            ->whereIn('status', [
-                MaintenanceRequest::STATUS_RESOLVED,
-                MaintenanceRequest::STATUS_CLOSED,
-            ]);
+            ->where('status', MaintenanceRequest::STATUS_CLOSED);
 
-        // งานที่ยังไม่ให้คะแนน
+        // งานที่ยังไม่ให้คะแนน (Paginated: 10 per page)
         $pendingRequests = (clone $baseQuery)
             ->with(['technician:id,name', 'assignments.user:id,name,role'])
-            ->whereDoesntHave('ratings', function ($q) use ($user) {
-                $q->where('rater_id', $user->id);
+            ->whereDoesntHave('rating')
+            ->where(function($q) use ($limitDate) {
+                $q->where('closed_at', '>=', $limitDate)
+                  ->orWhere('resolved_at', '>=', $limitDate)
+                  ->orWhere('completed_date', '>=', $limitDate);
             })
-            ->get()
-            ->filter(fn(MaintenanceRequest $req) => $this->withinRatingWindow($req))
-            ->values();
+            ->latest('id')
+            ->paginate(10, ['*'], 'pending_page')
+            ->withQueryString();
 
-        // งานที่ให้คะแนนแล้ว
+        // งานที่ให้คะแนนแล้ว (Paginated: 10 per page)
         $ratedRequests = (clone $baseQuery)
             ->with([
                 'technician:id,name',
-                'ratings' => function ($q) use ($user) {
-                    $q->where('rater_id', $user->id);
-                },
+                'rating',
             ])
-            ->whereHas('ratings', function ($q) use ($user) {
-                $q->where('rater_id', $user->id);
-            })
+            ->whereHas('rating')
             ->latest('closed_at')
-            ->get();
+            ->paginate(10, ['*'], 'history_page')
+            ->withQueryString();
+
+        // NEW: Calculate Stats for the reporter
+        $totalRatedCount = $ratedRequests->total();
+        $pendingCount    = $pendingRequests->total();
+        
+        // ดึงคะแนนเฉลี่ยที่ผู้ใช้คนนี้เคยให้ (คำนวณจากสถิติจริง ไม่ใช่แค่ในหน้า)
+        $avgScore = $totalRatedCount > 0 
+            ? round(MaintenanceRating::where('rater_id', $user->id)->avg('score'), 1)
+            : 0;
+
+        $submissionRate = ($totalRatedCount + $pendingCount) > 0 
+            ? round(($totalRatedCount / ($totalRatedCount + $pendingCount)) * 100, 1)
+            : 100;
 
         Log::info("User ID {$user->id} viewed their evaluation list."); // บันทึก Log การเข้าดูรายการ
 
         return view('maintenance.rating.evaluate', [
             'pendingRequests' => $pendingRequests,
             'ratedRequests'   => $ratedRequests,
+            'avgScore'        => $avgScore,
+            'totalRatedCount' => $totalRatedCount,
+            'pendingCount'    => $pendingCount,
+            'submissionRate'  => $submissionRate,
         ]);
     }
 
-    // Dashboard คะแนนของช่าง (รองรับ Sorting)
+    // Dashboard คะแนนของเจ้าหน้าที่ (รองรับ Sorting)
     public function technicianDashboard(Request $request)
     {
-        $sort = $request->get('sort', 'score_desc');
-        $from = $request->get('from');
-        $to   = $request->get('to');
-
-        // Default to current year if no filter
-        $start = $from ? \Carbon\Carbon::parse($from)->startOfDay() : \Carbon\Carbon::now()->startOfYear();
-        $end   = $to   ? \Carbon\Carbon::parse($to)->endOfDay()   : \Carbon\Carbon::now()->endOfMonth();
+        $sort = $request->get('sort', 'impact_desc');
 
         $query = User::query()
-            ->where('role', 'technician')
-            ->withAvg(['technicianRatings as technician_ratings_avg_score' => function($q) use ($start, $end) {
-                $q->whereBetween('created_at', [$start, $end]);
-            }], 'score')
-            ->withCount(['technicianRatings as technician_ratings_count' => function($q) use ($start, $end) {
-                $q->whereBetween('created_at', [$start, $end]);
-            }]);
+            ->whereIn('role', User::workerRoles())
+            ->where(function($q) {
+                $q->whereHas('technicianAssignments')
+                  ->orWhereHas('technicianRatings');
+            })
+            // Calculate Performance Metrics (Lifetime)
+            ->withAvg('technicianRatings as technician_ratings_avg_score', 'score')
+            ->withCount('technicianRatings as technician_ratings_count')
+            ->withSum('technicianRatings as performance_score', 'score');
 
         // Sorting
         $query = match ($sort) {
-            'score_asc'  => $query->orderBy('technician_ratings_avg_score', 'asc'),
-            'count_desc' => $query->orderBy('technician_ratings_count', 'desc'),
-            'count_asc'  => $query->orderBy('technician_ratings_count', 'asc'),
-            default      => $query->orderByDesc('technician_ratings_avg_score'),
+            'score_desc' => $query->orderByDesc('technician_ratings_avg_score')
+                                  ->orderByDesc('technician_ratings_count'),
+            'count_desc' => $query->orderByDesc('technician_ratings_count'),
+            'impact_desc' => $query->orderByDesc('performance_score'),
+            default      => $query->orderByDesc('performance_score'),
         };
 
-        $technicians = $query->get(['id', 'name', 'citizen_id']);
+        // Generate global stats for the dashboard header
+        $statsQuery = clone $query;
+        $allActiveTechs = $statsQuery->get(['id', 'name', 'technician_ratings_avg_score', 'technician_ratings_count', 'performance_score', 'role']);
+        
+        $totalTech = $allActiveTechs->count();
+        $globalAvg = round($allActiveTechs->avg('technician_ratings_avg_score'), 2);
+        $totalReviews = $allActiveTechs->sum('technician_ratings_count');
+
+        // Prepare Top 15 for the Chart (Fixed Top 15 regardless of table page)
+        $top15 = $allActiveTechs->take(15);
+
+        // Paginate the results to allow navigating through the full list of active technicians
+        $limit = $request->get('limit', 15);
+        $technicians = $query->paginate((int)$limit)->withQueryString();
 
         Log::info("Technician Dashboard viewed. Sorting by: {$sort}"); // บันทึก Log การเข้าดู Dashboard พร้อมค่าการเรียง
 
         return view('maintenance.rating.technicians-dashboard', [
             'technicians' => $technicians,
-            'selectedSort' => $sort, // ส่งค่าที่เลือกกลับไปที่ View เพื่อทำ Active State ใน Select
-            'chartLabels' => $technicians->pluck('name'),
-            'chartAvg'    => $technicians->pluck('technician_ratings_avg_score'),
-            'chartCount'  => $technicians->pluck('technician_ratings_count'),
+            'totalTech'   => $totalTech,
+            'globalAvg'   => $globalAvg,
+            'totalReviews' => $totalReviews,
+            'selectedSort' => $sort, 
+            'chartLabels' => $top15->pluck('name'),
+            'chartAvg'    => $top15->pluck('technician_ratings_avg_score'),
+            'chartCount'  => $top15->pluck('technician_ratings_count'),
         ]);
     }
 
@@ -107,18 +136,14 @@ class MaintenanceRatingController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
-        // ส่งตัวแปร $maintenanceRequest เข้าไปเช็คสิทธิ์แทน
+        // ตรวจสอบสิทธิ์ก่อน Redirect
         if ($redirect = $this->guardRatingAccess($maintenanceRequest, $user)) {
             return $redirect;
         }
 
-        $technicianId = $this->resolveTechnicianIdForRating($maintenanceRequest);
-
-        // ตอนส่งไปที่หน้า View ยังคงส่งไปในชื่อ 'req' เหมือนเดิม จะได้ไม่ต้องแก้โค้ดหน้าบ้าน
-        return view('maintenance.rating.form', [
-            'req'          => $maintenanceRequest,
-            'technicianId' => $technicianId,
-        ]);
+        // เปลี่ยนจาก Render form แยก เป็นการพาไปหน้า Show พร้อมเปิด Modal
+        return redirect()->route('maintenance.requests.show', $maintenanceRequest)
+            ->with('auto_rate', true);
     }
 
     // บันทึกคะแนน
@@ -136,12 +161,12 @@ class MaintenanceRatingController extends Controller
 
         $technicianId = $this->resolveTechnicianIdForRating($maintenanceRequest);
         if (! $technicianId) {
-            Log::error("Failed to store rating: No technician assigned for Request ID {$maintenanceRequest->id}"); // บันทึก Log กรณีไม่พบช่าง
+            Log::error("Failed to store rating: No technician assigned for Request ID {$maintenanceRequest->id}"); // บันทึก Log กรณีไม่พบเจ้าหน้าที่
             return redirect()
                 ->route('maintenance.requests.show', $maintenanceRequest)
                 ->with('toast', [
                     'type'    => 'warning',
-                    'message' => 'ยังไม่พบช่างที่เกี่ยวข้องกับงานนี้ จึงยังให้คะแนนไม่ได้',
+                    'message' => 'ยังไม่พบเจ้าหน้าที่ที่เกี่ยวข้องกับงานนี้ จึงยังให้คะแนนไม่ได้',
                 ]);
         }
 
@@ -157,27 +182,58 @@ class MaintenanceRatingController extends Controller
             ]
         );
 
-        Log::info("Rating stored: User ID {$user->id} rated Technician ID {$technicianId} with score {$data['score']}"); // บันทึก Log เมื่อบันทึกคะแนนสำเร็จ
+        Log::info("Rating stored: User ID {$user->id} rated Technician ID {$technicianId} with score {$data['score']}");
 
-        return redirect()
+
+        // Auto-close: หากงานยังอยู่สถานะ 'resolved' ให้ปิดงานอัตโนมัติเมื่อผู้แจ้งให้คะแนนแล้ว
+        // (ถือว่าการให้คะแนนคือการยืนยันรับงานคืน)
+        $maintenanceRequest->refresh();
+        $autoClosed = false;
+        if ($maintenanceRequest->status === MaintenanceRequest::STATUS_RESOLVED) {
+            try {
+                app(MaintenanceTransitionService::class)->applyTransition(
+                    $maintenanceRequest,
+                    ['status' => MaintenanceRequest::STATUS_CLOSED, 'note' => 'ปิดงานอัตโนมัติหลังผู้แจ้งให้คะแนนเรียบร้อย'],
+                    $user->id
+                );
+                $autoClosed = true;
+                Log::info("Auto-closed Request ID {$maintenanceRequest->id} after rating by User ID {$user->id}");
+            } catch (\Throwable $e) {
+                Log::warning("Auto-close failed for Request ID {$maintenanceRequest->id}: " . $e->getMessage());
+            }
+        }
+
+        $redirect = redirect()
             ->route('maintenance.requests.show', $maintenanceRequest)
             ->with('toast', [
                 'type'    => 'success',
-                'message' => 'บันทึกคะแนนเรียบร้อย',
+                'message' => $autoClosed ? 'บันทึกคะแนนและปิดงานเรียบร้อยแล้ว' : 'บันทึกคะแนนเรียบร้อย',
             ]);
+
+        if ($autoClosed) {
+            $redirect = $redirect->with('show_post_close_modal', true);
+        }
+
+        return $redirect;
     }
+
 
     // ตรวจสอบสิทธิ์
     protected function guardRatingAccess(MaintenanceRequest $maintenanceRequest, User $user): ?RedirectResponse
     {
+        // 1. อนุญาตให้ Admin หรือ Supervisor เข้าถึงได้เสมอ (เพื่อการตรวจสอบหรือช่วยประเมิน)
         $isAdminTeam = $user->isAdmin() || $user->isSupervisor();
-        
-        if (! $isAdminTeam && (int) $maintenanceRequest->reporter_id !== (int) $user->id) {
-            abort(403, 'คุณไม่มีสิทธิ์ให้คะแนนงานนี้');
+
+        if (!$isAdminTeam) {
+            // 2. ถ้าไม่ใช่ Admin ต้องเป็นผู้แจ้งเท่านั้น
+            if (!$maintenanceRequest->reporter_id || (int) $maintenanceRequest->reporter_id !== (int) $user->id) {
+                abort(403, 'คุณไม่มีสิทธิ์ให้คะแนนงานนี้ คุณต้องเป็นผู้แจ้งซ่อมจึงจะสามารถประเมินได้');
+            }
         }
 
-        if ($maintenanceRequest->status !== MaintenanceRequest::STATUS_CLOSED) {
-            abort(403, 'สามารถให้คะแนนได้เฉพาะงานที่ปิดเรียบร้อยแล้วเท่านั้น');
+        // 3. ตรวจสอบสถานะ (ต้องเป็น Resolved หรือ Closed เท่านั้น)
+        if (!in_array($maintenanceRequest->status, [MaintenanceRequest::STATUS_RESOLVED, MaintenanceRequest::STATUS_CLOSED], true)) {
+            abort(403, 'สามารถให้คะแนนได้เฉพาะงานที่ดำเนินการเสร็จสิ้นหรือปิดงานเรียบร้อยแล้วเท่านั้น');
         }
 
         $alreadyRated = MaintenanceRating::query()
@@ -208,7 +264,7 @@ class MaintenanceRatingController extends Controller
                 ->route('maintenance.requests.show', $maintenanceRequest)
                 ->with('toast', [
                     'type'    => 'warning',
-                    'message' => 'ยังไม่มีการมอบหมายช่างในงานนี้ จึงยังให้คะแนนไม่ได้',
+                    'message' => 'ยังไม่มีการมอบหมายเจ้าหน้าที่ในงานนี้ จึงยังให้คะแนนไม่ได้',
                 ]);
         }
 
@@ -248,7 +304,7 @@ class MaintenanceRatingController extends Controller
         return $base->isPast() && now()->diffInDays($base) <= $this->ratingDeadlineDays;
     }
 
-    // ค้นหา ID ของช่างที่รับผิดชอบงาน
+    // ค้นหา ID ของเจ้าหน้าที่ที่รับผิดชอบงาน
     protected function resolveTechnicianIdForRating(MaintenanceRequest $maintenanceRequest): ?int
     {
         $assignment = $maintenanceRequest->assignments()
@@ -292,17 +348,21 @@ class MaintenanceRatingController extends Controller
             ];
         }
 
-        // ความคิดเห็นล่าสุด
+        // ความคิดเห็นล่าสุด (จำกัดเพียง 6 รายการ)
         $reviews = $user->technicianRatings()
             ->with('rater:id,name,role')
             ->latest()
-            ->paginate(10);
+            ->take(6)
+            ->get();
 
         // งานล่าสุดที่ทำเสร็จ
         $recentJobs = $user->technicianAssignments()
             ->with(['maintenanceRequest' => function($q) {
                 $q->with('reporter:id,name');
             }])
+            ->whereHas('maintenanceRequest', function ($q) {
+                $q->where('status', \App\Models\MaintenanceRequest::STATUS_CLOSED);
+            })
             ->where('status', 'done')
             ->latest() // ใช้ created_at แทน completed_at ที่ไม่มีในตาราง
             ->take(5)
@@ -316,6 +376,12 @@ class MaintenanceRatingController extends Controller
                 'role_label'  => $user->role_label,
                 'avg_score'   => round((float) $user->technician_ratings_avg_score, 2),
                 'total_count' => (int) $user->technician_ratings_count,
+                'reviews'     => $reviews->map(fn($r) => [
+                    'score'      => $r->score,
+                    'comment'    => $r->comment,
+                    'created_at' => $r->created_at->format('d M Y'),
+                    'rater'      => $r->rater?->name ?? 'ไม่ระบุชื่อ',
+                ]),
             ]);
         }
 

@@ -6,7 +6,6 @@ use App\Models\MaintenanceRequest as MR;
 use App\Models\MaintenanceAssignment;
 use App\Models\MaintenanceLog;
 use App\Models\User;
-use App\Models\SlaConfig;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -15,7 +14,7 @@ class MaintenanceTransitionService
 {
     /**
      * ดำเนินการอัปเดตสถานะหลักของใบงานซ่อม
-     * พร้อมอัปเดต Timestamps ที่เกี่ยวข้อง จัดการช่าง และเก็บประวัติ Log
+     * พร้อมอัปเดต Timestamps ที่เกี่ยวข้อง จัดการเจ้าหน้าที่ และเก็บประวัติ Log
      */
     public function applyTransition(MR $req, array $data, ?int $actorId = null): MR
     {
@@ -43,19 +42,24 @@ class MaintenanceTransitionService
                     abort(409, 'สถานะไม่ถูกต้อง');
                 }
 
-                // บังคับระบุเหตุผลเมื่อพักงาน
+                // บังคับระบุเหตุผลเมื่อหยุดการซ่อมบำรุงชั่วคราว
                 if ($targetStatus === MR::STATUS_ON_HOLD && empty(trim($data['note'] ?? ''))) {
-                    abort(409, 'ต้องระบุเหตุผลในการพักงาน');
+                    abort(409, 'ต้องระบุเหตุผลในการหยุดการซ่อมบำรุงชั่วคราว');
                 }
 
-                // คำนวณเวลาพักงานเมื่อออกจากการพักงาน
+                // คำนวณเวลาหยุดการซ่อมบำรุงชั่วคราวเมื่อออกจากการหยุดชั่วคราว
                 if ($from === MR::STATUS_ON_HOLD && $locked->on_hold_at) {
                     $onHoldAt = Carbon::parse($locked->on_hold_at);
-                    $pausedMins = (int) ceil($onHoldAt->diffInMinutes(now()));
-                    $locked->paused_duration_minutes = (int) $locked->paused_duration_minutes + $pausedMins;
+                    $pausedSecs = $onHoldAt->diffInSeconds(now());
+                    
+                    // อัปเกรดเป็นวินาทีเพื่อความเป๊ะ (Pe-Pa)
+                    $locked->paused_duration_minutes = (int) $locked->paused_duration_minutes + (int) ceil($pausedSecs / 60);
                     
                     if ($locked->sla_due_date) {
-                        $locked->sla_due_date = Carbon::parse($locked->sla_due_date)->addMinutes($pausedMins);
+                        $locked->sla_due_date = Carbon::parse($locked->sla_due_date)->addSeconds($pausedSecs);
+                    }
+                    if ($locked->response_due_date && !$locked->acknowledged_at) {
+                        $locked->response_due_date = Carbon::parse($locked->response_due_date)->addSeconds($pausedSecs);
                     }
                 }
 
@@ -74,7 +78,7 @@ class MaintenanceTransitionService
             }
 
             // ปรับเปลี่ยนให้: ใครก็ตามที่กด "เริ่มงาน (In Progress) คนแรก" 
-            // จะถูกผูกชื่อเป็นช่างหลักชั่วคราว (Auto-assign) หากงานนั้นยังว่างอยู่
+            // จะถูกผูกชื่อเป็นเจ้าหน้าที่หลักชั่วคราว (Auto-assign) หากงานนั้นยังว่างอยู่
             if ($locked->status === MR::STATUS_IN_PROGRESS && empty($locked->technician_id) && $actorId) {
                 $locked->technician_id = (int) $actorId;
             }
@@ -90,13 +94,8 @@ class MaintenanceTransitionService
                         $locked->accepted_at = $now;
                         $locked->assigned_date ??= $now;
                         
-                        $slaTarget = SlaConfig::where('priority_level', $locked->priority ?? SlaConfig::PRIORITY_DEFAULT)
-                            ->where('is_active', true)->first() 
-                            ?? SlaConfig::where('priority_level', SlaConfig::PRIORITY_DEFAULT)->first();
-                        
-                        if ($slaTarget) {
-                            $locked->sla_due_date = $now->copy()->addMinutes($slaTarget->resolution_time_minutes);
-                        }
+                        // SLA calculations are now handled in the model creating hook
+                        // using the MaintenanceRequestType defaults.
                     }
                     break;
                 case MR::STATUS_IN_PROGRESS:
@@ -141,16 +140,21 @@ class MaintenanceTransitionService
                     $locked->loadMissing('technician:id,name');
                 }
 
+                $labels = MR::statusLabels();
+                $fromLabel = $labels[$originalStatus] ?? $originalStatus;
+                $toLabel = $labels[$locked->status] ?? $locked->status;
+                
                 $defaultNote = $data['note'] ?? $this->defaultNoteForStatus($locked->status, $actorId, $locked);
+                $finalNote = trim("[{$fromLabel} -> {$toLabel}] " . $defaultNote);
 
                 if ($techChanged && $locked->technician) {
-                    $defaultNote = trim(($defaultNote ? $defaultNote . ' • ' : '') . 'ช่าง: ' . $locked->technician->name);
+                    $finalNote = trim($finalNote . ' • เจ้าหน้าที่: ' . $locked->technician->name);
                 }
 
                 MaintenanceLog::create([
                     'request_id'  => $locked->id,
                     'action'      => MaintenanceLog::ACTION_TRANSITION,
-                    'note'        => $defaultNote ?: null,
+                    'note'        => $finalNote ?: null,
                     'user_id'     => $actorId,
                     'from_status' => $originalStatus,
                     'to_status'   => $locked->status,
@@ -223,9 +227,9 @@ class MaintenanceTransitionService
             MR::STATUS_ACKNOWLEDGED => 'รับทราบแล้ว',
             MR::STATUS_ACCEPTED     => 'รับเรื่องแล้ว',
             MR::STATUS_IN_PROGRESS  => 'กำลังดำเนินการ',
-            MR::STATUS_ON_HOLD      => 'พักงาน/รออะไหล่',
+            MR::STATUS_ON_HOLD      => 'หยุดการซ่อมบำรุงชั่วคราว/รออะไหล่',
             MR::STATUS_RESOLVED     => 'ซ่อมเสร็จแล้ว',
-            MR::STATUS_CLOSED       => 'ปิดงาน',
+            MR::STATUS_CLOSED       => 'อนุมัติผลการซ่อมบำรุง',
             MR::STATUS_CANCELLED    => 'ยกเลิก',
             MR::STATUS_REJECTED     => 'ไม่รับเรื่อง',
             default                 => 'อัปเดตสถานะ',

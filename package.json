@@ -27,6 +27,7 @@
     "@tailwindcss/line-clamp": "^0.4.4",
     "alpinejs": "^3.15.1",
     "autoprefixer": "^10.4.21",
+    "baseline-browser-mapping": "^2.10.20",
     "daisyui": "^5.4.3",
     "laravel-echo": "^2.3.0",
     "laravel-vite-plugin": "^2.0.1",
@@ -36,6 +37,7 @@
     "vite": "^7.1.9"
   },
   "dependencies": {
+    "@hotwired/turbo": "^8.0.23",
     "axios": "^1.13.2",
     "chart.js": "^4.5.1",
     "signature_pad": "^5.1.3"

@@ -16,7 +16,7 @@ class MaintenanceOperationLogController extends Controller
 {
     public function upsert(Request $request, MaintenanceRequest $maintenanceRequest)
     {
-        Gate::authorize('update', $maintenanceRequest);
+        Gate::authorize('updateOperationLog', $maintenanceRequest);
 
         $actorId = Auth::id();
 

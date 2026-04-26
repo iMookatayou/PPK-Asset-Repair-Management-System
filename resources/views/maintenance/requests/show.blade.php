@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'สรุปใบงานซ่อม #' . $req->id)
+@section('title', 'สรุปใบงานซ่อม #' . ($req->request_no ?? $req->id))
 
 @section('page-header')
     @php
@@ -55,18 +55,34 @@
 
         $canAcknowledge = $status === MR::STATUS_PENDING && \Gate::allows('acknowledge', $req);
         $canAccept = $status === MR::STATUS_ACKNOWLEDGED && \Gate::allows('accept', $req);
-        $canReject = in_array($status, [MR::STATUS_PENDING, MR::STATUS_ACKNOWLEDGED], true) && \Gate::allows('reject', $req);
-        $canCancel = in_array($status, [MR::STATUS_ACCEPTED, MR::STATUS_IN_PROGRESS, MR::STATUS_ON_HOLD], true) && \Gate::allows('cancel', $req);
+        $canReject =
+            in_array($status, [MR::STATUS_PENDING, MR::STATUS_ACKNOWLEDGED], true) && \Gate::allows('reject', $req);
+        $canCancel =
+            in_array($status, [MR::STATUS_ACCEPTED, MR::STATUS_IN_PROGRESS, MR::STATUS_ON_HOLD], true) &&
+            \Gate::allows('cancel', $req);
         $canStart = $status === MR::STATUS_ACCEPTED && \Gate::allows('startWork', $req);
         $canHold =
             in_array($status, [MR::STATUS_ACCEPTED, MR::STATUS_IN_PROGRESS], true) && \Gate::allows('hold', $req);
         $canResume = $status === MR::STATUS_ON_HOLD && \Gate::allows('resume', $req);
-        $canResolve =
-            $status === MR::STATUS_IN_PROGRESS && \Gate::allows('resolve', $req);
+        $canResolve = $status === MR::STATUS_IN_PROGRESS && \Gate::allows('resolve', $req);
         $canClose = $status === MR::STATUS_RESOLVED && \Gate::allows('close', $req);
+        $canUpdate = \Gate::allows('update', $req);
+
+        // Calculate Technician Display Name (Multi-tech support)
+        $headerWorkers = $req->workers;
+        if ($headerWorkers->isNotEmpty()) {
+            $lead = $headerWorkers->firstWhere('pivot.is_lead', true) ?? $headerWorkers->first();
+            if ($headerWorkers->count() > 1) {
+                $techDisplayName = $lead->name . ' + ' . ($headerWorkers->count() - 1) . ' คน';
+            } else {
+                $techDisplayName = $lead->name;
+            }
+        } else {
+            $techDisplayName = $req->technician?->name ?? 'ยังไม่มีเจ้าหน้าที่รับเรื่อง';
+        }
 
         $btnBase = 'inline-flex items-center justify-center gap-2
-              rounded-lg px-4 h-9
+              rounded-md px-4 h-9
               text-sm font-medium
               transition-all duration-200
               focus:outline-none focus:ring-2 focus:ring-offset-2';
@@ -100,7 +116,7 @@
 
                 <div class="flex items-center gap-3 min-w-0">
                     <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center">
-                        <img src="/icon/maintenance1.avif" class="h-7 w-7 object-contain"
+                        <img src="/icon/maintenance1.webp" class="h-7 w-7 object-contain"
                             style="filter: invert(24%) sepia(87%) saturate(1469%) hue-rotate(139deg) brightness(91%) contrast(102%);"
                             alt="Icon">
                     </span>
@@ -119,23 +135,25 @@
                                 <span>อัปเดต: <span
                                         class="font-medium text-slate-700">{{ $req->updated_at->format('Y-m-d H:i') }}</span></span>
                             @endif
-                            <span>ผู้รับผิดชอบ: <span
-                                    class="font-medium text-slate-700">{{ $req->technician?->name ?? 'ยังไม่มีช่างรับเรื่อง' }}</span></span>
                         </div>
                     </div>
                 </div>
 
                 {{-- Action buttons: workflow left, nav right --}}
                 <div class="flex flex-wrap items-center gap-2 shrink-0">
+                    <div class="w-px h-6 bg-slate-200 mx-1 hidden sm:block"></div>
+
                     {{-- Workflow buttons --}}
                     @if ($canAcknowledge)
                         <form method="POST" action="{{ route('maintenance.requests.acknowledge', $req->id) }}">
                             @csrf
                             <button
-                                class="{{ $btnBase }} bg-[#1e3a8a] text-white hover:bg-blue-900 focus:ring-blue-300">
+                                class="inline-flex items-center overflow-hidden rounded bg-[#1e3a8a] text-[13px] font-bold text-white hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all active:scale-95 group">
                                 <span
-                                    class="material-symbols-outlined ms text-[16px] leading-none">approval_delegation</span>
-                                รับทราบ
+                                    class="px-2.5 py-2 bg-black/10 flex items-center justify-center text-white/90 group-hover:text-white border-r border-white/10">
+                                    <span class="material-symbols-outlined text-[17px]">approval_delegation</span>
+                                </span>
+                                <span class="px-3 py-2 leading-none">รับทราบ</span>
                             </button>
                         </form>
                     @endif
@@ -144,9 +162,12 @@
                         <form method="POST" action="{{ route('maintenance.requests.accept', $req->id) }}">
                             @csrf
                             <button
-                                class="{{ $btnBase }} bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-300">
-                                <span class="material-symbols-outlined ms text-[16px] leading-none">check</span>
-                                รับเรื่อง
+                                class="inline-flex items-center overflow-hidden rounded bg-blue-600 text-[13px] font-bold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all active:scale-95 group">
+                                <span
+                                    class="px-2.5 py-2 bg-black/10 flex items-center justify-center text-white/90 group-hover:text-white border-r border-white/10">
+                                    <span class="material-symbols-outlined text-[17px]">check</span>
+                                </span>
+                                <span class="px-3 py-2 leading-none">รับเรื่อง</span>
                             </button>
                         </form>
                     @endif
@@ -155,38 +176,49 @@
                         <form method="POST" action="{{ route('maintenance.requests.start', $req->id) }}">
                             @csrf
                             <button
-                                class="{{ $btnBase }} bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-200">
+                                class="inline-flex items-center overflow-hidden rounded bg-emerald-600 text-[13px] font-bold text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-200 transition-all active:scale-95 group">
                                 <span
-                                    class="material-symbols-outlined ms text-[16px] leading-none">keyboard_arrow_right</span>
-                                ดำเนินการ
+                                    class="px-2.5 py-2 bg-black/10 flex items-center justify-center text-white/90 group-hover:text-white border-r border-white/10">
+                                    <span class="material-symbols-outlined text-[17px]">keyboard_arrow_right</span>
+                                </span>
+                                <span class="px-3 py-2 leading-none">ดำเนินการ</span>
                             </button>
                         </form>
                     @endif
 
                     @if ($canHold)
                         <button type="button" id="openHoldModalBtn"
-                            class="{{ $btnBase }} bg-amber-600 text-white hover:bg-amber-700 focus:ring-amber-200">
-                            <span class="material-symbols-outlined ms text-[16px] leading-none">pause_circle</span>
-                            พักชั่วคราว
+                            class="inline-flex items-center overflow-hidden rounded bg-amber-600 text-[13px] font-bold text-white hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-200 transition-all active:scale-95 group">
+                            <span
+                                class="px-2.5 py-2 bg-black/10 flex items-center justify-center text-white/90 group-hover:text-white border-r border-white/20">
+                                <span class="material-symbols-outlined text-[17px]">pause_circle</span>
+                            </span>
+                            <span class="px-3 py-2 leading-none">หยุดชั่วคราว</span>
                         </button>
                     @endif
 
                     @if ($canResume)
                         <form method="POST" action="{{ route('maintenance.requests.resume', $req->id) }}">
                             @csrf
-                            <button class="{{ $btnBase }} bg-sky-600 text-white hover:bg-sky-700 focus:ring-sky-200">
+                            <button
+                                class="inline-flex items-center overflow-hidden rounded bg-sky-600 text-[13px] font-bold text-white hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-200 transition-all active:scale-95 group">
                                 <span
-                                    class="material-symbols-outlined ms text-[16px] leading-none">keyboard_double_arrow_right</span>
-                                กลับเข้าดำเนินการ
+                                    class="px-2.5 py-2 bg-black/10 flex items-center justify-center text-white/90 group-hover:text-white border-r border-white/20">
+                                    <span class="material-symbols-outlined text-[17px]">keyboard_double_arrow_right</span>
+                                </span>
+                                <span class="px-3 py-2 leading-none">กลับเข้าดำเนินการ</span>
                             </button>
                         </form>
                     @endif
 
                     @if ($canResolve)
                         <button type="button" id="openResolveModalBtn"
-                            class="{{ $btnBase }} bg-emerald-700 text-white hover:bg-emerald-800 focus:ring-emerald-200">
-                            <span class="material-symbols-outlined ms text-[16px] leading-none">task_alt</span>
-                            ซ่อมบำรุงเสร็จสิ้น
+                            class="inline-flex items-center overflow-hidden rounded bg-emerald-700 text-[13px] font-bold text-white hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-200 transition-all active:scale-95 group">
+                            <span
+                                class="px-2.5 py-2 bg-black/10 flex items-center justify-center text-white/90 group-hover:text-white border-r border-white/20">
+                                <span class="material-symbols-outlined text-[17px]">task_alt</span>
+                            </span>
+                            <span class="px-3 py-2 leading-none">เสร็จสิ้น</span>
                         </button>
                     @endif
 
@@ -194,75 +226,95 @@
                         <form method="POST" action="{{ route('maintenance.requests.close', $req->id) }}">
                             @csrf
                             <button
-                                class="{{ $btnBase }} bg-slate-700 text-white hover:bg-slate-800 focus:ring-slate-300">
-                                <span class="material-symbols-outlined ms text-[16px] leading-none">done_all</span>
-                                อนุมัติ
+                                class="inline-flex items-center overflow-hidden rounded bg-emerald-800 text-[13px] font-bold text-white hover:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-300 transition-all active:scale-95 group">
+                                <span
+                                    class="px-2.5 py-2 bg-black/10 flex items-center justify-center text-white/90 group-hover:text-white border-r border-white/20">
+                                    <span class="material-symbols-outlined text-[17px]">check</span>
+                                </span>
+                                <span class="px-3 py-2 leading-none">อนุมัติปิดงาน</span>
                             </button>
                         </form>
                     @endif
 
                     @if ($req->status === \App\Models\MaintenanceRequest::STATUS_CLOSED)
                         @can('rate', $req)
-                            <a href="{{ route('maintenance.requests.rating.create', $req->id) }}"
-                                class="{{ $btnBase }} bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-200">
-                                <span class="material-symbols-outlined ms text-[16px] leading-none">star</span>
-                                ประเมินความพึงพอใจ
-                            </a>
+                            <button type="button" x-data @click="$dispatch('open-rating-modal')"
+                                class="inline-flex items-center overflow-hidden rounded bg-amber-500 text-[13px] font-bold text-white hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-200 transition-all active:scale-95 group">
+                                <span
+                                    class="px-2.5 py-2 bg-black/10 flex items-center justify-center text-white/90 group-hover:text-white border-r border-white/20">
+                                    <span class="material-symbols-outlined text-[17px]">star</span>
+                                </span>
+                                <span class="px-3 py-2 leading-none">ประเมินความพึงพอใจ</span>
+                            </button>
                         @endcan
                     @endif
 
                     @if ($canReject)
                         <button type="button" id="openRejectModalBtn"
-                            class="{{ $btnBase }} bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-300">
-                            <span class="material-symbols-outlined ms text-[16px] leading-none">block</span>
-                            ไม่รับเรื่อง
+                            class="inline-flex items-center overflow-hidden rounded bg-rose-600 text-[13px] font-bold text-white hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-300 transition-all active:scale-95 group">
+                            <span
+                                class="px-2.5 py-2 bg-black/10 flex items-center justify-center text-white/90 group-hover:text-white border-r border-white/20">
+                                <span class="material-symbols-outlined text-[17px]">block</span>
+                            </span>
+                            <span class="px-3 py-2 leading-none">ไม่รับเรื่อง</span>
                         </button>
                     @endif
 
                     @if ($canCancel)
                         <button type="button" id="openCancelModalBtn"
-                            class="{{ $btnBase }} bg-slate-500 text-white hover:bg-slate-600 focus:ring-slate-300">
-                            <span class="material-symbols-outlined ms text-[16px] leading-none">cancel</span>
-                            ยกเลิกซ่อม
+                            class="inline-flex items-center overflow-hidden rounded bg-slate-500 text-[13px] font-bold text-white hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300 transition-all active:scale-95 group">
+                            <span
+                                class="px-2.5 py-2 bg-black/10 flex items-center justify-center text-white/90 group-hover:text-white border-r border-white/20">
+                                <span class="material-symbols-outlined text-[17px]">cancel</span>
+                            </span>
+                            <span class="px-3 py-2 leading-none">ยกเลิกการซ่อมบำรุง</span>
                         </button>
                     @endif
 
-                    {{-- Divider: แสดงเฉพาะเมื่อมี workflow button --}}
-                    @if (
-                        $canAcknowledge ||
-                            $canAccept ||
-                            $canStart ||
-                            $canHold ||
-                            $canResume ||
-                            $canResolve ||
-                            $canClose ||
-                            $canReject ||
-                            $canCancel ||
-                            $req->status === \App\Models\MaintenanceRequest::STATUS_CLOSED)
-                        <div class="h-6 w-px bg-slate-200"></div>
-                    @endif
+                    <div class="ml-2 flex items-center gap-2">
 
-                    {{-- Nav buttons --}}
-                    <a href="{{ route('maintenance.requests.index') }}"
-                        class="inline-flex items-center gap-1.5 rounded-lg border {{ $line }} bg-white px-3 h-9 text-[13px] font-medium text-slate-700 hover:bg-slate-50">
-                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none">
-                            <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round" />
-                        </svg>
-                        กลับ
-                    </a>
 
-                    <a href="{{ route('maintenance.requests.work-order', $req->id) }}" target="_blank"
-                        class="inline-flex items-center gap-1.5 rounded-lg border {{ $line }} bg-white px-3 h-9 text-[13px] font-medium text-slate-700 hover:bg-slate-50">
-                        <span class="material-symbols-outlined ms text-[16px] leading-none">print</span>
-                        พิมพ์ PDF
-                    </a>
+                        {{-- Nav buttons --}}
+                        <a href="{{ url()->previous() !== url()->current() ? url()->previous() : route('maintenance.requests.index') }}"
+                            class="inline-flex items-center h-9 gap-2 rounded-md border {{ $line }} bg-white px-4 text-[13px] font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 transition-all">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                            กลับ
+                        </a>
+
+                        @if ($canUpdate)
+                            <a href="{{ route('maintenance.requests.edit', $req->id) }}"
+                                class="inline-flex items-center gap-1.5 rounded-md border {{ $line }} bg-white px-4 h-9 text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-all">
+                                <span
+                                    class="material-symbols-outlined ms text-[16px] leading-none text-slate-500">edit</span>
+                                แก้ไข
+                            </a>
+                        @endif
+
+                        <a href="{{ route('maintenance.requests.work-order', $req->id) }}" target="_blank"
+                            class="inline-flex items-center gap-1.5 rounded-md border {{ $line }} bg-white px-4 h-9 text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-all">
+                            <span class="material-symbols-outlined ms text-[16px] leading-none">print</span>
+                            พิมพ์ PDF
+                        </a>
+                    </div>
+
+                    {{-- History Button (Circular) - Moved to far right --}}
+                    <div class="ml-2">
+
+                        <button type="button" id="openHistoryModalBtn"
+                            class="inline-flex w-10 h-10 items-center justify-center rounded-full border {{ $line }} bg-white text-slate-600 transition-all hover:bg-slate-50 hover:text-blue-600 hover:border-blue-200 focus:outline-none focus:ring-2 focus:ring-slate-200 group"
+                            title="ดูประวัติการดำเนินงานและ Operation Log ทั้งหมด">
+                            <span
+                                class="material-symbols-outlined text-[22px] transition-transform group-hover:rotate-[-15deg]">history</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
             {{-- Row 2: Progress bar --}}
-            <div class="w-full px-2 sm:px-4 mt-5">
-                <div class="relative w-full">
+            <div class="w-full px-2 sm:px-4 mt-5 overflow-x-auto pb-4">
+                <div class="relative w-full min-w-[500px] sm:min-w-full">
                     <div class="absolute top-[22px] left-0 w-full h-[6px] bg-slate-200 rounded-full z-0"></div>
                     <div class="absolute top-[22px] left-0 h-[6px] bg-[#1e3a8a] rounded-full z-0 transition-all duration-700 ease-out"
                         style="width: {{ $lineWidth }};"></div>
@@ -338,7 +390,8 @@
         $input = "mt-2 w-full h-10 rounded-md border $line bg-white px-3 py-2 text-sm
             focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
         $textarea = "mt-2 w-full rounded-md border $line bg-white px-3 py-2 text-sm
-              focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
+              focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 resize-none overflow-hidden";
+        $textareaStyle = 'min-height:unset;height:auto;';
 
         $headCls = 'flex items-start gap-3 pb-3 min-h-[56px]';
         $noCls = "w-8 h-8 shrink-0 rounded-full border border-emerald-600 bg-emerald-600
@@ -348,26 +401,7 @@
         $accentWrap = 'min-w-0 relative pl-3 pt-[1px]';
         $accentBar = 'absolute left-0 top-[2px] w-[3px] h-9 rounded-full bg-emerald-600/90';
 
-        $select = "w-full h-9 rounded-md border $line bg-white px-3 text-sm
-          focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
-
-        $prio = strtolower((string) ($req->priority ?? ''));
-
-        $prioLabel =
-            [
-                'low' => 'ต่ำ',
-                'medium' => 'ปานกลาง',
-                'high' => 'เร่งด่วน',
-                'urgent' => 'เร่งด่วนมาก',
-            ][$prio] ?? '-';
-
-        $prioTextTone = match ($prio) {
-            'low' => 'text-slate-600',
-            'medium' => 'text-sky-600',
-            'high' => 'text-amber-600',
-            'urgent' => 'text-rose-600',
-            default => 'text-slate-600',
-        };
+        $select = 'ts-basic w-full';
 
         $assetName = $req->asset?->name ?? ($req->asset_id ? '#' . $req->asset_id : '—');
         $assetCode = $req->asset?->asset_code;
@@ -389,8 +423,8 @@
 
         $fallbackRoleLabels = [
             'it' => 'IT',
-            'tech' => 'ช่าง',
-            'technician' => 'ช่าง',
+            'tech' => 'เจ้าหน้าที่',
+            'technician' => 'เจ้าหน้าที่',
             'engineer' => 'วิศวกร',
             'supervisor' => 'หัวหน้างาน',
             'unknown' => 'อื่น ๆ',
@@ -400,7 +434,7 @@
 
         $roleLabels = [];
         foreach ($allWorkers as $u) {
-            $code = (string) ($u->role ?? 'unknown');
+            $code = strtolower(trim((string) ($u->role ?? 'unknown')));
             if (!isset($roleLabels[$code])) {
                 $roleLabels[$code] = $u->role_label ?? ($fallbackRoleLabels[$code] ?? ucfirst($code));
             }
@@ -416,32 +450,40 @@
         });
     @endphp
 
-    <div class="mx-auto max-w-screen-2xl px-3 sm:px-6 lg:px-8 pb-8">
+    <div class="mx-auto max-w-screen-2xl px-3 sm:px-6 lg:px-8 pb-8" x-data="{ ratingOpen: {{ request('rate') == 1 || session('auto_rate') || $errors->has('score') || $errors->has('comment') ? 'true' : 'false' }} }"
+        x-on:open-rating-modal.window="ratingOpen = true" x-init="if (new URLSearchParams(window.location.search).has('rate')) {
+            let url = new URL(window.location.href);
+            url.searchParams.delete('rate');
+            window.history.replaceState({}, '', url);
+        }">
         <div class="mt-4 space-y-6">
-            <div class="relative grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="relative grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                 <div class="hidden lg:block absolute inset-y-0 left-1/2 w-px bg-slate-200"></div>
 
-                                    @include('maintenance.requests.partials._asset_info')
+                @include('maintenance.requests.partials._asset_info')
 
-                                    @include('maintenance.requests.partials._issue_details')
+                @include('maintenance.requests.partials._issue_details')
             </div>
 
             <div class="border-t {{ $line }}"></div>
 
-                                @include('maintenance.requests.partials._reporter_info')
-
-            <div class="border-t {{ $line }}"></div>
-
-                                @include('maintenance.requests.partials._attachments')
-
-            <div class="border-t {{ $line }}"></div>
-
-            <div class="relative grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="relative grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                 <div class="hidden lg:block absolute inset-y-0 left-1/2 w-px bg-slate-200"></div>
-                                    @include('maintenance.requests.partials._operation_log')
-
-                                    @include('maintenance.requests.partials._assigned_team')
+                @include('maintenance.requests.partials._reporter_info')
+                @include('maintenance.requests.partials._attachments')
             </div>
+
+            <div class="border-t {{ $line }}"></div>
+
+            <div class="relative grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                <div class="hidden lg:block absolute inset-y-0 left-1/2 w-px bg-slate-200"></div>
+                @include('maintenance.requests.partials._assigned_team')
+                @include('maintenance.requests.partials._operation_log')
+            </div>
+
+            <div class="border-t {{ $line }}"></div>
+
+            @include('maintenance.requests.partials._sla_info')
         </div>
 
         {{-- Assign Modal --}}
@@ -449,17 +491,17 @@
             <div id="assignModal"
                 class="fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-900/40 backdrop-blur-sm p-3 sm:p-4">
                 <div
-                    class="relative z-[10000] w-full max-w-4xl overflow-hidden rounded-2xl border {{ $line }} bg-white shadow-xl">
+                    class="relative z-[10000] w-full max-w-4xl overflow-hidden rounded-2xl border {{ $line }} bg-white ">
 
                     {{-- Modal Header --}}
                     <div class="flex items-center justify-between border-b {{ $line }} px-6 py-4">
                         <div class="flex items-start gap-3 min-w-0">
                             <span class="mt-0.5 inline-flex h-10 w-10 items-center justify-center text-indigo-700">
-                                <img src="/icon/technical-support.avif" class="h-9 w-9 object-contain" alt="Icon">
+                                <img src="/icon/technical-support.webp" class="h-9 w-9 object-contain" alt="Icon">
                             </span>
                             <div class="min-w-0">
-                                <div class="text-[16px] font-semibold text-slate-900 leading-tight">มอบหมายทีมช่าง</div>
-                                <p class="text-[13px] text-slate-500">ค้นหาและเลือกช่างที่ต้องการ</p>
+                                <div class="text-[16px] font-semibold text-slate-900 leading-tight">มอบหมายทีมเจ้าหน้าที่</div>
+                                <p class="text-[13px] text-slate-500">ค้นหาและเลือกเจ้าหน้าที่ที่ต้องการ</p>
                             </div>
                         </div>
                         <button type="button" id="closeAssignModalBtn"
@@ -471,7 +513,7 @@
                         </button>
                     </div>
 
-                    <form method="POST" action="{{ $assignStoreUrl }}">
+                    <form method="POST" action="{{ $assignStoreUrl }}" data-dirty-check="true">
                         @csrf
                         <input type="hidden" id="assignSuggestRole" value="{{ $suggestRole }}">
                         <input type="hidden" name="update_team_flag" value="1">
@@ -497,9 +539,9 @@
                                                 </svg>
                                             </span>
                                             <input id="assignSearch" type="text"
-                                                class="w-full rounded-lg border {{ $line }} bg-white pl-9 pr-3 py-2.5 text-[13px]
+                                                class="w-full rounded-md border {{ $line }} bg-white pl-9 pr-3 py-2.5 text-[13px]
                                         focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
-                                                placeholder="พิมพ์ชื่อช่าง...">
+                                                placeholder="พิมพ์ชื่อเจ้าหน้าที่...">
                                         </div>
                                     </div>
 
@@ -507,7 +549,7 @@
                                         <label
                                             class="block text-[13px] font-semibold text-slate-700 mb-1.5">กรองตามตำแหน่ง</label>
                                         <select id="assignRoleFilter"
-                                            class="w-full rounded-lg border {{ $line }} bg-white px-3 py-2.5 text-[13px]
+                                            class="w-full rounded-md border {{ $line }} bg-white px-3 py-2.5 text-[13px]
                                     focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400">
                                             <option value="">— ทั้งหมด —</option>
                                             @foreach ($roleGroupsSorted as $roleCode => $users)
@@ -523,12 +565,12 @@
 
                                     <div class="grid grid-cols-2 gap-2">
                                         <button type="button" id="assignSelectAllBtn"
-                                            class="inline-flex items-center justify-center rounded-lg border {{ $line }} bg-white px-3 py-2
+                                            class="inline-flex items-center justify-center rounded-md border {{ $line }} bg-white px-3 py-2
                                     text-[12px] font-semibold text-slate-700 hover:bg-slate-100 transition-colors">
                                             เลือกทั้งหมด
                                         </button>
                                         <button type="button" id="assignClearAllBtn"
-                                            class="inline-flex items-center justify-center rounded-lg border {{ $line }} bg-white px-3 py-2
+                                            class="inline-flex items-center justify-center rounded-md border {{ $line }} bg-white px-3 py-2
                                     text-[12px] font-semibold text-slate-700 hover:bg-slate-100 transition-colors">
                                             ล้างการเลือก
                                         </button>
@@ -542,7 +584,7 @@
                                         <div class="text-[13px] text-slate-500" id="assignSelectedMeta">0 คน</div>
                                     </div>
                                     <div id="assignSelectedEmpty" class="text-[13px] text-slate-400 flex-none">
-                                        ยังไม่ได้เลือกช่าง
+                                        ยังไม่ได้เลือกเจ้าหน้าที่
                                     </div>
                                     {{-- แต่ละ item แสดงชื่อเต็ม ไม่ตัด --}}
                                     <div id="assignSelectedList"
@@ -552,11 +594,11 @@
                                 {{-- Footer ปุ่มย้ายมาอยู่ใต้ sidebar --}}
                                 <div class="border-t {{ $line }} bg-slate-50 px-5 py-3 flex gap-2">
                                     <button type="button" id="cancelAssignModalBtn"
-                                        class="flex-1 py-2.5 text-[13px] font-semibold border {{ $line }} rounded-lg bg-white text-slate-700 hover:bg-slate-100 transition-colors">
+                                        class="flex-1 py-2.5 text-[13px] font-semibold border {{ $line }} rounded-md bg-white text-slate-700 hover:bg-slate-100 transition-colors">
                                         ยกเลิก
                                     </button>
                                     <button type="submit"
-                                        class="flex-1 py-2.5 text-[13px] font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-200 transition-colors">
+                                        class="flex-1 py-2.5 text-[13px] font-semibold bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-200 transition-colors">
                                         บันทึก
                                     </button>
                                 </div>
@@ -570,14 +612,15 @@
                                 <div
                                     class="px-5 py-3 border-b {{ $line }} bg-white flex items-center justify-between">
                                     <div class="text-[14px] font-semibold text-slate-800">
-                                        รายชื่อช่าง
+                                        รายชื่อเจ้าหน้าที่
                                         <span id="assignVisibleCount" class="text-slate-500 font-normal">(0)</span>
                                     </div>
                                 </div>
 
                                 {{-- Hint --}}
                                 <div class="px-5 py-2 border-b {{ $line }} bg-slate-50">
-                                    <p class="text-[12px] text-slate-400">ใช้ตัวกรองด้านซ้ายเพื่อค้นหาและเลือกช่างได้รวดเร็ว
+                                    <p class="text-[12px] text-slate-400">
+                                        ใช้ตัวกรองด้านซ้ายเพื่อค้นหาและเลือกเจ้าหน้าที่ได้รวดเร็ว
                                     </p>
                                 </div>
 
@@ -585,7 +628,7 @@
                                 <div class="flex-1 min-h-0 overflow-y-auto" id="assignListScroll">
                                     @if ($roleGroupsSorted->isEmpty())
                                         <div class="px-5 py-10 text-center text-[14px] text-slate-500">
-                                            ไม่พบข้อมูลช่างในระบบ
+                                            ไม่พบข้อมูลเจ้าหน้าที่ในระบบ
                                         </div>
                                     @else
                                         @foreach ($roleGroupsSorted as $roleCode => $users)
@@ -594,7 +637,7 @@
                                                     $roleLabels[$roleCode] ??
                                                     ($fallbackRoleLabels[$roleCode] ?? ucfirst((string) $roleCode));
                                                 $roleCount = $users->count();
-                                                $roleKey = strtolower((string) $roleCode);
+                                                $roleKey = strtolower(trim((string) $roleCode));
                                             @endphp
                                             <section class="border-b {{ $line }}" data-role-group="1"
                                                 data-role-group-code="{{ $roleKey }}">
@@ -632,8 +675,7 @@
                                                             <div
                                                                 class="h-8 w-8 flex-shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100">
                                                                 @if ($avatar)
-                                                                    <img src="{{ $avatar }}"
-                                                                        alt="{{ $worker->name }}"
+                                                                    <img src="{{ $avatar }}" alt="{{ $worker->name }}"
                                                                         class="h-full w-full object-cover">
                                                                 @else
                                                                     <div
@@ -666,8 +708,7 @@
         @if ($canReject)
             <div id="rejectModal"
                 class="fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-                <div
-                    class="relative z-[10000] w-full max-w-xl rounded-2xl border {{ $line }} bg-white shadow-xl">
+                <div class="relative z-[10000] w-full max-w-xl rounded-2xl border {{ $line }} bg-white ">
                     <div class="flex items-center justify-between border-b {{ $line }} px-4 py-3">
                         <div class="text-sm font-semibold text-rose-600">ไม่รับเรื่อง</div>
                         <button type="button" id="closeRejectModalBtn"
@@ -679,15 +720,15 @@
                         </button>
                     </div>
                     <form method="POST" action="{{ route('maintenance.requests.reject', $req->id) }}"
-                        class="px-4 py-4 space-y-4">
+                        class="px-4 py-4 space-y-4" data-dirty-check="true">
                         @csrf
                         <div>
                             <label class="block text-sm font-medium text-slate-700">ระบุเหตุผลที่ไม่รับเรื่อง <span
                                     class="text-rose-600">*</span></label>
-                            <textarea name="reject_reason" rows="4" required
-                                class="mt-2 w-full rounded-md border {{ $line }} bg-white px-3 py-2 text-sm
+                            <textarea name="reject_reason" rows="3" required style="min-height:unset;height:auto;"
+                                class="mt-2 w-full rounded-md border {{ $line }} bg-white px-3 py-2 text-sm resize-none overflow-hidden
                                focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
-                                placeholder="เช่น ข้อมูลไม่ครบถ้วน, แจ้งซ้ำ, หรือไม่ใช่หน้าที่ของทีมช่าง..."></textarea>
+                                placeholder="เช่น ข้อมูลไม่ครบถ้วน, แจ้งซ้ำ, หรือไม่ใช่หน้าที่ของทีมเจ้าหน้าที่..."></textarea>
                         </div>
                         <div class="flex justify-end gap-2 pt-2">
                             <button type="button" id="cancelRejectModalBtn"
@@ -708,10 +749,9 @@
         @if ($canCancel)
             <div id="cancelModal"
                 class="fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-                <div
-                    class="relative z-[10000] w-full max-w-xl rounded-2xl border {{ $line }} bg-white shadow-xl">
+                <div class="relative z-[10000] w-full max-w-xl rounded-2xl border {{ $line }} bg-white ">
                     <div class="flex items-center justify-between border-b {{ $line }} px-4 py-3">
-                        <div class="text-sm font-semibold text-slate-600">ยกเลิกซ่อม</div>
+                        <div class="text-sm font-semibold text-slate-600">ยกเลิกการซ่อมบำรุง</div>
                         <button type="button" id="closeCancelModalBtn"
                             class="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700">
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -721,13 +761,13 @@
                         </button>
                     </div>
                     <form method="POST" action="{{ route('maintenance.requests.cancel', $req->id) }}"
-                        class="px-4 py-4 space-y-4">
+                        class="px-4 py-4 space-y-4" data-dirty-check="true">
                         @csrf
                         <div>
                             <label class="block text-sm font-medium text-slate-700">ระบุเหตุผลการยกเลิก <span
                                     class="text-rose-600">*</span></label>
-                            <textarea name="cancel_reason" rows="4" required
-                                class="mt-2 w-full rounded-md border {{ $line }} bg-white px-3 py-2 text-sm
+                            <textarea name="cancel_reason" rows="3" required style="min-height:unset;height:auto;"
+                                class="mt-2 w-full rounded-md border {{ $line }} bg-white px-3 py-2 text-sm resize-none overflow-hidden
                                focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
                                 placeholder="เช่น แจ้งผิดหน่วยงาน, ซ่อมเองได้แล้ว, หรือขอยกเลิกรายการนี้..."></textarea>
                         </div>
@@ -738,7 +778,7 @@
                             </button>
                             <button type="submit"
                                 class="px-3 py-2 text-xs bg-slate-600 text-white rounded-md hover:bg-slate-700 focus:ring-2 focus:ring-slate-200">
-                                ยืนยันการยกเลิกซ่อม
+                                ยืนยันการยกเลิกการซ่อมบำรุง
                             </button>
                         </div>
                     </form>
@@ -750,8 +790,7 @@
         @if ($canHold)
             <div id="holdModal"
                 class="fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-                <div
-                    class="relative z-[10000] w-full max-w-xl rounded-2xl border {{ $line }} bg-white shadow-xl">
+                <div class="relative z-[10000] w-full max-w-xl rounded-2xl border {{ $line }} bg-white ">
                     <div class="flex items-center justify-between border-b {{ $line }} px-4 py-3">
                         <div class="text-sm font-semibold text-slate-900">พักชั่วคราว</div>
                         <button type="button" id="closeHoldModalBtn"
@@ -763,13 +802,13 @@
                         </button>
                     </div>
                     <form method="POST" action="{{ route('maintenance.requests.hold', $req->id) }}"
-                        class="px-4 py-4 space-y-4">
+                        class="px-4 py-4 space-y-4" data-dirty-check="true">
                         @csrf
                         <div>
                             <label class="block text-sm font-medium text-slate-700">ระบุเหตุผลในการพักชั่วคราว <span
                                     class="text-amber-600">*</span></label>
-                            <textarea name="note" rows="4" required
-                                class="mt-2 w-full rounded-md border {{ $line }} bg-white px-3 py-2 text-sm
+                            <textarea name="note" rows="3" required style="min-height:unset;height:auto;"
+                                class="mt-2 w-full rounded-md border {{ $line }} bg-white px-3 py-2 text-sm resize-none overflow-hidden
                            focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
                                 placeholder="เช่น รออะไหล่, รอเบิกเครื่องมือ, หรือเหตุผลอื่น ๆ..."></textarea>
                         </div>
@@ -792,8 +831,7 @@
         @if ($canResolve)
             <div id="resolveModal"
                 class="fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-                <div
-                    class="relative z-[10000] w-full max-w-xl rounded-2xl border {{ $line }} bg-white shadow-xl">
+                <div class="relative z-[10000] w-full max-w-xl rounded-2xl border {{ $line }} bg-white ">
                     <div class="flex items-center justify-between border-b {{ $line }} px-4 py-3">
                         <div class="text-sm font-semibold text-slate-900">ซ่อมบำรุงเสร็จสิ้น</div>
                         <button type="button" id="closeResolveModalBtn"
@@ -805,13 +843,13 @@
                         </button>
                     </div>
                     <form method="POST" action="{{ route('maintenance.requests.resolve', $req->id) }}"
-                        class="px-4 py-4 space-y-4">
+                        class="px-4 py-4 space-y-4" data-dirty-check="true">
                         @csrf
                         <div>
                             <label class="block text-sm font-medium text-slate-700">ระบุรายละเอียดการแก้ปัญหา <span
                                     class="text-emerald-600">*</span></label>
-                            <textarea name="resolution_note" rows="4" required
-                                class="mt-2 w-full rounded-md border {{ $line }} bg-white px-3 py-2 text-sm
+                            <textarea name="resolution_note" rows="3" required style="min-height:unset;height:auto;"
+                                class="mt-2 w-full rounded-md border {{ $line }} bg-white px-3 py-2 text-sm resize-none overflow-hidden
                                focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                                 placeholder="เช่น เปลี่ยนอะไหล่, ซ่อมแผงวงจรสำเร็จ, ผ่านการสอบเทียบแล้ว..."></textarea>
                         </div>
@@ -830,20 +868,56 @@
             </div>
         @endif
 
+        {{-- History Modal --}}
+        <div id="historyModal"
+            class="fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+            <div
+                class="relative z-[10000] w-full max-w-2xl rounded-2xl border {{ $line }} bg-white overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div class="flex items-center justify-between border-b {{ $line }} px-6 py-4 bg-slate-50/50">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="h-9 w-9 rounded-xl bg-slate-900 text-white flex items-center justify-center -slate-200">
+                            <span class="material-symbols-outlined text-[20px]">history</span>
+                        </div>
+                        <div>
+                            <div class="text-[15px] font-bold text-slate-900">ประวัติการดำเนินงาน</div>
+                            <div class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Operation & Status
+                                History Log</div>
+                        </div>
+                    </div>
+                    <button type="button" id="closeHistoryModalBtn"
+                        class="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
+                        <span class="material-symbols-outlined text-[20px]">close</span>
+                    </button>
+                </div>
+
+                <div class="px-6 py-6 max-h-[60vh] overflow-y-auto bg-white custom-scrollbar-indigo">
+                    @include('maintenance.requests.partials._timeline')
+                </div>
+
+                <div class="flex justify-end border-t {{ $line }} px-6 py-4 bg-slate-50/50">
+                    <button type="button" id="cancelHistoryModalBtn"
+                        class="h-10 px-6 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-95">
+                        ปิดหน้าต่าง
+                    </button>
+                </div>
+            </div>
+        </div>
+
         {{-- Post-Close Action Modal --}}
         @if (session('show_post_close_modal'))
             <div id="postCloseModal"
                 class="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
                 <div
                     class="relative z-[10000] w-full max-w-md transform transition-all animate-in fade-in zoom-in duration-300">
-                    <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+                    <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white ">
                         {{-- Icon Header --}}
                         <div class="bg-slate-50 px-6 py-8 text-center border-b border-slate-100">
                             <div
-                                class="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 mb-4 shadow-inner">
+                                class="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 mb-4 ">
                                 <span class="material-symbols-outlined text-[48px]">check_circle</span>
                             </div>
-                            <h3 class="text-xl font-bold text-slate-900">อนุมัติเรียบร้อยแล้ว!</h3>
+                            <h3 class="text-xl font-bold text-slate-900">อนุมัติผลการซ่อมบำรุงเรียบร้อยแล้ว!</h3>
                             <p class="mt-2 text-sm text-slate-500">ขอบคุณที่ใช้บริการครับ คุณต้องการดำเนินการอย่างไรต่อ?
                             </p>
                         </div>
@@ -852,7 +926,7 @@
                         <div class="p-6 space-y-3">
                             @can('rate', $req)
                                 <a href="{{ route('maintenance.requests.rating.create', $req->id) }}"
-                                    class="flex w-full items-center justify-center gap-3 rounded-2xl bg-amber-500 py-4 text-[15px] font-bold text-white shadow-lg shadow-amber-200 hover:bg-amber-600 hover:scale-[1.02] active:scale-[0.98] transition-all">
+                                    class="flex w-full items-center justify-center gap-3 rounded-2xl bg-amber-500 py-4 text-[15px] font-bold text-white -amber-200 hover:bg-amber-600 hover:scale-[1.02] active:scale-[0.98] transition-all">
                                     <span class="material-symbols-outlined text-[20px]">star</span>
                                     ประเมินความพึงพอใจ
                                 </a>
@@ -873,6 +947,95 @@
             </script>
         @endif
 
+        {{-- Rating Popup Modal --}}
+        <div x-show="ratingOpen" class="fixed inset-0 z-[9999] overflow-y-auto" style="display: none;"
+            x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200"
+            x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+
+            <div class="flex items-center justify-center min-h-screen p-4">
+                {{-- Backdrop --}}
+                <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="ratingOpen = false"></div>
+
+                {{-- Modal Content --}}
+                <div class="relative bg-white rounded-sm max-w-lg w-full overflow-hidden transform transition-all"
+                    x-transition:enter="transition ease-out duration-300"
+                    x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100">
+
+                    {{-- Header --}}
+                    <div class="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white">
+                        <div class="flex items-center gap-4">
+                            <div class="flex flex-col">
+                                <h3 class="text-[18px] font-bold text-slate-900 tracking-tight">ประเมินความพึงพอใจ</h3>
+                                <p class="text-[12px] text-slate-400 font-bold tracking-widest uppercase mt-0.5">
+                                    เลขที่ใบงาน
+                                    #{{ $req->request_no ?? $req->id }}</p>
+                            </div>
+                        </div>
+                        <button @click="ratingOpen = false"
+                            class="w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all">
+                            <span class="material-symbols-outlined text-[20px]">close</span>
+                        </button>
+                    </div>
+
+                    {{-- Form --}}
+                    <form action="{{ route('maintenance.requests.rating.store', $req) }}" method="POST" class="p-8"
+                        data-dirty-check="true">
+                        @csrf
+                        <div class="mb-8">
+                            <div class="text-[14px] font-bold text-slate-700 uppercase tracking-tight mb-2">
+                                หัวข้อการแจ้งซ่อม</div>
+                            <p class="text-[16px] font-bold text-slate-800 tracking-tight leading-relaxed">
+                                {{ $req->title }}</p>
+                        </div>
+
+                        {{-- Star Rating --}}
+                        <div class="mb-10 text-center">
+                            <label
+                                class="block text-[15px] font-bold text-slate-800 mb-6">คุณพึงพอใจกับงานซ่อมนี้แค่ไหน?</label>
+                            <div class="flex flex-row-reverse justify-center gap-2">
+                                @for ($i = 5; $i >= 1; $i--)
+                                    <input type="radio" id="star{{ $i }}" name="score"
+                                        value="{{ $i }}" class="hidden peer" required>
+                                    <label for="star{{ $i }}"
+                                        class="cursor-pointer text-slate-300 hover:text-amber-400 peer-hover:text-amber-400 peer-checked:text-amber-500 transition-all transform hover:scale-125">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" viewBox="0 0 20 20"
+                                            fill="currentColor">
+                                            <path
+                                                d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                        </svg>
+                                    </label>
+                                @endfor
+                            </div>
+                            @error('score')
+                                <p class="mt-2 text-rose-500 text-[12px] font-bold">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div class="mb-8 p-1 bg-slate-50 rounded-sm border border-slate-100">
+                            <textarea name="comment" rows="3" style="min-height:unset;height:auto;"
+                                class="w-full bg-white rounded-sm border-none text-[14px] focus:ring-0 placeholder-slate-300 resize-none overflow-hidden p-4"
+                                placeholder="แชร์ประสบการณ์ของคุณเพื่อการพัฒนาบริการ...">{{ old('comment') }}</textarea>
+                            @error('comment')
+                                <p class="mt-2 text-rose-500 text-[12px] font-bold px-4 pb-2">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div class="flex gap-4">
+                            <button type="button" @click="ratingOpen = false"
+                                class="flex-1 px-6 py-3 bg-slate-100 text-slate-500 rounded-sm font-bold text-[14px] hover:bg-slate-200 transition-all active:scale-95">
+                                ยกเลิก
+                            </button>
+                            <button type="submit"
+                                class="flex-1 px-6 py-3 bg-[#0F2D5C] text-white rounded-sm font-bold text-[14px] hover:bg-[#1a3d75] transition-all active:scale-95">
+                                บันทึกการประเมิน
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 @endsection
 
@@ -954,11 +1117,11 @@
 
                         const item = document.createElement('div');
                         item.className =
-                            'flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 animate-in fade-in slide-in-from-left-2 duration-200';
+                            'flex items-center gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 animate-in fade-in slide-in-from-left-2 duration-200';
                         item.dataset.userId = userId;
 
                         item.innerHTML = `
-                    <div class="h-8 w-8 rounded-full bg-slate-800 text-white grid place-items-center text-[11px] font-bold flex-shrink-0 shadow-sm">
+                    <div class="h-8 w-8 rounded-full bg-slate-800 text-white grid place-items-center text-[11px] font-bold flex-shrink-0 ">
                         ${escapeHtml(ini)}
                     </div>
                     <div class="min-w-0 flex-1">
@@ -987,19 +1150,26 @@
                     const r = (roleFilter?.value || '').trim().toLowerCase();
 
                     getAllRows().forEach(row => {
-                        const name = (row.getAttribute('data-name') || '').toLowerCase();
-                        const role = (row.getAttribute('data-role') || '').toLowerCase();
+                        const name = (row.getAttribute('data-name') || '').toLowerCase().trim();
+                        const role = (row.getAttribute('data-role') || '').toLowerCase().trim();
                         const okName = !q || name.includes(q);
                         const okRole = !r || role === r;
                         row.style.display = (okName && okRole) ? '' : 'none';
                     });
 
-                    // ซ่อนหัวข้อกลุ่ม (Group Header) ถ้าไม่มีลูกทีมในกลุ่มนั้นแสดงอยู่เลย
+                    // อัปเดตการแสดงผล Hint
+                    if (hintEl) {
+                        if (r === suggestRole && r !== '') {
+                            hintEl.classList.remove('hidden');
+                        } else {
+                            hintEl.classList.add('hidden');
+                        }
+                    }
+
                     modal.querySelectorAll('[data-role-group]').forEach(group => {
                         const inner = Array.from(group.querySelectorAll('.assign-user-row'));
                         group.style.display = inner.some(x => x.style.display !== 'none') ? '' : 'none';
                     });
-
                     updateCounts();
                 }
 
@@ -1008,17 +1178,27 @@
                 function showModal() {
                     modal.classList.remove('hidden');
                     modal.classList.add('flex');
-                    document.body.style.overflow = 'hidden'; // ล็อค Scroll พื้นหลัง
+                    document.body.style.overflow = 'hidden';
 
-                    // ถ้ามี Suggest Role ให้เลือกให้ตั้งต้นไว้เลย
-                    if (roleFilter && suggestRole && !roleFilter.value) {
-                        const hasOption = Array.from(roleFilter.options)
-                            .some(opt => (opt.value || '').toLowerCase() === suggestRole);
-                        if (hasOption) {
-                            roleFilter.value = suggestRole;
-                            hintEl?.classList.remove('hidden');
+                    // คืนค่า Checkbox ตามค่าเริ่มต้นใน HTML (ช่วยกรณีผู้ใช้กด "ล้าง" แต่ไม่ได้กดบันทึกแล้วปิดหน้าต่างไป)
+                    getAllCheckboxes().forEach(cb => {
+                        cb.checked = cb.defaultChecked;
+                    });
+
+                    // ล้างช่องค้นหา
+                    if (searchInput) searchInput.value = '';
+
+                    // รีเซ็ตตัวกรองตำแหน่งกลับไปที่ทีมที่แนะนำ (หรือ "ทั้งหมด" หากไม่มีคำแนะนำ)
+                    if (roleFilter) {
+                        if (suggestRole) {
+                            const hasOption = Array.from(roleFilter.options)
+                                .some(opt => (opt.value || '').toLowerCase().trim() === suggestRole);
+                            roleFilter.value = hasOption ? suggestRole : '';
+                        } else {
+                            roleFilter.value = '';
                         }
                     }
+
                     applyFilter();
                 }
 
@@ -1052,6 +1232,7 @@
                 });
 
                 searchInput?.addEventListener('input', applyFilter);
+                searchInput?.addEventListener('keyup', applyFilter);
                 roleFilter?.addEventListener('change', applyFilter);
 
                 // เมื่อมีการติ๊ก Checkbox ในลิสต์
@@ -1059,7 +1240,7 @@
                     if (e.target?.classList?.contains('assign-user-checkbox')) updateCounts();
                 });
 
-                // ปุ่มลบออกจาก Sidebar (ตัว Chip)
+                // ลบชิปจาก Sidebar
                 selectedListEl?.addEventListener('click', e => {
                     const btn = e.target.closest('.assign-chip-remove');
                     if (!btn) return;
@@ -1074,9 +1255,9 @@
                     const submitBtn = this.querySelector('button[type="submit"]');
                     if (submitBtn) {
                         submitBtn.disabled = true;
-                        submitBtn.innerHTML = '<span class="animate-spin mr-2">◌</span> กำลังบันทึก...';
+                        submitBtn.innerHTML =
+                            '<span class="animate-spin mr-2 text-[14px]">◌</span> กำลังบันทึก...';
                     }
-                    // ปล่อยให้ Form ส่งข้อมูลแบบ Standard POST ไปยัง Action URL
                 });
 
                 // รันครั้งแรกเพื่อตั้งค่าเริ่มต้น
@@ -1180,6 +1361,31 @@
                 cancelResolveBtn?.addEventListener('click', hideResolve);
                 resolveModal.addEventListener('click', e => {
                     if (e.target === resolveModal) hideResolve();
+                });
+            }
+
+            // --- 9. History Modal Logic ---
+            const historyModal = document.getElementById('historyModal');
+            const openHistoryBtn = document.getElementById('openHistoryModalBtn');
+            const closeHistoryBtn = document.getElementById('closeHistoryModalBtn');
+            const cancelHistoryBtn = document.getElementById('cancelHistoryModalBtn');
+
+            if (historyModal && openHistoryBtn) {
+                const showHistory = () => {
+                    historyModal.classList.remove('hidden');
+                    historyModal.classList.add('flex');
+                    document.body.style.overflow = 'hidden';
+                };
+                const hideHistory = () => {
+                    historyModal.classList.add('hidden');
+                    historyModal.classList.remove('flex');
+                    document.body.style.overflow = '';
+                };
+                openHistoryBtn.addEventListener('click', showHistory);
+                closeHistoryBtn?.addEventListener('click', hideHistory);
+                cancelHistoryBtn?.addEventListener('click', hideHistory);
+                historyModal.addEventListener('click', e => {
+                    if (e.target === historyModal) hideHistory();
                 });
             }
         })();

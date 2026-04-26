@@ -27,9 +27,11 @@
                             <p class="mt-1.5 text-[13px] text-slate-600">แก้ไขข้อมูลส่วนตัวของคุณ</p>
                         </div>
                     </div>
-                    <a href="{{ route('profile.show') }}"
-                        class="inline-flex items-center gap-1 px-3 py-1.5 bg-white text-slate-600 border border-slate-200 rounded-lg text-[14px] font-medium hover:bg-slate-50 transition-colors">
-                        <span class="material-symbols-outlined text-[18px]">chevron_left</span>
+                    <a href="{{ url()->previous() !== url()->current() ? url()->previous() : route('profile.show') }}"
+                        class="inline-flex items-center h-9 gap-2 rounded-md border border-slate-200 bg-white px-4 text-[13px] font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 transition-all">
+                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
                         กลับ
                     </a>
                 </div>
@@ -38,7 +40,8 @@
 
         <div class="px-4 md:px-6 lg:px-8 py-10 max-w-4xl mx-auto w-full">
             @if (session('status'))
-                <div class="mb-8 rounded-lg bg-emerald-50 border border-emerald-100 px-4 py-3 text-[13px] text-emerald-700 flex items-center gap-2">
+                <div
+                    class="mb-8 rounded-lg bg-emerald-50 border border-emerald-100 px-4 py-3 text-[13px] text-emerald-700 flex items-center gap-2">
                     <span class="material-symbols-outlined text-[18px]">check_circle</span>
                     {{ session('status') }}
                 </div>
@@ -58,12 +61,12 @@
                         <div class="md:col-span-2 flex items-center gap-6">
                             <div class="relative">
                                 <img id="avatar-preview"
-                                    @if (!$avatarThumb && !$avatarMain) class="hidden h-20 w-20 rounded-full object-cover border-2 border-slate-100 shadow-sm"
-                                    @else class="h-20 w-20 rounded-full object-cover border-2 border-slate-100 shadow-sm" @endif
+                                    @if (!$avatarThumb && !$avatarMain) class="hidden h-20 w-20 rounded-full object-cover border-2 border-slate-100 "
+                                    @else class="h-20 w-20 rounded-full object-cover border-2 border-slate-100 " @endif
                                     src="{{ $avatarThumb ?: $avatarMain }}" />
 
                                 <div id="avatar-fallback" @if ($avatarThumb || $avatarMain) class="hidden" @endif
-                                    class="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-600 text-white shadow-sm border border-emerald-700/10">
+                                    class="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-600 text-white border border-emerald-700/10">
                                     <span class="text-2xl font-bold tracking-tighter">{{ $initials }}</span>
                                 </div>
                             </div>
@@ -76,7 +79,8 @@
                                         เลือกไฟล์รูปภาพใหม่
                                     </label>
                                     <input id="avatar-input" type="file" name="avatar" accept="image/*" class="hidden">
-                                    <p id="file-name-display" class="text-[12px] text-slate-400 italic">ยังไม่ได้เลือกไฟล์ใหม่...</p>
+                                    <p id="file-name-display" class="text-[12px] text-slate-400 italic">
+                                        ยังไม่ได้เลือกไฟล์ใหม่...</p>
                                 </div>
 
                                 <label class="inline-flex items-center gap-2 text-[13px] text-slate-600 cursor-pointer">
@@ -93,7 +97,8 @@
 
                     {{-- เลขบัตร --}}
                     <div class="grid grid-cols-1 md:grid-cols-3 py-6 border-b border-slate-100 gap-4 items-start">
-                        <div class="text-[14px] font-bold text-slate-500 uppercase tracking-wide mt-2.5">เลขประจำตัวประชาชน</div>
+                        <div class="text-[14px] font-bold text-slate-500 uppercase tracking-wide mt-2.5">เลขประจำตัวประชาชน
+                        </div>
                         <div class="md:col-span-2">
                             <input type="text" value="{{ $user->citizen_id }}"
                                 class="w-full bg-slate-50 border border-slate-200 rounded-lg text-[15px] text-slate-400 font-mono py-2.5 px-3 cursor-not-allowed"
@@ -107,9 +112,11 @@
 
                     {{-- ชื่อ --}}
                     <div class="grid grid-cols-1 md:grid-cols-3 py-6 border-b border-slate-100 gap-4 items-center">
-                        <label for="name" class="text-[14px] font-bold text-slate-500 uppercase tracking-wide">ชื่อ - นามสกุล</label>
+                        <label for="name" class="text-[14px] font-bold text-slate-500 uppercase tracking-wide">ชื่อ -
+                            นามสกุล</label>
                         <div class="md:col-span-2">
-                            <input id="name" name="name" type="text" value="{{ old('name', $user->name) }}" required
+                            <input id="name" name="name" type="text" value="{{ old('name', $user->name) }}"
+                                required
                                 class="w-full rounded-lg border-slate-200 text-[15px] py-2.5 focus:ring-emerald-600 focus:border-emerald-600 @error('name') border-rose-400 @enderror">
                             @error('name')
                                 <p class="mt-1 text-[12px] text-rose-600">{{ $message }}</p>
@@ -119,7 +126,8 @@
 
                     {{-- อีเมล --}}
                     <div class="grid grid-cols-1 md:grid-cols-3 py-6 border-b border-slate-100 gap-4 items-center">
-                        <label for="email" class="text-[14px] font-bold text-slate-500 uppercase tracking-wide">อีเมล</label>
+                        <label for="email"
+                            class="text-[14px] font-bold text-slate-500 uppercase tracking-wide">อีเมล</label>
                         <div class="md:col-span-2">
                             <input id="email" name="email" type="email" value="{{ old('email', $user->email) }}"
                                 class="w-full rounded-lg border-slate-200 text-[15px] py-2.5 focus:ring-emerald-600 focus:border-emerald-600 @error('email') border-rose-400 @enderror">
@@ -128,10 +136,11 @@
 
                     {{-- หน่วยงาน (ปรับกล่องให้เหมือนชาวบ้าน) --}}
                     <div class="grid grid-cols-1 md:grid-cols-3 py-6 border-b border-slate-100 gap-4 items-center">
-                        <label for="department" class="text-[14px] font-bold text-slate-500 uppercase tracking-wide">หน่วยงาน / แผนก</label>
+                        <label for="department"
+                            class="text-[14px] font-bold text-slate-500 uppercase tracking-wide">หน่วยงาน / แผนก</label>
                         <div class="md:col-span-2">
                             <select id="department" name="department"
-                                class="w-full rounded-lg border-slate-200 text-[15px] py-2.5 focus:ring-emerald-600 focus:border-emerald-600 shadow-sm appearance-none bg-white">
+                                class="w-full rounded-lg border-slate-200 text-[15px] py-2.5 focus:ring-emerald-600 focus:border-emerald-600 appearance-none bg-white">
                                 <option value="">— ไม่ระบุหน่วยงาน —</option>
                                 @foreach (\App\Models\Department::query()->orderBy('code')->get() as $dept)
                                     <option value="{{ $dept->code }}" @selected($currentValue == $dept->code)>
@@ -145,7 +154,7 @@
 
                     <div class="py-10 flex justify-end gap-3">
                         <button type="submit"
-                            class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-10 py-3 text-[15px] font-bold text-white hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all">
+                            class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-10 py-3 text-[15px] font-bold text-white hover:bg-emerald-700 -emerald-100 transition-all">
                             <span class="material-symbols-outlined text-[20px]">check_circle</span>
                             บันทึกการเปลี่ยนแปลง
                         </button>
@@ -159,7 +168,7 @@
     <div id="cropper-modal" class="fixed inset-0 z-[100] hidden overflow-y-auto">
         <div class="flex min-h-screen items-center justify-center p-4">
             <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
-            <div class="relative w-full max-w-xl rounded-2xl bg-white shadow-2xl overflow-hidden">
+            <div class="relative w-full max-w-xl rounded-2xl bg-white overflow-hidden">
                 <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                     <h3 class="text-lg font-bold text-slate-900">ตัดรูปโปรไฟล์</h3>
                     <button type="button" id="cropper-close" class="text-slate-400 hover:text-slate-600">
@@ -172,8 +181,10 @@
                     </div>
                 </div>
                 <div class="px-6 py-4 bg-slate-50 flex items-center justify-end gap-3">
-                    <button type="button" id="cropper-cancel" class="px-4 py-2 text-[14px] font-bold text-slate-500 hover:text-slate-700">ยกเลิก</button>
-                    <button type="button" id="cropper-apply" class="px-6 py-2 bg-emerald-600 text-white text-[14px] font-bold rounded-lg hover:bg-emerald-700 shadow-sm">
+                    <button type="button" id="cropper-cancel"
+                        class="px-4 py-2 text-[14px] font-bold text-slate-500 hover:text-slate-700">ยกเลิก</button>
+                    <button type="button" id="cropper-apply"
+                        class="px-6 py-2 bg-emerald-600 text-white text-[14px] font-bold rounded-lg hover:bg-emerald-700 ">
                         ตกลง
                     </button>
                 </div>
@@ -204,10 +215,16 @@
             let cropper = null;
             let pendingFileName = null;
 
-            function openModal() { modal.classList.remove('hidden'); }
+            function openModal() {
+                modal.classList.remove('hidden');
+            }
+
             function closeModal() {
                 modal.classList.add('hidden');
-                if (cropper) { cropper.destroy(); cropper = null; }
+                if (cropper) {
+                    cropper.destroy();
+                    cropper = null;
+                }
             }
 
             fileInput.addEventListener('change', (e) => {
@@ -242,10 +259,15 @@
 
             btnApply.addEventListener('click', () => {
                 if (!cropper) return;
-                const canvas = cropper.getCroppedCanvas({ width: 512, height: 512 });
+                const canvas = cropper.getCroppedCanvas({
+                    width: 512,
+                    height: 512
+                });
                 canvas.toBlob((blob) => {
                     const fileName = (pendingFileName || 'avatar').split('.')[0] + '.webp';
-                    const croppedFile = new File([blob], fileName, { type: 'image/webp' });
+                    const croppedFile = new File([blob], fileName, {
+                        type: 'image/webp'
+                    });
                     const dt = new DataTransfer();
                     dt.items.add(croppedFile);
                     fileInput.files = dt.files;

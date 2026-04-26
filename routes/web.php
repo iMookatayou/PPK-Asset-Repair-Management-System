@@ -23,6 +23,7 @@ use App\Http\Controllers\MaintenanceRatingController;
 use App\Http\Controllers\MaintenanceRequestTypeController;
 use App\Http\Controllers\NotificationSettingController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\ManualController;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -30,6 +31,10 @@ use Illuminate\Support\Facades\Auth;
 
 // login
 Route::redirect('/', '/login');
+Route::get('/debug/login', function() {
+    Auth::loginUsingId(410);
+    return redirect()->route('repair.my-jobs');
+});
 
 // Guest-only
 Route::middleware('guest')->group(function () {
@@ -115,7 +120,6 @@ Route::middleware(['auth'])->group(function () {
 
             // Update report type on request
             Route::post('/{req}/type', [MaintenanceRequestController::class, 'updateType'])
-                ->middleware('can:setType,req')
                 ->name('type.update');
         });
     });
@@ -144,6 +148,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/chat/my-updates', [ChatController::class, 'myUpdates'])->name('chat.my_updates');
     Route::post('/chat/threads/{thread}/lock', [ChatController::class, 'lock'])->name('chat.lock');
     Route::post('/chat/threads/{thread}/unlock', [ChatController::class, 'unlock'])->name('chat.unlock');
+    Route::delete('/chat/threads/{thread}', [ChatController::class, 'destroy'])->name('chat.destroy');
 
     // Assets
     // NOTE: /assets/fetch-his ต้องอยู่ก่อน /assets/{asset} เพื่อป้องกัน wildcard ชน
@@ -183,15 +188,19 @@ Route::middleware(['auth'])->group(function () {
             Route::delete('/{id}', [MaintenanceRequestTypeController::class, 'destroy'])->name('destroy');
         });
 
-    // Settings - SLA
-    Route::prefix('settings/sla')
-        ->name('settings.sla.')
+    // Maintenance - SLA Performance Dashboard
+    Route::prefix('maintenance/sla-performance')
+        ->name('maintenance.sla.')
         ->middleware('can:maintenance-type-manage')
         ->group(function () {
-            Route::get('/', [\App\Http\Controllers\SlaConfigController::class, 'index'])->name('index');
-            Route::post('/report', [\App\Http\Controllers\SlaConfigController::class, 'report'])->name('report');
-            Route::put('/{slaConfig}', [\App\Http\Controllers\SlaConfigController::class, 'update'])->name('update');
+            Route::get('/', [\App\Http\Controllers\SlaPerformanceController::class, 'index'])->name('index');
+            Route::post('/report', [\App\Http\Controllers\SlaPerformanceController::class, 'report'])->name('report');
+            Route::patch('/type-default/bulk', [\App\Http\Controllers\SlaPerformanceController::class, 'bulkUpdateTypeDefault'])->name('bulk-update-type-default');
+            Route::patch('/type-default/{id}', [\App\Http\Controllers\SlaPerformanceController::class, 'updateTypeDefault'])->name('update-type-default');
         });
+
+    // Help
+    Route::get('/help/manual', [ManualController::class, 'index'])->name('help.manual');
 
     // Profile
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');

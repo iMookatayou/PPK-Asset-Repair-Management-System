@@ -34,7 +34,7 @@ class MaintenanceAssignmentController extends Controller
 
         $actorId = $request->user()?->id;
 
-        // เตรียมรายชื่อช่าง (คัดเฉพาะที่มีตัวตนและไม่ซ้ำ)
+        // เตรียมรายชื่อเจ้าหน้าที่ (คัดเฉพาะที่มีตัวตนและไม่ซ้ำ)
         $userIds = collect($data['user_ids'] ?? [])
             ->filter()
             ->map(fn($v) => (int) $v)
@@ -69,7 +69,7 @@ class MaintenanceAssignmentController extends Controller
 
                 $existing = $lockedReq->assignments()->get()->keyBy('user_id');
 
-                // บังคับเป็น null เสมอ เพราะเราไม่ใช้ระบบช่างรับผิดชอบหลัก (Lead) แล้ว
+                // บังคับเป็น null เสมอ เพราะเราไม่ใช้ระบบเจ้าหน้าที่รับผิดชอบหลัก (Lead) แล้ว
                 $lockedReq->technician_id = null;
 
                 if ($workers->isNotEmpty() && $lockedReq->assigned_date === null) {
@@ -87,7 +87,7 @@ class MaintenanceAssignmentController extends Controller
                         // ถ้ามีรายชื่ออยู่แล้ว แต่อาจจะเคยโดนยกเลิกไป ให้ดึงกลับมาใหม่
                         $updateData = [
                             'role'    => $worker->role,
-                            'is_lead' => false, // ทุกคนคือช่างเท่ากันหมด ไม่มี Lead
+                            'is_lead' => false, // ทุกคนคือเจ้าหน้าที่เท่ากันหมด ไม่มี Lead
                         ];
 
                         if ($assignment->status === MaintenanceAssignment::STATUS_CANCELLED) {
@@ -98,7 +98,7 @@ class MaintenanceAssignmentController extends Controller
 
                         $assignment->update($updateData);
                     } else {
-                        // ถ้าเป็นช่างใหม่ที่เพิ่งเพิ่มเข้ามา
+                        // ถ้าเป็นเจ้าหน้าที่ใหม่ที่เพิ่งเพิ่มเข้ามา
                         MaintenanceAssignment::create([
                             'maintenance_request_id' => $lockedReq->id,
                             'user_id'                => $worker->id,
@@ -129,7 +129,7 @@ class MaintenanceAssignmentController extends Controller
                 'actor_id'   => $actorId,
             ]);
 
-            return back()->with('toast', Toast::success('อัปเดตรายชื่อช่างเรียบร้อยแล้ว', 1800));
+            return back()->with('toast', Toast::success('อัปเดตรายชื่อเจ้าหน้าที่เรียบร้อยแล้ว', 1800));
         } catch (\Throwable $e) {
             Log::error('[MaintenanceAssignment::store] failed', [
                 'request_id' => $req->id,
@@ -169,7 +169,7 @@ class MaintenanceAssignmentController extends Controller
                 'actor_id'      => $actorId,
             ]);
 
-            return back()->with('toast', Toast::success('ยกเลิกการมอบหมายช่างเรียบร้อยแล้ว', 1800));
+            return back()->with('toast', Toast::success('ยกเลิกการมอบหมายเจ้าหน้าที่เรียบร้อยแล้ว', 1800));
         } catch (\Throwable $e) {
             Log::error('[MaintenanceAssignment::destroy] failed', [
                 'assignment_id' => $assignment->id,

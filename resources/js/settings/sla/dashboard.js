@@ -1,6 +1,12 @@
 import Chart from 'chart.js/auto';
 
 (function () {
+    const activeCharts = [];
+    function destroyAllCharts() { while (activeCharts.length) activeCharts.pop().destroy(); }
+    let _rid = 0; // prevents stale double-init when run() called multiple times
+    document.addEventListener('turbo:before-cache', destroyAllCharts);
+
+
     const parseJSON = (str, def = []) => {
         try { return JSON.parse(str); } catch (e) { return def; }
     };
@@ -55,7 +61,7 @@ import Chart from 'chart.js/auto';
                 function tick(now) {
                     const p     = Math.min((now - t0) / dur, 1);
                     const eased = p === 1 ? 1 : 1 - Math.pow(2, -10 * p);
-                    el.textContent = (target * eased).toFixed(decimals) + suffix;
+                    el.textContent = (target * eased).toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + suffix;
                     if (p < 1) requestAnimationFrame(tick);
                 }
                 requestAnimationFrame(tick);
@@ -64,11 +70,14 @@ import Chart from 'chart.js/auto';
         });
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    function run() {
+        destroyAllCharts();
+        const rid = ++_rid;
         Chart.defaults.font.family = "'Inter', sans-serif";
         Chart.defaults.color       = '#747781';
 
         document.fonts.ready.then(() => {
+            if (rid !== _rid) return; // superseded — skip stale init
 
             // Trend Chart  Mixed Bar (resolution hours) + Line (compliance)
             const trendEl = document.getElementById('slaTrendChart');
@@ -82,7 +91,7 @@ import Chart from 'chart.js/auto';
                         labels   : parseJSON(trendEl.dataset.labels),
                         datasets : [
                             {
-                                label              : 'เวลาแก้ไขเฉลี่ย (ชม.)',
+                                label              : 'Avg. Resolution (H)',
                                 type               : 'bar',
                                 data               : trendData,
                                 backgroundColor    : 'rgba(15, 45, 92, 0.85)',
@@ -94,7 +103,7 @@ import Chart from 'chart.js/auto';
                                 order              : 2,
                             },
                             {
-                                label                : 'อัตราการบรรลุเป้าหมาย (%)',
+                                label                : 'Compliance Rate (%)',
                                 type                 : 'line',
                                 data                 : parseJSON(trendEl.dataset.compliance),
                                 borderColor          : '#006c46',
@@ -109,6 +118,7 @@ import Chart from 'chart.js/auto';
                                 borderWidth          : 2.5,
                                 yAxisID              : 'y1',
                                 order                : 1,
+                                clip                 : false,
                             },
                         ],
                     },
@@ -135,6 +145,7 @@ import Chart from 'chart.js/auto';
                                 beginAtZero : true,
                                 grid        : { color: '#f1f5f9' },
                                 ticks       : { font: { size: 11 } },
+                                grace       : '10%',
                             },
                             y1 : {
                                 type           : 'linear',
@@ -152,6 +163,7 @@ import Chart from 'chart.js/auto';
                     },
                 });
 
+                activeCharts.push(trendChart);
                 watchAndAnimate(trendEl, trendChart);
             }
 
@@ -206,6 +218,7 @@ import Chart from 'chart.js/auto';
 
                 });
 
+                activeCharts.push(distChart);
                 watchAndAnimate(distEl, distChart);
             }
 
@@ -220,9 +233,9 @@ import Chart from 'chart.js/auto';
                     data : {
                         labels   : parseJSON(deptEl.dataset.labels),
                         datasets : [{
-                            label              : 'งานเกินเป้าเวลา',
+                            label              : 'Breached Tickets',
                             data               : deptVals,
-                            backgroundColor    : 'rgba(186, 26, 26, 0.85)',
+                            backgroundColor    : 'rgba(225, 29, 72, 0.85)',
                             borderRadius       : 4,
                             borderSkipped      : 'left',
                             barPercentage      : deptVals.length <= 5 ? 0.35 : 0.8,
@@ -272,6 +285,7 @@ import Chart from 'chart.js/auto';
                     },
                 });
 
+                activeCharts.push(deptChart);
                 watchAndAnimate(deptEl, deptChart);
             }
 
@@ -279,5 +293,15 @@ import Chart from 'chart.js/auto';
             initCountUp();
 
         }); // fonts.ready
-    }); // DOMContentLoaded
+    } // run()
+
+    document.addEventListener('turbo:load', run);
+
+    // Fallback: Turbo executes this lazy script AFTER turbo:load has already fired
+    // (first Turbo navigation to this page). If canvases are in DOM, run immediately.
+    if (document.getElementById('slaTrendChart') ||
+        document.getElementById('slaDistChart')  ||
+        document.getElementById('slaDeptChart')) {
+        run();
+    }
 })();

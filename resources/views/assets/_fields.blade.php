@@ -6,12 +6,12 @@
   $departments = is_iterable($departments ?? null) ? collect($departments) : collect();
 
   // Base class for inputs/selects to match Maintenance form
-  $CTL = 'mt-1.5 block w-full h-11 rounded-lg border border-slate-300 px-3 py-2 text-sm
+  $CTL = 'mt-1.5 block w-full h-11 rounded-md border border-slate-300 px-3 py-2 text-sm
           focus:border-emerald-500 focus:ring-emerald-500 bg-white transition-all';
 
   // Styling for Step/Accent Headers
   $headCls   = "flex items-start gap-3 pb-3 min-h-[56px]";
-  $noCls     = "w-8 h-8 shrink-0 rounded-full bg-emerald-600 flex items-center justify-center text-sm font-bold text-white leading-none shadow-sm";
+  $noCls     = "w-8 h-8 shrink-0 rounded-full bg-emerald-600 flex items-center justify-center text-sm font-bold text-white leading-none ";
   $titleCls  = "text-base font-semibold text-slate-900 leading-tight";
   $subCls    = "text-sm text-slate-500 leading-snug";
   $accentWrap= "min-w-0 relative pl-3 pt-[1px]";
@@ -60,7 +60,7 @@
         </label>
         <div class="flex gap-2 mt-1.5">
           <input id="his_asset_id" name="his_asset_id" type="text" class="{{ $CTL }} mt-0 flex-1 @error('his_asset_id') border-rose-400 ring-rose-200 @enderror" value="{{ old('his_asset_id', $asset->his_asset_id ?? '') }}" placeholder="เช่น RPJ-001234">
-          <button type="button" id="btn-fetch-his" class="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-5 text-sm font-medium text-white hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors whitespace-nowrap h-11">
+          <button type="button" id="btn-fetch-his" class="inline-flex items-center gap-1.5 rounded-md bg-sky-600 px-5 text-sm font-medium text-white hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors whitespace-nowrap h-11">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
@@ -231,7 +231,7 @@
   {{-- หมวดหมู่หมายเหตุ --}}
   <section class="pt-2">
     <label class="block text-sm font-medium text-slate-700" for="note">หมายเหตุเพิ่มเติม</label>
-    <textarea id="note" name="note" rows="3" class="mt-1.5 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500 bg-white min-h-[80px]" placeholder="ข้อมูลเพิ่มเติมเกี่ยวกับครุภัณฑ์...">{{ old('note', $asset->note ?? '') }}</textarea>
+    <textarea id="note" name="note" rows="3" class="mt-1.5 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500 bg-white min-h-[80px]" placeholder="ข้อมูลเพิ่มเติมเกี่ยวกับครุภัณฑ์...">{{ old('note', $asset->note ?? '') }}</textarea>
   </section>
 
 </div>

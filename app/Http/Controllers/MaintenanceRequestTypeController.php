@@ -73,6 +73,8 @@ class MaintenanceRequestTypeController extends Controller
             'description' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
+            'default_response_minutes' => ['nullable', 'integer', 'min:0'],
+            'default_resolution_minutes' => ['nullable', 'integer', 'min:0'],
         ]);
 
         if ($validator->fails()) {
@@ -90,6 +92,8 @@ class MaintenanceRequestTypeController extends Controller
             'description' => $data['description'] ?? null,
             'is_active' => array_key_exists('is_active', $data) ? (bool) $data['is_active'] : true,
             'sort_order' => array_key_exists('sort_order', $data) ? (int) $data['sort_order'] : 0,
+            'default_response_minutes' => $data['default_response_minutes'] ?? null,
+            'default_resolution_minutes' => $data['default_resolution_minutes'] ?? null,
         ]);
 
         if (!$request->expectsJson()) {
@@ -123,6 +127,8 @@ class MaintenanceRequestTypeController extends Controller
             'description' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
+            'default_response_minutes' => ['nullable', 'integer', 'min:0'],
+            'default_resolution_minutes' => ['nullable', 'integer', 'min:0'],
         ]);
 
         if ($validator->fails()) {
@@ -140,6 +146,8 @@ class MaintenanceRequestTypeController extends Controller
             'description' => $data['description'] ?? null,
             'is_active' => array_key_exists('is_active', $data) ? (bool) $data['is_active'] : (bool) $type->is_active,
             'sort_order' => array_key_exists('sort_order', $data) ? (int) $data['sort_order'] : (int) $type->sort_order,
+            'default_response_minutes' => $data['default_response_minutes'] ?? null,
+            'default_resolution_minutes' => $data['default_resolution_minutes'] ?? null,
         ]);
 
         if (!$request->expectsJson()) {

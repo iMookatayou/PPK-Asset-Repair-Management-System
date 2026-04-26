@@ -2,6 +2,16 @@
 import Chart from 'chart.js/auto';
 
 (function () {
+  // Track active Chart.js instances so we can destroy them before Turbo caches the page
+  const activeCharts = [];
+
+  function destroyAllCharts() {
+    while (activeCharts.length) activeCharts.pop().destroy();
+  }
+
+  // Clean up before Turbo snapshots the page (prevents canvas-already-in-use errors on back-nav)
+  document.addEventListener('turbo:before-cache', destroyAllCharts);
+
   const parseJSON = (str, def = []) => {
     try { return JSON.parse(str); } catch (e) { return def; }
   };
@@ -55,9 +65,42 @@ import Chart from 'chart.js/auto';
       io.observe(canvas);
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
+  // turbo:load fires on first load AND every Turbo navigation
+  document.addEventListener('turbo:load', () => {
+    destroyAllCharts(); // reset before re-initialising
     Chart.defaults.font.family = "'Inter', sans-serif";
     Chart.defaults.color       = '#747781';
+
+    /**
+     * Animates stat-card numbers.
+     * Add  data-countup="25"  to any element.
+     */
+    const initCountUp = () => {
+      document.querySelectorAll('[data-countup]').forEach(el => {
+        const target = parseFloat(el.dataset.countup) || 0;
+        const decimals = (el.dataset.countup.split('.')[1] || '').length;
+        const suffix = el.dataset.suffix || '';
+        const dur = 1200;
+        let started = false;
+
+        const io = new IntersectionObserver((entries) => {
+          if (!entries[0].isIntersecting || started) return;
+          started = true;
+          io.disconnect();
+          const t0 = performance.now();
+          function tick(now) {
+            const p = Math.min((now - t0) / dur, 1);
+            const eased = p === 1 ? 1 : 1 - Math.pow(2, -10 * p);
+            el.textContent = (target * eased).toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + suffix;
+            if (p < 1) requestAnimationFrame(tick);
+          }
+          requestAnimationFrame(tick);
+        }, { threshold: 0.5 });
+        io.observe(el);
+      });
+    };
+
+    initCountUp();
 
     const tooltipDefaults = {
         backgroundColor : '#0F2D5C',
@@ -72,7 +115,7 @@ import Chart from 'chart.js/auto';
         bodyFont  : { family: 'Inter', size: 12 },
     };
 
-    const charts = [];
+    // (charts tracked in module-level activeCharts array)
 
     // AssetCentral Theme Colors
     const PRIMARY_NAVY = '#00275f';
@@ -187,7 +230,7 @@ import Chart from 'chart.js/auto';
           },
           options: commonOptions,
         });
-        charts.push(trendChart);
+        activeCharts.push(trendChart);
         watchAndAnimate(trendEl, trendChart);
       }
 
@@ -199,7 +242,7 @@ import Chart from 'chart.js/auto';
           parseJSON(typeEl.dataset.values),
           BLUE_SET
         ));
-        charts.push(typeChart);
+        activeCharts.push(typeChart);
         watchAndAnimate(typeEl, typeChart);
       }
 
@@ -207,7 +250,7 @@ import Chart from 'chart.js/auto';
       const statusEl = safeGet('statusDonut');
       if (statusEl) {
         const statusChart = new Chart(statusEl.getContext('2d'), donutConfig(
-          ['รอดำเนินการ', 'กำลังดำเนินการ', 'ซ่อมบำรุงเสร็จสิ้น', 'อนุมัติแล้ว', 'ยกเลิกซ่อม/ไม่รับเรื่อง'],
+          ['รอดำเนินการ', 'กำลังดำเนินการ', 'ซ่อมบำรุงเสร็จสิ้น', 'อนุมัติแล้ว', 'ยกเลิกการซ่อมบำรุง/ไม่รับเรื่อง'],
           [
             Number(statusEl.dataset.pending || 0),
             Number(statusEl.dataset.progress || 0),
@@ -216,7 +259,7 @@ import Chart from 'chart.js/auto';
           ],
           [ACCENT_BLUE, PRIMARY_NAVY, SECONDARY_GREEN, DANGER_RED]
         ));
-        charts.push(statusChart);
+        activeCharts.push(statusChart);
         watchAndAnimate(statusEl, statusChart);
       }
 
@@ -242,12 +285,12 @@ import Chart from 'chart.js/auto';
           },
           options: commonOptions,
         });
-        charts.push(deptChart);
+        activeCharts.push(deptChart);
         watchAndAnimate(deptEl, deptChart);
       }
     });
 
-    const safeResizeAll = () => requestAnimationFrame(() => charts.forEach((c) => c.resize()));
+    const safeResizeAll = () => requestAnimationFrame(() => activeCharts.forEach((c) => c.resize()));
 
     // filter toggle
     const btn = safeGet('filterToggle');

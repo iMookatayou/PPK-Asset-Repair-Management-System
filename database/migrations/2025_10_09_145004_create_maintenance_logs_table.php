@@ -11,21 +11,29 @@ return new class extends Migration
         Schema::create('maintenance_logs', function (Blueprint $table) {
             $table->id();
 
+            // หมายเลขใบงานที่เกี่ยวข้อง
             $table->foreignId('request_id')
                 ->constrained('maintenance_requests')
                 ->cascadeOnUpdate()
                 ->cascadeOnDelete();
 
+            // ผู้ที่กระทำการ (Action) นั้น ๆ
             $table->foreignId('user_id')
                 ->nullable()
                 ->constrained('users')
                 ->cascadeOnUpdate()
                 ->nullOnDelete();
 
+            // ชื่อเรียกเหตุการณ์หรือการกระทำ (เช่น status_change, technician_assigned, note_added)
             $table->string('action', 100);
+
+            // บันทึกข้อความหรือรายละเอียดของการกระทำนั้น
             $table->text('note')->nullable();
 
+            // สถานะตั้งต้นก่อนการเปลี่ยนแปลง
             $table->string('from_status', 50)->nullable();
+
+            // สถานะเป้าหมายหลังการเปลี่ยนแปลง
             $table->string('to_status', 50)->nullable();
 
             $table->timestamps();

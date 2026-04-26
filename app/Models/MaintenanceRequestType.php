@@ -14,6 +14,8 @@ class MaintenanceRequestType extends Model
         'default_user_id',
         'is_active',
         'sort_order',
+        'default_response_minutes',
+        'default_resolution_minutes',
     ];
 
     public function requests()

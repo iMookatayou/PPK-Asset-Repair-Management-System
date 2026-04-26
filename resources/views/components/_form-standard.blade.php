@@ -45,7 +45,7 @@
     @endif
 
     <form method="POST" action="{{ form_action ?? '#' }}"
-          class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" novalidate>
+          class="rounded-2xl border border-slate-200 bg-white p-6 " novalidate>
       @csrf
       @isset($method)
         @if (strtoupper($method) === 'PUT')

@@ -6,25 +6,26 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
     public function index(Request $req)
     {
-        $hasReqDate       = Schema::hasColumn('maintenance_requests','request_date');
-        $hasCreatedAt     = Schema::hasColumn('maintenance_requests','created_at');
-        $hasCompletedDate = Schema::hasColumn('maintenance_requests','completed_date');
-        $hasCompletedAt   = Schema::hasColumn('maintenance_requests','completed_at');
-        $hasMrDeptId      = Schema::hasColumn('maintenance_requests','department_id');
+        $hasReqDate       = Cache::remember('schema.has_mr_request_date', 3600, fn() => Schema::hasColumn('maintenance_requests','request_date'));
+        $hasCreatedAt     = Cache::remember('schema.has_mr_created_at', 3600, fn() => Schema::hasColumn('maintenance_requests','created_at'));
+        $hasCompletedDate = Cache::remember('schema.has_mr_completed_date', 3600, fn() => Schema::hasColumn('maintenance_requests','completed_date'));
+        $hasCompletedAt   = Cache::remember('schema.has_mr_completed_at', 3600, fn() => Schema::hasColumn('maintenance_requests','completed_at'));
+        $hasMrDeptId      = Cache::remember('schema.has_mr_department_id', 3600, fn() => Schema::hasColumn('maintenance_requests','department_id'));
 
-        $hasAssets        = Schema::hasTable('assets');
-        $hasType          = $hasAssets && Schema::hasColumn('assets','type');
-        $hasAssetDeptId   = $hasAssets && Schema::hasColumn('assets','department_id');
+        $hasAssets        = Cache::remember('schema.has_assets_table', 3600, fn() => Schema::hasTable('assets'));
+        $hasType          = $hasAssets && Cache::remember('schema.has_assets_type', 3600, fn() => Schema::hasColumn('assets','type'));
+        $hasAssetDeptId   = $hasAssets && Cache::remember('schema.has_assets_department_id', 3600, fn() => Schema::hasColumn('assets','department_id'));
 
-        $hasDeptTbl       = Schema::hasTable('departments');
-        $hasDeptNameTh    = $hasDeptTbl && Schema::hasColumn('departments','name_th');
-        $hasDeptNameEn    = $hasDeptTbl && Schema::hasColumn('departments','name_en');
+        $hasDeptTbl       = Cache::remember('schema.has_departments_table', 3600, fn() => Schema::hasTable('departments'));
+        $hasDeptNameTh    = $hasDeptTbl && Cache::remember('schema.has_departments_name_th', 3600, fn() => Schema::hasColumn('departments','name_th'));
+        $hasDeptNameEn    = $hasDeptTbl && Cache::remember('schema.has_departments_name_en', 3600, fn() => Schema::hasColumn('departments','name_en'));
 
         $base = DB::table('maintenance_requests as mr');
 
@@ -36,8 +37,14 @@ class DashboardController extends Controller
 
         // ----- Filters -----
         if ($status !== '') {
-            if ($status === 'completed') {
-                $base->whereIn('mr.status', ['resolved','closed']);
+            $statusMap = [
+                'completed'  => ['resolved', 'closed'],
+                'processing' => ['acknowledged', 'accepted', 'in_progress', 'on_hold'],
+                'cancelled'  => ['cancelled', 'rejected'],
+            ];
+
+            if (isset($statusMap[$status])) {
+                $base->whereIn('mr.status', $statusMap[$status]);
             } else {
                 $base->where('mr.status', $status);
             }
@@ -61,14 +68,22 @@ class DashboardController extends Controller
         }
 
         // ----- Stats card (Overview) -----
+        $allStatuses = ['pending', 'acknowledged', 'accepted', 'in_progress', 'on_hold', 'resolved', 'closed'];
         $stats = [
             'total'      => (clone $base)->count(),
-            'pending'    => (clone $base)->where('mr.status','pending')->count(),
-            'processing' => (clone $base)->whereIn('mr.status', ['acknowledged','accepted','in_progress', 'on_hold'])->count(),
-            'completed'  => (clone $base)->whereIn('mr.status', ['resolved','closed'])->count(),
-            'cancelled'  => (clone $base)->whereIn('mr.status', ['cancelled','rejected'])->count(),
             'monthCost'  => 0.0,
         ];
+
+        // Individual counts for all statuses
+        $statusCounts = (clone $base)->select('mr.status', DB::raw('count(*) as count'))->groupBy('mr.status')->pluck('count', 'status');
+        foreach ($allStatuses as $s) {
+            $stats[$s] = $statusCounts->get($s, 0);
+        }
+
+        // Grouped stats for convenience
+        $stats['processing'] = $stats['acknowledged'] + $stats['accepted'] + $stats['in_progress'] + $stats['on_hold'];
+        $stats['completed']  = $stats['resolved'] + $stats['closed'];
+        $stats['cancelled']  = 0; // Hide/ignore
 
         // สำหรับ UI card ที่เขียนว่า "Active"
         $stats['inProgress'] = $stats['processing'];
@@ -105,21 +120,34 @@ class DashboardController extends Controller
         ];
 
         if ($dateCol) {
-            $startThis = now()->startOfMonth();
-            $startLast = (clone $startThis)->subMonth();
+            // เปลี่ยนจากรายเดือนเป็นรายปี (Year-to-Date vs Last Year) ตามความเหมาะสมของการสรุปภาพรวม
+            $startThis = now()->startOfYear();
+            $startLast = (clone $startThis)->subYear();
 
-            $kpi['thisMonth'] = (clone $base)
-                ->whereBetween($dateCol, [$startThis, now()->endOfDay()])
-                ->count();
+            $endThis = now()->endOfDay();
+            $endLast = (clone $startThis)->subSecond();
 
-            $kpi['lastMonth'] = (clone $base)
-                ->whereBetween($dateCol, [$startLast, (clone $startThis)->subSecond()])
-                ->count();
+            $kpiStats = (clone $base)->selectRaw("
+                SUM(CASE WHEN $dateCol BETWEEN ? AND ? THEN 1 ELSE 0 END) as this_month,
+                SUM(CASE WHEN $dateCol BETWEEN ? AND ? THEN 1 ELSE 0 END) as last_month,
+                SUM(CASE WHEN $dateCol BETWEEN ? AND ? AND mr.status IN ('resolved','closed') THEN 1 ELSE 0 END) as this_month_completed,
+                SUM(CASE WHEN $dateCol BETWEEN ? AND ? AND mr.status IN ('resolved','closed') THEN 1 ELSE 0 END) as last_month_completed
+            ", [$startThis, $endThis, $startLast, $endLast, $startThis, $endThis, $startLast, $endLast])->first();
 
-            $kpi['thisMonthCompleted'] = (clone $base)
-                ->whereBetween($dateCol, [$startThis, now()->endOfDay()])
-                ->whereIn('mr.status', ['resolved','closed'])
-                ->count();
+            $kpi['thisMonth'] = (int) $kpiStats->this_month;
+            $kpi['lastMonth'] = (int) $kpiStats->last_month;
+            $kpi['thisMonthCompleted'] = (int) $kpiStats->this_month_completed;
+            $kpi['lastMonthCompleted'] = (int) $kpiStats->last_month_completed;
+
+            // Calculate trends (Percentage like stocks)
+            $calcTrend = function($current, $previous) {
+                if ($previous == 0) return $current > 0 ? 100 : 0;
+                $val = round((($current - $previous) / $previous) * 100, 1);
+                return $val > 999 ? 999 : ($val < -999 ? -999 : $val);
+            };
+
+            $kpi['totalTrend']     = $calcTrend($kpi['thisMonth'], $kpi['lastMonth']);
+            $kpi['completedTrend'] = $calcTrend($kpi['thisMonthCompleted'], $kpi['lastMonthCompleted']);
         }
 
         // avgResolveHours (ถ้ามี completed date/at)
@@ -142,11 +170,17 @@ class DashboardController extends Controller
 
         $totalReq = (int)($stats['total'] ?? 0);
 
+        // สร้าง Base Query สำหรับกราฟเพื่อให้แสดงผลเท่ากัน (Default ย้อนหลัง 12 เดือน)
+        $chartBase = clone $base;
+        if (!$from && $dateCol) {
+            $chartBase->where($dateCol, '>=', now()->startOfMonth()->subMonths(11));
+        }
+
         // ==============================
-        //  By asset type (ทั้งหมด)
+        //  By asset type
         // ==============================
         if ($hasAssets) {
-            $qType = (clone $base)
+            $qType = (clone $chartBase)
                 ->leftJoin('assets as a', 'a.id', '=', 'mr.asset_id');
 
             if ($hasType) {
@@ -156,10 +190,10 @@ class DashboardController extends Controller
                     ->orderByDesc('cnt')
                     ->get();
             } else {
-                $assetTypes = collect([(object) ['type' => 'ไม่ระบุ', 'cnt' => $totalReq]]);
+                $assetTypes = collect([(object) ['type' => 'ไม่ระบุ', 'cnt' => $chartBase->count()]]);
             }
         } else {
-            $assetTypes = collect([(object) ['type' => 'ไม่ระบุ', 'cnt' => $totalReq]]);
+            $assetTypes = collect([(object) ['type' => 'ไม่ระบุ', 'cnt' => $chartBase->count()]]);
         }
 
         $byAssetType = $assetTypes->map(fn($r) => [
@@ -168,10 +202,10 @@ class DashboardController extends Controller
         ])->values();
 
         // ==============================
-        //  By department (ทั้งหมด)
+        //  By department
         // ==============================
         if ($hasDeptTbl && ($hasDeptNameTh || $hasDeptNameEn)) {
-            $qDept = (clone $base);
+            $qDept = (clone $chartBase);
 
             if ($hasAssets) {
                 $qDept->leftJoin('assets as a', 'a.id', '=', 'mr.asset_id');
@@ -251,10 +285,11 @@ class DashboardController extends Controller
             $techWorkload = $techRows->map(function ($r) use ($users) {
                 $user = $users->get($r->tech_id);
                 return [
-                    'id'     => (int) $r->tech_id,
-                    'name'   => $user ? $user->name : 'Unknown',
-                    'total'  => (int) $r->total,
-                    'avatar' => $user ? $user->avatar_thumb_url : '',
+                    'id'         => (int) $r->tech_id,
+                    'name'       => $user ? $user->clean_name : 'Unknown',
+                    'role_label' => $user ? $user->role_label : '',
+                    'total'      => (int) $r->total,
+                    'avatar'     => $user ? $user->avatar_thumb_url : '',
                 ];
             })->values();
         } else {

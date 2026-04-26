@@ -51,22 +51,24 @@ class MaintenanceRequestController extends Controller
         $userId   = (int) Auth::id();
 
         $status   = strtolower(trim($request->string('status')->toString()));
-        $priority = strtolower(trim($request->string('priority')->toString()));
+        $status   = strtolower(trim($request->string('status')->toString()));
         $q        = trim($request->string('q')->toString());
         $assetId  = $request->integer('asset_id');
 
         // NEW: type filter
-        $typeId = $request->input('type_id', ''); // อาจเป็น '', '__null__', หรือ id
+        $typeId = $request->input('type_id'); // อาจเป็น null, '__null__', หรือ id
 
         // ---- ใช้ helper ดึงค่าการเรียง + จัดการ session ต่อ user ----
         [$sortBy, $sortDir] = $this->resolveSort($request);
 
         // NEW: dropdown options (Maintenance Types)
-        $types = \App\Models\MaintenanceRequestType::query()
-            ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->get();
+        $types = Cache::remember('maintenance_request_types', 3600, function () {
+            return \App\Models\MaintenanceRequestType::query()
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name']);
+        });
 
         $query = MR::query()
 
@@ -102,12 +104,11 @@ class MaintenanceRequestController extends Controller
 
             // filter อื่น ๆ
             ->when($assetId, fn($qb) => $qb->where('maintenance_requests.asset_id', $assetId))
-            ->when($status, fn($qb) => $qb->where('maintenance_requests.status', $status))
-            ->when($priority, fn($qb) => $qb->where('maintenance_requests.priority', $priority))
-            ->when($q !== '', fn($qb) => $qb->search($q))
+            ->when(filled($status), fn($qb) => $qb->where('maintenance_requests.status', $status))
+            ->when(filled($q), fn($qb) => $qb->search($q))
 
             // NEW: filter type_id
-            ->when($typeId !== '', function ($qb) use ($typeId) {
+            ->when(filled($typeId), function ($qb) use ($typeId) {
                 if ($typeId === '__null__') {
                     $qb->whereNull('maintenance_requests.type_id');
                 } else {
@@ -115,35 +116,42 @@ class MaintenanceRequestController extends Controller
                 }
             });
 
-        if ($q !== '') {
-            // กันผลสลับแถว + ทำให้ผลคงที่
-            $query->orderByDesc('maintenance_requests.id');
+        // ---- Sorting Logic ----
+        $dir = strtolower($sortDir) === 'asc' ? 'asc' : 'desc';
+
+        if ($sortBy === 'request_no') {
+            // 1) เอา request_no ว่าง/NULL ไปท้ายเสมอ
+            $query->orderByRaw("CASE WHEN maintenance_requests.request_no IS NULL OR maintenance_requests.request_no = '' THEN 1 ELSE 0 END ASC");
+            // 2) เรียงตาม request_no
+            $query->orderBy('maintenance_requests.request_no', $dir);
+            // 3) tie-breaker
+            $query->orderBy('maintenance_requests.id', $dir);
         } else {
-            if ($sortBy === 'request_no') {
-                $dir = strtolower($sortDir) === 'asc' ? 'asc' : 'desc';
-
-                // 1) เอา request_no ว่าง/NULL ไปท้ายเสมอ
-                $query->orderByRaw("CASE WHEN maintenance_requests.request_no IS NULL OR maintenance_requests.request_no = '' THEN 1 ELSE 0 END ASC");
-
-                // 2) เรียง request_no ตามทิศทางที่เลือก
-                $query->orderBy('maintenance_requests.request_no', $dir);
-
-                // 3) tie-breaker กันสลับแถว
+            $allowed = ['id', 'request_date', 'status', 'updated_at', 'created_at', 'title'];
+            if (!in_array($sortBy, $allowed, true)) {
+                $sortBy = 'id';
+            }
+            $query->orderBy('maintenance_requests.' . $sortBy, $dir);
+            
+            // Add ID tie-breaker if not already sorting by ID
+            if ($sortBy !== 'id') {
                 $query->orderBy('maintenance_requests.id', $dir);
-            } else {
-                // safety: whitelist allowed sort columns
-                $allowed = ['request_no', 'id', 'request_date', 'status', 'priority', 'updated_at', 'created_at'];
-                if (!in_array($sortBy, $allowed, true)) {
-                    $sortBy = 'request_no';
-                }
-                $sortDir = strtolower($sortDir) === 'asc' ? 'asc' : 'desc';
-
-                $query->orderBy('maintenance_requests.' . $sortBy, $sortDir);
             }
         }
 
+        // Add logging to debug why filters return 0 rows in production
+        \Illuminate\Support\Facades\Log::info('MaintenanceRequests Search Query', [
+            'sql' => $query->toSql(),
+            'bindings' => $query->getBindings(),
+            // 'count' removed to optimize loading speed
+            'q' => $q,
+            'status' => $status,
+            'user' => $user?->email,
+        ]);
+
         $list = $query
             ->paginate(20)
+
             ->withQueryString();
 
         return view('maintenance.requests.index', compact(
@@ -151,7 +159,6 @@ class MaintenanceRequestController extends Controller
             'types',
             'typeId',
             'status',
-            'priority',
             'q',
             'sortBy',
             'sortDir'
@@ -212,11 +219,13 @@ class MaintenanceRequestController extends Controller
         $users  = \App\Models\User::orderBy('name')->get(['id', 'name']);
         $depts  = \App\Models\Department::orderBy('name_th')->get(['id', 'code', 'name_th', 'name_en']);
 
-        $types = \App\Models\MaintenanceRequestType::query()
-            ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->get(['id', 'name']);
+        $types = Cache::remember('maintenance_request_types', 3600, function () {
+            return \App\Models\MaintenanceRequestType::query()
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name']);
+        });
 
         return view('maintenance.requests.create', compact('assets', 'users', 'depts', 'types'));
     }
@@ -224,7 +233,6 @@ class MaintenanceRequestController extends Controller
     public function index(Request $request)
     {
         $status   = $request->string('status')->toString();
-        $priority = $request->string('priority')->toString();
         $q        = trim($request->string('q')->toString());
         $assetId  = $request->integer('asset_id');
 
@@ -243,34 +251,25 @@ class MaintenanceRequestController extends Controller
 
             ->when($assetId, fn($qb) => $qb->where('asset_id', $assetId))
             ->when($status, fn($qb) => $qb->where('status', $status))
-            ->when($priority, fn($qb) => $qb->where('priority', $priority))
 
             ->when($q !== '', fn($qb) => $qb->search($q));
 
-        if ($q !== '') {
-            // กันผลสลับแถว + ทำให้ผลคงที่
-            $query->orderByDesc('id');
+        // ---- Sorting Logic ----
+        $dir = strtolower($sortDir) === 'asc' ? 'asc' : 'desc';
+
+        if ($sortBy === 'request_no') {
+            $query->orderByRaw("CASE WHEN request_no IS NULL OR request_no = '' THEN 1 ELSE 0 END ASC");
+            $query->orderBy('request_no', $dir);
+            $query->orderBy('id', $dir);
         } else {
-            if ($sortBy === 'request_no') {
-                $dir = strtolower($sortDir) === 'asc' ? 'asc' : 'desc';
+            $allowed = ['id', 'request_date', 'status', 'updated_at', 'created_at'];
+            if (!in_array($sortBy, $allowed, true)) {
+                $sortBy = 'id';
+            }
+            $query->orderBy($sortBy, $dir);
 
-                // 1) เอา request_no ว่าง/NULL ไปท้ายเสมอ
-                $query->orderByRaw("CASE WHEN request_no IS NULL OR request_no = '' THEN 1 ELSE 0 END ASC");
-
-                // 2) เรียง request_no ตามทิศทางที่เลือก
-                $query->orderBy('request_no', $dir);
-
-                // 3) tie-breaker กันสลับแถว
+            if ($sortBy !== 'id') {
                 $query->orderBy('id', $dir);
-            } else {
-                // safety
-                $allowed = ['request_no', 'id', 'request_date'];
-                if (!in_array($sortBy, $allowed, true)) {
-                    $sortBy = 'request_no';
-                }
-                $sortDir = strtolower($sortDir) === 'asc' ? 'asc' : 'desc';
-
-                $query->orderBy($sortBy, $sortDir);
             }
         }
 
@@ -297,7 +296,7 @@ class MaintenanceRequestController extends Controller
             ]);
         }
 
-        return view('maintenance.requests.index', compact('list', 'status', 'priority', 'q', 'sortBy', 'sortDir'));
+        return view('maintenance.requests.index', compact('list', 'status', 'q', 'sortBy', 'sortDir'));
     }
 
     /**
@@ -337,7 +336,6 @@ class MaintenanceRequestController extends Controller
         $rules = [
             'title'          => ['required', 'string', 'max:255'],
             'description'    => ['nullable', 'string', 'max:5000'],
-            'priority'       => ['required', Rule::in(['low', 'medium', 'high', 'urgent'])],
             'asset_id'       => ['nullable', 'integer', 'exists:assets,id'],
             'department_id'  => ['nullable', 'integer', 'exists:departments,id'],
             'type_id'        => ['nullable', 'integer', 'exists:maintenance_request_types,id'],
@@ -401,7 +399,6 @@ class MaintenanceRequestController extends Controller
             'title'           => ['sometimes', 'required', 'string', 'max:255'],
             'description'     => ['nullable', 'string', 'max:5000'],
             'asset_id'        => ['nullable', 'integer', 'exists:assets,id'],
-            'priority'        => ['nullable', \Illuminate\Validation\Rule::in(['low', 'medium', 'high', 'urgent'])],
             'request_date'    => ['nullable', 'date'],
             'reporter_name'   => ['nullable', 'string', 'max:255'],
             'reporter_phone'  => ['nullable', 'string', 'max:30'],
@@ -742,11 +739,13 @@ class MaintenanceRequestController extends Controller
         $techUsers   = $this->suggestTechUsersForRequest($mr);
         $suggestRole = strtolower(trim((string) $mr->type?->default_role_code));
         
-        $types = \App\Models\MaintenanceRequestType::query()
-            ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->get(['id', 'name']);
+        $types = Cache::remember('maintenance_request_types', 3600, function () {
+            return \App\Models\MaintenanceRequestType::query()
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name']);
+        });
     
         return view('maintenance.requests.edit', compact(
             'mr',
@@ -813,14 +812,14 @@ class MaintenanceRequestController extends Controller
             ->select($selectCols)
             ->orderBy('name');
     
-        // หากไม่มีประเภทงานระบุมา ให้คืนค่าช่างทั้งหมดในระบบ
+        // หากไม่มีประเภทงานระบุมา ให้คืนค่าเจ้าหน้าที่ทั้งหมดในระบบ
         if (!$type) {
             return $base->get();
         }
     
         $suggested = collect();
     
-        // 1) ดึงรายชื่อช่างที่เป็น Default สำหรับงานประเภทนี้
+        // 1) ดึงรายชื่อเจ้าหน้าที่ที่เป็น Default สำหรับงานประเภทนี้
         if (!empty($type->default_user_id)) {
             $u = User::query()
                 ->with(['roleRef'])
@@ -832,7 +831,7 @@ class MaintenanceRequestController extends Controller
             }
         }
     
-        // 2) กรองรายชื่อช่างตามหน่วยงานหรือบทบาทที่กำหนดไว้ในประเภทงาน
+        // 2) กรองรายชื่อเจ้าหน้าที่ตามหน่วยงานหรือบทบาทที่กำหนดไว้ในประเภทงาน
         $filterQuery = clone $base;
     
         if (!empty($type->default_department_code)) {
@@ -846,34 +845,51 @@ class MaintenanceRequestController extends Controller
     
         $filteredUsers = $filterQuery->get();
     
-        // 3) Fallback: ถ้ากรองแล้วไม่เจอใครเลย ให้แสดงรายชื่อทีมทั้งหมดแทน
+        // 3) Fallback: หากกรองแล้วไม่เจอใครเลย ให้แสดงรายชื่อทีมทั้งหมดแทน
         if ($filteredUsers->isEmpty()) {
             $filteredUsers = $base->get();
         }
     
+        // NEW: รวมทุกคนที่เป็นทีมงานเพื่อให้ Frontend สามารถเลือก "ทั้งหมด" ได้
+        // ใช้ Query ใหม่เพื่อให้แน่ใจว่าไม่มี Filter อื่นค้างอยู่
+        $allTeam = User::query()
+            ->inRoles(User::teamRoles())
+            ->with(['roleRef'])
+            ->select($selectCols)
+            ->orderBy('name')
+            ->get();
+
         // รวมผลลัพธ์ ตัดรายชื่อที่ซ้ำออก และจัดลำดับ Index ใหม่
         return $suggested
             ->merge($filteredUsers)
+            ->merge($allTeam)
             ->unique('id')
             ->values();
     }
     
     public function updateType(Request $request, MR $req)
     {
-        // ตรวจสอบสิทธิ์ผ่าน Policy: MaintenanceRequestPolicy@setType
-        Gate::authorize('setType', $req);
-    
-        $validator = Validator::make($request->all(), [
-            'type_id' => ['nullable', 'integer', 'exists:maintenance_request_types,id'],
-        ]);
-
-        if ($validator->fails()) {
-            if ($request->expectsJson()) {
-                return response()->json(['errors' => $validator->errors()], 422);
+        try {
+            $response = Gate::inspect('setType', $req);
+            
+            if ($response->denied()) {
+                if ($request->expectsJson()) {
+                    return response()->json(['message' => $response->message() ?: 'คุณไม่มีสิทธิ์เปลี่ยนประเภทใบงานนี้'], 403);
+                }
+                return back()->with('toast', \App\Support\Toast::warning($response->message() ?: 'คุณไม่มีสิทธิ์เปลี่ยนประเภทใบงานนี้', 3000));
             }
-            return back()->withErrors($validator)
-                ->with('toast', Toast::warning($validator->errors()->first(), 3000));
-        }
+
+            $validator = Validator::make($request->all(), [
+                'type_id' => ['nullable', 'integer', 'exists:maintenance_request_types,id'],
+            ]);
+
+            if ($validator->fails()) {
+                if ($request->expectsJson()) {
+                    return response()->json(['errors' => $validator->errors()], 422);
+                }
+                return back()->withErrors($validator)
+                    ->with('toast', \App\Support\Toast::warning($validator->errors()->first(), 3000));
+            }
 
         $data = $validator->validated();
     
@@ -891,10 +907,13 @@ class MaintenanceRequestController extends Controller
     
             // บันทึกประวัติการเปลี่ยนแปลงลงใน MaintenanceLog
             if (class_exists(MaintenanceLog::class)) {
+                $oldType = \App\Models\MaintenanceRequestType::find($oldId)?->name ?? $oldId;
+                $newType = \App\Models\MaintenanceRequestType::find($newId)?->name ?? $newId;
+                
                 MaintenanceLog::create([
                     'request_id'  => $req->id,
                     'action'      => MaintenanceLog::ACTION_UPDATE,
-                    'note'        => "เปลี่ยนประเภทใบงาน: {$oldId} -> {$newId}",
+                    'note'        => "เปลี่ยนประเภทใบงาน: [{$oldType}] -> [{$newType}]",
                     'user_id'     => $request->user()?->id,
                     'from_status' => null,
                     'to_status'   => null,
@@ -909,14 +928,31 @@ class MaintenanceRequestController extends Controller
             ]);
         });
     
-        if ($request->expectsJson()) {
-            return response()->json([
-                'data' => $req->fresh(['type']),
-                'toast' => Toast::success('อัปเดตประเภทใบงานแล้ว', 1600),
-            ], Response::HTTP_OK);
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'data' => $req->fresh(['type']),
+                    'toast' => Toast::success('อัปเดตประเภทใบงานแล้ว', 1600),
+                ], Response::HTTP_OK);
+            }
+        
+            return redirect()->route('maintenance.requests.show', $req)
+                ->with('toast', Toast::success('อัปเดตประเภทใบงานแล้ว', 1600));
+
+        } catch (\Exception $e) {
+            Log::error('[MaintenanceRequest::updateType] Error', [
+                'mr_id'   => $req->id,
+                'message' => $e->getMessage(),
+                'trace'   => $e->getTraceAsString(),
+            ]);
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง',
+                    'error' => config('app.debug') ? $e->getMessage() : null
+                ], 500);
+            }
+
+            return back()->with('toast', \App\Support\Toast::error('เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง', 4000));
         }
-    
-        return redirect()->route('maintenance.requests.show', $req)
-            ->with('toast', Toast::success('อัปเดตประเภทใบงานแล้ว', 1600));
     }
 }

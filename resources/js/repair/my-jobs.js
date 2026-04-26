@@ -4,27 +4,40 @@
   function showLoader() { $("loaderOverlay")?.classList.add("show"); }
   function hideLoader() { $("loaderOverlay")?.classList.remove("show"); }
 
-  function submitAcknowledge(id, ticketNo) {
-    const ok = confirm(`ยืนยัน “รับทราบ” งาน #${ticketNo} ?`);
+  async function submitAcknowledge(id, ticketNo) {
+    const ok = await window.Confirm.show({
+      title: 'ยืนยันรับทราบงาน',
+      message: `ยืนยัน “รับทราบ” งาน #${ticketNo} หรือไม่?`,
+      variant: 'primary'
+    });
     if (!ok) return;
     showLoader();
     const form = $(`ackForm-${id}`);
     if (form) form.submit();
   }
 
-  function submitAccept(id, ticketNo) {
-    const ok = confirm(`ยืนยัน “รับเรื่อง” งาน #${ticketNo} ?`);
+  async function submitAccept(id, ticketNo) {
+    const ok = await window.Confirm.show({
+      title: 'ยืนยันรับเรื่อง',
+      message: `ยืนยัน “รับเรื่อง” งาน #${ticketNo} เข้าดำเนินการหรือไม่?`,
+      variant: 'success'
+    });
     if (!ok) return;
     showLoader();
     const form = $(`acceptForm-${id}`);
     if (form) form.submit();
   }
 
-  function submitReject(id, ticketNo) {
+  async function submitReject(id, ticketNo) {
     const remark = prompt(`ระบุเหตุผล “ไม่รับเรื่อง” งาน #${ticketNo} (ไม่กรอกก็ได้)`, "");
     if (remark === null) return;
 
-    const ok = confirm(`ยืนยัน “ไม่รับเรื่อง” งาน #${ticketNo} ?`);
+    const ok = await window.Confirm.show({
+      title: 'ยืนยันไม่รับเรื่อง',
+      message: `คุณแน่ใจหรือไม่ที่จะ “ไม่รับเรื่อง” งาน #${ticketNo}?`,
+      variant: 'danger',
+      confirmText: 'ยืนยันไม่รับเรื่อง'
+    });
     if (!ok) return;
 
     const input = $(`rejectRemark-${id}`);
@@ -36,29 +49,57 @@
   }
 
   function renderDonut() {
-    const pending = parseInt(($("stat-pending")?.textContent || "0").trim(), 10) || 0;
-    const inprog  = parseInt(($("stat-in-progress")?.textContent || "0").trim(), 10) || 0;
-    const comp    = parseInt(($("stat-completed")?.textContent || "0").trim(), 10) || 0;
+    const getVal = (id) => parseInt(($(id)?.textContent || "0").trim(), 10) || 0;
 
-    const total = pending + inprog + comp;
+    const pending = getVal("stat-pending");
+    const ack     = getVal("stat-acknowledged");
+    const accept  = getVal("stat-accepted");
+    const inprog  = getVal("stat-in-progress");
+    const onhold  = getVal("stat-on-hold");
+    const resolved = getVal("stat-resolved");
+    const closed   = getVal("stat-closed");
+
+    const total = pending + ack + accept + inprog + onhold + resolved + closed;
     const donut = $("donut");
     const pctEl = $("donutPct");
     if (!donut || !pctEl) return;
 
-    const completedPct = total > 0 ? Math.round((comp / total) * 100) : 0;
+    // Pct still total completed (Resolved + Closed)
+    const completedPct = total > 0 ? Math.round(((resolved + closed) / total) * 100) : 0;
     pctEl.textContent = `${completedPct}%`;
 
-    const degPending = total > 0 ? (pending / total) * 360 : 0;
-    const degInprog  = total > 0 ? (inprog  / total) * 360 : 0;
-    const degComp    = total > 0 ? (comp    / total) * 360 : 0;
+    if (total === 0) {
+      donut.style.background = "#e2e8f0";
+      return;
+    }
+
+    const dPending = (pending / total) * 360;
+    const dAck     = (ack / total) * 360;
+    const dAccept  = (accept / total) * 360;
+    const dInprog  = (inprog / total) * 360;
+    const dOnhold  = (onhold / total) * 360;
+    const dResolved = (resolved / total) * 360;
+    const dClosed  = (closed / total) * 360;
 
     const a0 = 0;
-    const a1 = a0 + degPending;
-    const a2 = a1 + degInprog;
-    const a3 = a2 + degComp;
+    const a1 = a0 + dPending;
+    const a2 = a1 + dAck;
+    const a3 = a2 + dAccept;
+    const a4 = a3 + dInprog;
+    const a5 = a4 + dOnhold;
+    const a6 = a5 + dResolved;
+    const a7 = a6 + dClosed;
 
-    donut.style.background =
-      `conic-gradient(#f59e0b ${a0}deg ${a1}deg,#0ea5e9 ${a1}deg ${a2}deg,#10b981 ${a2}deg ${a3}deg,#e2e8f0 ${a3}deg 360deg)`;
+    donut.style.background = `conic-gradient(
+      #f59e0b ${a0}deg ${a1}deg,
+      #38bdf8 ${a1}deg ${a2}deg,
+      #6366f1 ${a2}deg ${a3}deg,
+      #3b82f6 ${a3}deg ${a4}deg,
+      #94a3b8 ${a4}deg ${a5}deg,
+      #10b981 ${a5}deg ${a6}deg,
+      #065f46 ${a6}deg ${a7}deg,
+      #e2e8f0 ${a7}deg 360deg
+    )`;
   }
 
   const LS_KEY = "myjobs.notify.sound.enabled";
@@ -68,29 +109,48 @@
   let pendingBeep = 0;
 
   function setNotifyUI(enabled) {
-    const dot = $("notifyStatusDot");
+    const ids = [
+      { btn: "notifyToggleBtn", icon: "notifyIcon", dot: "notifyStatusDot" },
+      { btn: "notifyToggleBtnMobileTop", icon: "notifyIconMobileTop", dot: "notifyStatusDotMobileTop" },
+      { btn: "notifyToggleBtnMobile", icon: null, dot: null } // icon is inside btn
+    ];
+
+    ids.forEach(group => {
+      const btn = $(group.btn);
+      const icon = $(group.icon);
+      const dot = $(group.dot);
+
+      if (btn) {
+        btn.title = enabled ? "แจ้งเตือน (เปิดเสียงแล้ว)" : "แจ้งเตือน (กดเพื่อเปิดเสียง)";
+        // For buttons without a separate icon ID, find the <i> inside
+        if (!icon) {
+          const innerIcon = btn.querySelector('i');
+          if (innerIcon) {
+            innerIcon.className = enabled ? 'bi bi-bell-fill me-2' : 'bi bi-bell-slash me-2';
+          }
+        }
+      }
+
+      if (icon) {
+        icon.className = enabled ? 'bi bi-bell-fill' : 'bi bi-bell-slash';
+      }
+
+      if (dot) {
+        dot.classList.toggle('d-none', !enabled && pendingBeep === 0);
+        // We can also sync the dot style if needed
+      }
+    });
+
     const text = $("notifyText");
-    const btn = $("notifyToggleBtn");
-
     if (text) text.textContent = enabled ? "เปิดเสียง" : "ปิดเสียง";
-    if (btn) btn.title = enabled ? "แจ้งเตือน (เปิดเสียงแล้ว)" : "แจ้งเตือน (กดเพื่อเปิดเสียง)";
-
-    if (dot) {
-      dot.classList.remove("bg-slate-300", "bg-emerald-500", "bg-amber-500", "bg-secondary");
-      if (!enabled) dot.classList.add("bg-slate-300");
-      else if (pendingBeep > 0) dot.classList.add("bg-amber-500"); // มีแจ้งเตือนค้าง
-      else dot.classList.add("bg-emerald-500");
-    }
   }
 
   async function unlockAudio(audioEl) {
-    // ต้องเรียกจาก user gesture (onclick) เพื่อปลดล็อก autoplay policy
     if (!audioEl) return false;
-
     try {
       const prevVol = audioEl.volume;
-      audioEl.volume = 0;          // mute ชั่วคราวเพื่อไม่ให้มีเสียงตอน unlock
-      await audioEl.play();        // ลอง play
+      audioEl.volume = 0;
+      await audioEl.play();
       audioEl.pause();
       audioEl.currentTime = 0;
       audioEl.volume = prevVol ?? 1;
@@ -127,18 +187,14 @@
   }
 
   function initRealtimeNotify() {
-    const btn = $("notifyToggleBtn");
     const audio = $("notifySound");
-
-    // เจ้าหน้าที่เท่านั้น (audio + btn อยู่ที่ navbar สำหรับ role !== member)
-    if (!audio || !btn) return;
+    if (!audio) return;
 
     // restore state
     soundEnabled = localStorage.getItem(LS_KEY) === "1";
     setNotifyUI(soundEnabled);
 
-    // toggle click
-    btn?.addEventListener("click", async () => {
+    const toggle = async () => {
       if (soundEnabled) {
         soundEnabled = false;
         localStorage.setItem(LS_KEY, "0");
@@ -156,18 +212,20 @@
       soundEnabled = true;
       localStorage.setItem(LS_KEY, "1");
 
-      // ถ้ามีแจ้งเตือนค้าง -> ดัง 1 ครั้งพอ แล้วล้างค้าง
       if (pendingBeep > 0 && audio) {
         pendingBeep = 0;
         try {
           audio.currentTime = 0;
           await audio.play();
-        } catch (e) {
-          // ถ้าโดนบล็อกอีกก็ไม่เป็นไร
-        }
+        } catch (e) {}
       }
-
       setNotifyUI(true);
+    };
+
+    // Bind to all buttons
+    ["notifyToggleBtn", "notifyToggleBtnMobileTop", "notifyToggleBtnMobile"].forEach(id => {
+      const btn = $(id);
+      if (btn) btn.addEventListener("click", toggle);
     });
 
     // ต้องมี Echo
@@ -191,9 +249,14 @@
   window.submitAccept = submitAccept;
   window.submitReject = submitReject;
 
-  document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("turbo:load", () => {
     hideLoader();
     if ($("donut")) renderDonut(); // เฉพาะหน้า my-jobs
-    initRealtimeNotify(); // รันทุกหน้า (สำหรับเจ้าหน้าที่จะมีเสียงทั้งระบบ)
+
+    // initRealtimeNotify ทำงานครั้งเดียว (Echo subscription ผูกกับ WebSocket ไม่ควร subscribe ซ้ำ)
+    if (!window.__realtimeNotifyInit) {
+      window.__realtimeNotifyInit = true;
+      initRealtimeNotify();
+    }
   });
 })();

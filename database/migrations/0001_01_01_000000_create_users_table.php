@@ -11,35 +11,32 @@ return new class extends Migration
         Schema::create('users', function (Blueprint $table) {
             $table->id();
 
-            // เลขบัตรประชาชน 13 หลัก (ใช้เป็นหลักในการ Login)
-            $table->string('citizen_id', 13)
-                  ->unique()
-                  ->comment('เลขประจำตัวประชาชน 13 หลัก');
+            // เลขประจำตัวประชาชน 13 หลัก (ใช้เป็น Username หลักในการเข้าสู่ระบบ)
+            $table->string('citizen_id', 13)->unique();
 
+            // ชื่อ-นามสกุล ของผู้ใช้งาน
             $table->string('name');
 
-            // email ไม่บังคับแล้ว แต่ถ้ามีก็ยังต้องไม่ซ้ำกัน
-            $table->string('email')
-                  ->nullable()
-                  ->unique();
+            // ที่อยู่อีเมล (ไม่บังคับ แต่ต้องไม่ซ้ำถ้ามีการระบุ)
+            $table->string('email')->nullable()->unique();
+            
+            // วันที่ยืนยันอีเมล
             $table->timestamp('email_verified_at')->nullable();
 
+            // รหัสผ่านที่ผ่านการ Hash แล้ว
             $table->string('password');
 
-            // เก็บรหัสหน่วยงาน (code จากตาราง departments) เผื่อ filter
-            $table->string('department', 100)
-                  ->nullable()
-                  ->index();
+            // รหัสแผนก/หน่วยงาน (อ้างอิงจาก code ในตาราง departments)
+            $table->string('department', 100)->nullable()->index();
 
-            // เก็บ role เป็น code (ไปแมปกับ roles.code)
-            $table->string('role', 50)
-                  ->default('member')
-                  ->index();
+            // บทบาทของผู้ใช้งาน (เช่น admin, technician, member) อ้างอิงจาก code ในตาราง roles
+            $table->string('role', 50)->default('member')->index();
 
-            // รูปโปรไฟล์
+            // พาธเก็บไฟล์รูปภาพโปรไฟล์ (Original และ Thumbnail)
             $table->string('profile_photo_path', 2048)->nullable();
             $table->string('profile_photo_thumb', 2048)->nullable();
 
+            // ไฟล์เสียงแจ้งเตือนที่ผู้ใช้เลือกใช้งาน
             $table->string('notification_sound')->default('new-request.mp3');
 
             $table->rememberToken();

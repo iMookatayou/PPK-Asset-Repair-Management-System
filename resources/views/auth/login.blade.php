@@ -4,7 +4,7 @@
 @section('content')
 
 
-    <form method="POST" action="{{ route('login') }}" class="space-y-4">
+    <form method="POST" action="{{ route('login') }}" data-turbo="false" class="space-y-4">
         @csrf
 
         {{-- Citizen ID --}}

@@ -10,10 +10,19 @@ return new class extends Migration
     {
         Schema::create('chat_thread_reads', function (Blueprint $table) {
             $table->id();
+
+            // ผู้ใช้งานที่เข้ามาอ่านห้องแชท
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+
+            // ห้องแชทที่ผู้ใช้กำลังอ่าน
             $table->foreignId('chat_thread_id')->constrained('chat_threads')->cascadeOnDelete();
+
+            // ID ของข้อความล่าสุดที่ผู้ใช้คนนี้ได้อ่านแล้ว
             $table->unsignedBigInteger('last_read_message_id')->nullable();
+
+            // วันที่และเวลาที่มีการเข้ามาอ่านล่าสุด
             $table->timestamp('last_read_at')->nullable();
+
             $table->timestamps();
 
             $table->unique(['user_id','chat_thread_id'], 'utr_user_thread_unique');

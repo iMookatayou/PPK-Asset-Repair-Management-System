@@ -9,12 +9,12 @@
 
     $levelLabel =
         $avgScore >= 4.5
-            ? 'ยอดเยี่ยม (Excellent)'
+            ? 'ยอดเยี่ยม'
             : ($avgScore >= 4.0
-                ? 'ดีมาก (Very Good)'
+                ? 'ดีมาก'
                 : ($avgScore >= 3.0
-                    ? 'ดี (Good)'
-                    : 'ควรปรับปรุง (Needs Improvement)'));
+                    ? 'ดี'
+                    : 'ควรปรับปรุง'));
 
     $insightText =
         $avgScore >= 4.5
@@ -43,7 +43,7 @@
         <div class="mx-auto max-w-screen-xl px-4 sm:px-6 lg:px-8 py-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex items-center gap-4 min-w-0">
-                    <div class="h-16 w-16 shrink-0 rounded-xl overflow-hidden border {{ $line }} bg-slate-100">
+                    <div class="h-16 w-16 shrink-0 rounded-lg overflow-hidden border {{ $line }} bg-slate-100">
                         @if ($tech->avatar_thumb_url)
                             <img src="{{ $tech->avatar_thumb_url }}" alt="{{ $tech->name }}"
                                 class="h-full w-full object-cover">
@@ -55,10 +55,14 @@
                         @endif
                     </div>
                     <div class="min-w-0">
-                        <h1 class="text-[22px] font-bold text-slate-900 leading-tight">{{ $tech->name }}</h1>
+                        <h1 class="text-[22px] font-semibold text-slate-900 leading-tight">{{ $tech->name }}</h1>
                         <div class="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-slate-500">
-                            <span
-                                class="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[11px] font-bold uppercase tracking-wider border border-indigo-100">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor"
+                                    stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
                                 {{ $tech->role_label }}
                             </span>
                             @if ($tech->department_name)
@@ -78,10 +82,9 @@
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
                     <a href="{{ route('maintenance.requests.rating.technicians') }}"
-                        class="inline-flex items-center gap-2 rounded-lg border {{ $line }} bg-white px-4 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50">
-                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none">
-                            <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round" />
+                        class="inline-flex items-center h-9 gap-2 rounded-md border {{ $line }} bg-white px-4 text-[13px] font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 transition-all">
+                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
                         กลับ
                     </a>
@@ -99,7 +102,7 @@
 
             {{-- Rating Distribution --}}
             <div class="bg-white rounded-lg border {{ $line }} p-6">
-                <h3 class="text-[14px] font-bold text-slate-900 mb-5">Rating Distribution</h3>
+                <h3 class="text-[1.05rem] font-semibold text-[#0F2D5C] tracking-tight leading-tight mb-5">การกระจายคะแนน</h3>
 
                 {{-- Big Score + Stars --}}
                 <div class="flex items-end gap-3 mb-5">
@@ -114,7 +117,7 @@
                                 </svg>
                             @endfor
                         </div>
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Average Score</span>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">คะแนนเฉลี่ย</span>
                     </div>
                 </div>
 
@@ -122,7 +125,7 @@
                 <div class="space-y-2.5">
                     @foreach ($distribution as $stars => $data)
                         <div class="flex items-center gap-3">
-                            <span class="text-[12px] text-slate-500 w-12 shrink-0">{{ $stars }} Stars</span>
+                            <span class="text-[12px] text-slate-500 w-12 shrink-0">{{ $stars }} ดาว</span>
                             <div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
                                 <div class="h-full bg-emerald-500 rounded-full" style="width: {{ $data['percent'] }}%">
                                 </div>
@@ -132,13 +135,13 @@
                     @endforeach
                 </div>
 
-                <p class="mt-5 text-[12px] text-slate-400">Total ratings analyzed: <span
+                <p class="mt-5 text-[12px] text-slate-400">จำนวนการประเมินทั้งหมด: <span
                         class="font-semibold text-slate-600">{{ $totalReviews }}</span></p>
             </div>
 
             {{-- Performance Insights --}}
             <div class="lg:col-span-2 bg-white rounded-lg border {{ $line }} p-6">
-                <h3 class="text-[14px] font-bold text-slate-900 mb-5">Performance Insights</h3>
+                <h3 class="text-[1.05rem] font-semibold text-[#0F2D5C] tracking-tight leading-tight mb-5">ข้อมูลประสิทธิภาพการทำงาน</h3>
 
                 {{-- 3 Metrics — no border box, just layout --}}
                 <div class="grid grid-cols-3 gap-6 mb-6">
@@ -149,8 +152,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Jobs
-                                Delivered</span>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">งานที่เสร็จสิ้น</span>
                         </div>
                         <div class="text-4xl font-bold text-slate-900">{{ $totalJobs }}</div>
                     </div>
@@ -162,11 +164,11 @@
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Satisfaction</span>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ความพึงพอใจ</span>
                         </div>
                         <div class="text-4xl font-bold text-emerald-600">{{ number_format(($avgScore / 5) * 100, 1) }}%
                         </div>
-                        <div class="text-[11px] text-slate-400 mt-1">{{ number_format($avgScore, 1) }}/10 customer rating
+                        <div class="text-[11px] text-slate-400 mt-1">คะแนน {{ number_format($avgScore, 1) }}/5 จากผู้ใช้บริการ
                         </div>
                     </div>
 
@@ -177,7 +179,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
-                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Member Since</span>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">เป็นสมาชิกตั้งแต่</span>
                         </div>
                         <div class="text-4xl font-bold text-slate-900">{{ $tech->created_at->format('M y') }}</div>
                         <div class="text-[11px] text-slate-400 mt-1">{{ $levelLabel }}</div>
@@ -185,14 +187,14 @@
                 </div>
 
                 {{-- Insight box — left border accent style --}}
-                <div class="flex items-start gap-3 p-4 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+                <div class="flex items-start gap-3 p-4 bg-blue-50 rounded-md border-l-4 border-blue-500">
                     <svg class="w-4 h-4 text-blue-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2"
                         viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <div>
-                        <div class="text-[13px] font-bold text-blue-900 mb-0.5">Strategic Efficiency</div>
+                        <div class="text-[13px] font-bold text-blue-900 mb-0.5">ประสิทธิภาพเชิงกลยุทธ์</div>
                         <div class="text-[12px] text-blue-700 leading-relaxed">{{ $insightText }}</div>
                     </div>
                 </div>
@@ -202,23 +204,23 @@
         {{-- Row 2: Recent Work Orders --}}
         <div class="bg-white rounded-lg border {{ $line }} mb-6 overflow-hidden">
             <div class="flex items-center justify-between px-6 py-4 border-b {{ $line }}">
-                <h3 class="text-[15px] font-bold text-slate-900">Recent Work Orders</h3>
-                <a href="#" class="text-[13px] font-semibold text-indigo-600 hover:text-indigo-800">View All
-                    History</a>
+                <h3 class="text-[1.05rem] font-semibold text-[#0F2D5C] tracking-tight leading-tight">รายการงานล่าสุด
+                </h3>
+                <a href="#" class="text-[13px] font-semibold text-indigo-600 hover:text-indigo-800">ดูประวัติทั้งหมด</a>
             </div>
             <table class="w-full text-sm text-left">
-                <thead class="bg-slate-50 text-slate-500 text-[11px] font-bold uppercase tracking-wider">
+                <thead class="bg-slate-50 text-slate-500 text-[10px] font-semibold uppercase tracking-wider">
                     <tr>
-                        <th class="px-6 py-3">Request #</th>
-                        <th class="px-6 py-3">Reporter</th>
-                        <th class="px-6 py-3">Completed Date</th>
-                        <th class="px-6 py-3 text-right">Action</th>
+                        <th class="px-6 py-3">เลขที่ใบแจ้งซ่อม</th>
+                        <th class="px-6 py-3">ผู้แจ้ง</th>
+                        <th class="px-6 py-3">วันที่เสร็จสิ้น</th>
+                        <th class="px-6 py-3 text-right">การจัดการ</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y {{ $line }}">
                     @forelse($recentJobs as $job)
                         <tr class="hover:bg-slate-50/50 transition-colors">
-                            <td class="px-6 py-3.5 font-bold text-indigo-600">#{{ $job->maintenance_request_id }}</td>
+                            <td class="px-6 py-3.5 font-semibold text-indigo-600">#{{ $job->maintenance_request_id }}</td>
                             <td class="px-6 py-3.5 text-slate-700 text-[13px]">
                                 {{ $job->maintenanceRequest?->reporter?->name ?? 'ไม่ระบุชื่อ' }}</td>
                             <td class="px-6 py-3.5 text-slate-500 text-[13px]">
@@ -226,7 +228,7 @@
                             <td class="px-6 py-3.5 text-right">
                                 <a href="{{ route('maintenance.requests.show', $job->maintenance_request_id) }}"
                                     class="text-[13px] font-bold text-indigo-600 hover:text-indigo-800">
-                                    View Details &rarr;
+                                    ดูรายละเอียด &rarr;
                                 </a>
                             </td>
                         </tr>
@@ -241,8 +243,8 @@
         </div>
 
         {{-- Row 3: Recent Feedback --}}
-        <div>
-            <h3 class="text-[15px] font-bold text-slate-900 mb-4">Recent Feedback</h3>
+        <div class="mb-10">
+            <h3 class="text-[1.05rem] font-semibold text-[#0F2D5C] tracking-tight leading-tight mb-4">ความคิดเห็นล่าสุด</h3>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 @forelse($reviews as $review)
@@ -259,7 +261,7 @@
                                     {{ mb_strtoupper(mb_substr($review->rater?->name ?? 'U', 0, 2)) }}
                                 </div>
                                 <div>
-                                    <div class="font-bold text-slate-900 text-[14px] leading-tight">
+                                    <div class="font-semibold text-slate-900 text-[14px] leading-tight">
                                         {{ $review->rater?->name ?? 'ไม่ระบุชื่อ' }}</div>
                                     <div class="text-[11px] text-slate-400 mt-0.5">
                                         {{ $review->rater?->role_label ?? 'User' }}</div>
@@ -282,7 +284,7 @@
                             @if ($review->comment)
                                 {{ $review->comment }}
                             @else
-                                <span class="text-slate-400 not-italic">No written feedback provided.</span>
+                                <span class="text-slate-400 not-italic">ไม่มีข้อความความคิดเห็น</span>
                             @endif
                         </p>
 
@@ -290,20 +292,20 @@
                         <div class="flex items-center justify-between">
                             @if ($review->score >= 4)
                                 <span
-                                    class="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded border border-emerald-100 uppercase tracking-wider">Completed</span>
+                                    class="text-emerald-600 text-[11px] font-semibold uppercase tracking-wider">เสร็จสมบูรณ์</span>
                             @elseif($review->score <= 2)
                                 <span
-                                    class="px-2.5 py-1 bg-rose-50 text-rose-700 text-[10px] font-bold rounded border border-rose-100 uppercase tracking-wider">Critical</span>
+                                    class="text-rose-600 text-[11px] font-semibold uppercase tracking-wider">เร่งด่วน/วิกฤต</span>
                             @else
                                 <span
-                                    class="px-2.5 py-1 bg-slate-50 text-slate-500 text-[10px] font-bold rounded border {{ $line }} uppercase tracking-wider">Reviewed</span>
+                                    class="text-slate-500 text-[11px] font-semibold uppercase tracking-wider">ตรวจสอบแล้ว</span>
                             @endif
                             <span class="text-[11px] text-slate-400">{{ $review->created_at->format('d M Y') }}</span>
                         </div>
                     </div>
                 @empty
                     <div
-                        class="lg:col-span-2 py-16 text-center bg-slate-50 rounded-lg border-2 border-dashed border-slate-200">
+                        class="lg:col-span-2 py-16 text-center bg-slate-50 rounded-md border-2 border-dashed border-slate-200">
                         <svg class="mx-auto h-10 w-10 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24"
                             stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -312,10 +314,6 @@
                         <p class="text-[13px] font-medium text-slate-500">ยังไม่มีรีวิว</p>
                     </div>
                 @endforelse
-            </div>
-
-            <div class="mt-6">
-                {{ $reviews->links() }}
             </div>
         </div>
 

@@ -31,6 +31,7 @@ class MaintenanceJobController extends Controller
         $tech   = $request->integer('tech');
         $q      = $request->string('q')->toString();
         $resp   = strtolower($request->string('resp')->toString());
+        $typeId = $request->integer('type');
 
         // Base query for both list and stats
         $base = MR::query()
@@ -62,22 +63,28 @@ class MaintenanceJobController extends Controller
             // Extra Filters
             ->when($status, fn($qb) => $qb->where('maintenance_requests.status', $status))
             ->when($tech,   fn($qb) => $qb->where('maintenance_requests.technician_id', $tech))
+            ->when($typeId, fn($qb) => $qb->where('maintenance_requests.type_id', $typeId))
             ->when($q,      fn($qb) => $qb->search($q))
             ->when($resp,   fn($qb) => $qb->where('ma.response_status', $resp))
             // Default: Hide closed/cancelled if no status filter
             ->when(!$status, fn($qb) => $qb->whereNotIn('maintenance_requests.status', [MR::STATUS_CLOSED, MR::STATUS_CANCELLED]))
             
-            ->orderByRaw("CASE priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
-            ->orderBy('maintenance_requests.updated_at', 'desc');
+            ->orderBy('maintenance_requests.created_at', 'desc')
+            ->orderBy('maintenance_requests.id', 'desc');
 
-        $jobs = $query->paginate(12)->withQueryString();
+        $jobs = $query->paginate(20)->withQueryString();
 
         // 2. Calculate Stats
+        // Use the base query so stats match the current filter scope (All vs My Jobs)
         $statsRow = (clone $base)
             ->select([
                 DB::raw("SUM(CASE WHEN maintenance_requests.status = 'pending' THEN 1 ELSE 0 END) as pending_count"),
-                DB::raw("SUM(CASE WHEN maintenance_requests.status IN ('accepted','in_progress','on_hold') THEN 1 ELSE 0 END) as in_progress_count"),
-                DB::raw("SUM(CASE WHEN maintenance_requests.status IN ('resolved','closed') THEN 1 ELSE 0 END) as completed_count")
+                DB::raw("SUM(CASE WHEN maintenance_requests.status = 'acknowledged' THEN 1 ELSE 0 END) as acknowledged_count"),
+                DB::raw("SUM(CASE WHEN maintenance_requests.status = 'accepted' THEN 1 ELSE 0 END) as accepted_count"),
+                DB::raw("SUM(CASE WHEN maintenance_requests.status = 'in_progress' THEN 1 ELSE 0 END) as in_progress_count"),
+                DB::raw("SUM(CASE WHEN maintenance_requests.status = 'on_hold' THEN 1 ELSE 0 END) as on_hold_count"),
+                DB::raw("SUM(CASE WHEN maintenance_requests.status = 'resolved' THEN 1 ELSE 0 END) as resolved_count"),
+                DB::raw("SUM(CASE WHEN maintenance_requests.status = 'closed' THEN 1 ELSE 0 END) as closed_count"),
             ])
             ->when($filter === 'my', function ($qb) use ($userId) {
                 $qb->where(function ($qq) use ($userId) {
@@ -89,16 +96,52 @@ class MaintenanceJobController extends Controller
                 $qb->whereNull('maintenance_requests.technician_id')
                    ->where('maintenance_requests.status', MR::STATUS_ACKNOWLEDGED);
             })
+            ->when($tech,   fn($qb) => $qb->where('maintenance_requests.technician_id', $tech))
+            ->when($typeId, fn($qb) => $qb->where('maintenance_requests.type_id', $typeId))
+            ->when($q,    fn($qb) => $qb->search($q))
             ->first();
 
         $stats = [
-            'pending'     => (int) ($statsRow->pending_count ?? 0),
-            'in_progress' => (int) ($statsRow->in_progress_count ?? 0),
-            'completed'   => (int) ($statsRow->completed_count ?? 0),
+            'pending'      => (int) ($statsRow->pending_count ?? 0),
+            'acknowledged' => (int) ($statsRow->acknowledged_count ?? 0),
+            'accepted'     => (int) ($statsRow->accepted_count ?? 0),
+            'in_progress'  => (int) ($statsRow->in_progress_count ?? 0),
+            'on_hold'      => (int) ($statsRow->on_hold_count ?? 0),
+            'resolved'     => (int) ($statsRow->resolved_count ?? 0),
+            'closed'       => (int) ($statsRow->closed_count ?? 0),
         ];
+
+        // 2.1 Calculate Monthly Average & Current Month Stats
+        $thisMonthStart = now()->startOfMonth();
+        $monthlyStats = (clone $base)
+            ->select([
+                DB::raw("SUM(CASE WHEN maintenance_requests.status = 'closed' AND maintenance_requests.closed_at >= '{$thisMonthStart}' THEN 1 ELSE 0 END) as closed_this_month"),
+                DB::raw("MIN(maintenance_requests.closed_at) as first_closed_at"),
+            ])
+            ->when($filter === 'my', function ($qb) use ($userId) {
+                $qb->where(function ($qq) use ($userId) {
+                    $qq->where('maintenance_requests.technician_id', $userId)
+                       ->orWhereNotNull('ma.maintenance_request_id');
+                });
+            })
+            ->first();
+
+        $closedThisMonth = (int) ($monthlyStats->closed_this_month ?? 0);
+        $firstClosed = $monthlyStats->first_closed_at ? \Carbon\Carbon::parse($monthlyStats->first_closed_at) : null;
+        $monthsActive = $firstClosed ? max(1, now()->diffInMonths($firstClosed) + 1) : 1;
+        $avgClosedPerMonth = round($stats['closed'] / $monthsActive, 1);
+
+        $stats['closed_this_month'] = $closedThisMonth;
+        $stats['closed_avg_per_month'] = $avgClosedPerMonth;
 
         // 3. Team list for Filter
         $team = User::whereIn('role', ['admin', 'supervisor', 'technician'])
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        // 4. Job Types for inline editing
+        $types = \App\Models\MaintenanceRequestType::where('is_active', true)
+            ->orderBy('sort_order')
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -106,9 +149,11 @@ class MaintenanceJobController extends Controller
             'list'   => $jobs,
             'stats'  => $stats,
             'team'   => $team,
+            'types'  => $types,
             'filter' => $filter,
             'status' => $status,
             'tech'   => $tech,
+            'typeId' => $typeId,
             'q'      => $q,
             'resp'   => $resp,
         ]);
@@ -124,7 +169,6 @@ class MaintenanceJobController extends Controller
         $userId = $user->id;
         $search = $request->search;
         $status = $request->status;
-        $prio   = $request->priority;
 
         $jobs = MR::with(['department', 'type', 'asset'])
             ->where(function ($q) use ($userId) {
@@ -147,14 +191,8 @@ class MaintenanceJobController extends Controller
                     $q->whereNotIn('status', [MR::STATUS_CLOSED]);
                 }
             })
-            ->when($prio, function ($q, $prio) {
-                if ($prio !== 'all') {
-                    $q->where('priority', $prio);
-                }
-            })
-            ->orderByRaw("CASE priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
             ->orderBy('created_at', 'desc')
-            ->paginate(12)
+            ->paginate(20)
             ->withQueryString();
 
         return response()->json(['data' => $jobs]);

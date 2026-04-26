@@ -17,6 +17,7 @@ class AuthServiceProvider extends ServiceProvider
         User::class => UserPolicy::class,
         MR::class => MaintenanceRequestPolicy::class,
         MaintenanceRequestType::class => MaintenanceRequestTypePolicy::class,
+        \App\Models\Asset::class => \App\Policies\AssetPolicy::class,
     ];
 
     public function boot(): void

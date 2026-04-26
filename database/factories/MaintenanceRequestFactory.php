@@ -12,8 +12,10 @@ class MaintenanceRequestFactory extends Factory
 {
     protected $model = MaintenanceRequest::class;
 
+    // กำหนดค่าเริ่มต้นให้กับ Model MaintenanceRequest
     public function definition(): array
     {
+        // สุ่มสถานะของใบแจ้งซ่อม
         $status = $this->faker->randomElement([
             MaintenanceRequest::STATUS_PENDING,
             MaintenanceRequest::STATUS_ACCEPTED,
@@ -22,17 +24,12 @@ class MaintenanceRequestFactory extends Factory
             MaintenanceRequest::STATUS_CLOSED,
         ]);
 
-        $priority = $this->faker->randomElement([
-            MaintenanceRequest::PRIORITY_LOW,
-            MaintenanceRequest::PRIORITY_MEDIUM,
-            MaintenanceRequest::PRIORITY_HIGH,
-            MaintenanceRequest::PRIORITY_URGENT,
-        ]);
-
+        // สุ่มวันที่แจ้งซ่อมย้อนหลังไม่เกิน 11 เดือน
         $requestDate = Carbon::instance(
             $this->faker->dateTimeBetween('-11 months', 'now')
         );
 
+        // คำนวณลำดับเวลา (Timestamp Waterfall) ตามสถานะของงาน
         $acknowledgedAt = in_array($status, ['accepted','in_progress','resolved','closed'], true)
             ? $requestDate->copy()->addHours(rand(1, 12))
             : null;
@@ -66,7 +63,6 @@ class MaintenanceRequestFactory extends Factory
             'title'         => 'แจ้งซ่อม: '.$this->faker->words(3, true),
             'description'   => $this->faker->sentence(12),
 
-            'priority'      => $priority,
             'status'        => $status,
 
             'technician_id' => $technicianId,

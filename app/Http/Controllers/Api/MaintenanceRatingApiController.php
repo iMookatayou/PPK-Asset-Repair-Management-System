@@ -16,7 +16,7 @@ class MaintenanceRatingApiController extends Controller
     /**
      * กำหนดช่วงเวลาที่อนุญาตให้ให้คะแนน (วัน)
      */
-    protected int $ratingDeadlineDays = 7;
+    protected int $ratingDeadlineDays = 30;
 
     /**
      * ดึง “งานที่รอการให้คะแนน” ของ user ปัจจุบัน

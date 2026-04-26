@@ -13,7 +13,7 @@ class AssetCategoryController extends Controller
 {
     public function index()
     {
-        $categories = AssetCategory::orderBy('name')->paginate(12);
+        $categories = AssetCategory::orderBy('name')->paginate(20);
 
         Log::info('[AssetCategory::index] listing', [
             'total'    => $categories->total(),
