@@ -14,10 +14,11 @@ use App\Models\MaintenanceRequest;
  */
 class MaintenanceLogSeeder extends Seeder
 {
+    // เริ่มต้นการรัน Seeder สำหรับสร้างประวัติการดำเนินงาน (Timeline Logs)
     public function run(): void
     {
         DB::transaction(function () {
-            // ดึงทั้งหมดทีละก้อน เผื่อโปรเจ็กต์จริงมีข้อมูลเยอะ
+            // ดึงข้อมูลใบแจ้งซ่อมทั้งหมดมาสร้าง Logs (แบ่งเป็นก้อนละ 200 รายการเพื่อประหยัดหน่วยความจำ)
             MaintenanceRequest::query()
                 ->orderBy('id')
                 ->chunk(200, function ($requests) {
@@ -50,7 +51,6 @@ class MaintenanceLogSeeder extends Seeder
             'action'     => 'created',
             'note'       => $this->makeNote('สร้างคำขอซ่อม', [
                 'title'    => $req->title,
-                'priority' => $req->priority,
                 'source'   => $req->source,
             ]),
             'created_at' => $req->request_date ?? $req->created_at,
@@ -62,7 +62,7 @@ class MaintenanceLogSeeder extends Seeder
                 'request_id' => $req->id,
                 'user_id'    => $req->technician_id,
                 'action'     => 'assigned',
-                'note'       => 'มอบหมายงานให้ช่างแล้ว',
+                'note'       => 'มอบหมายงานให้เจ้าหน้าที่แล้ว',
                 'created_at' => $req->assigned_date,
             ]);
         }
@@ -73,7 +73,7 @@ class MaintenanceLogSeeder extends Seeder
                 'request_id' => $req->id,
                 'user_id'    => $req->technician_id,
                 'action'     => 'accepted',
-                'note'       => 'ช่างรับงาน',
+                'note'       => 'เจ้าหน้าที่รับงาน',
                 'created_at' => $req->accepted_at,
             ]);
         }
@@ -95,7 +95,7 @@ class MaintenanceLogSeeder extends Seeder
                 'request_id' => $req->id,
                 'user_id'    => $req->technician_id,
                 'action'     => 'on_hold',
-                'note'       => 'พักงานชั่วคราว (รออะไหล่/รอผู้ใช้งาน)',
+                'note'       => 'หยุดการซ่อมบำรุงชั่วคราว (รออะไหล่/รอผู้ใช้งาน)',
                 'created_at' => $req->on_hold_at,
             ]);
         }
@@ -120,7 +120,7 @@ class MaintenanceLogSeeder extends Seeder
                 'request_id' => $req->id,
                 'user_id'    => $req->technician_id, // หรือผู้อนุมัติปิดงาน ถ้ามี
                 'action'     => 'closed',
-                'note'       => 'ปิดงานเรียบร้อย',
+                'note'       => 'อนุมัติผลการซ่อมบำรุงเรียบร้อยแล้ว',
                 'created_at' => $req->closed_at,
             ]);
         }

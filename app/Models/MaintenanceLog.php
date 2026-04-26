@@ -13,6 +13,8 @@ class MaintenanceLog extends Model
         'user_id',
         'action',
         'note',
+        'from_status',
+        'to_status',
     ];
 
     protected $casts = [

@@ -1,17 +1,24 @@
+import '@hotwired/turbo'
 import '../css/app.css'
 import Alpine from 'alpinejs'
 import SignaturePad from 'signature_pad'
 window.SignaturePad = SignaturePad
-import './nav-intro';
+import './sidebar-intro';
 import './bootstrap';
 import './repair/my-jobs';
-import '../css/repair/my-jobs.css';
 import './repair/dashboard';
-import '../css/repair/dashboard.css';
 
 // Initialize Alpine.js globally for Blade components using x-data/x-show
 window.Alpine = Alpine
-Alpine.start()
+
+// Alpine + Turbo: start Alpine once, let it observe DOM mutations for Turbo swaps
+document.addEventListener('turbo:load', () => {
+    if (!window.__alpineStarted) {
+        Alpine.start()
+        window.__alpineStarted = true
+    }
+});
+
 
 // SearchSelect component behavior: enhances div[data-ss]
 (() => {

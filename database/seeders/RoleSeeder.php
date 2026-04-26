@@ -7,8 +7,10 @@ use App\Models\Role;
 
 class RoleSeeder extends Seeder
 {
+    // เริ่มต้นการรัน Seeder สำหรับข้อมูลสิทธิ์ (Roles)
     public function run(): void
     {
+        // รายการ Roles พื้นฐานที่ใช้งานในระบบ
         $roles = [
             [
                 'code'       => 'admin',
@@ -42,7 +44,7 @@ class RoleSeeder extends Seeder
             ],
             [
                 'code'       => 'technician',
-                'name_th'    => 'ช่างซ่อมบำรุง',
+                'name_th'    => 'เจ้าหน้าที่ซ่อมบำรุง',
                 'name_en'    => 'Technician',
                 'sort_order' => 60,
             ],
@@ -54,10 +56,11 @@ class RoleSeeder extends Seeder
             ],
         ];
 
+        // วนลูปเพื่อบันทึกข้อมูล (ใช้ updateOrCreate เพื่อป้องกันข้อมูลซ้ำ)
         foreach ($roles as $r) {
             Role::updateOrCreate(
-                ['code' => $r['code']],
-                $r
+                ['code' => $r['code']], // ค้นหาด้วยรหัส code
+                $r                      // ข้อมูลที่จะอัปเดตหรือสร้างใหม่
             );
         }
     }

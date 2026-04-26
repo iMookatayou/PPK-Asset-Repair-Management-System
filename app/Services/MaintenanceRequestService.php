@@ -35,7 +35,7 @@ class MaintenanceRequestService
         $departmentId = $data['department_id'] ?? null;
 
         if (!$isTeam) {
-            $data['priority'] = 'medium';
+            // Priority default removed
         }
 
         if (!empty($data['asset_id'])) {
@@ -52,7 +52,6 @@ class MaintenanceRequestService
             $newReq = MR::create([
                 'title'          => $data['title'],
                 'description'    => $data['description'] ?? null,
-                'priority'       => $data['priority'],
                 'status'         => MR::STATUS_PENDING,
                 'request_date'   => now(),
                 'asset_id'       => $data['asset_id'] ?? null,
@@ -85,7 +84,6 @@ class MaintenanceRequestService
                     'id'         => $req->id,
                     'request_no' => $req->request_no ?? null,
                     'title'      => $req->title,
-                    'priority'   => $req->priority,
                     'status'     => $req->status,
                     'created_at' => $req->created_at?->toIso8601String(),
                 ]));
@@ -131,7 +129,6 @@ class MaintenanceRequestService
                 unset(
                     $data['technician_id'],
                     $data['user_ids'],
-                    $data['priority'],
                     $data['cost'],
                     $data['resolution_note'],
                     $data['operation_date'],

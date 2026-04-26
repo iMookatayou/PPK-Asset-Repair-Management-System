@@ -5,6 +5,12 @@ const parseJSON = (str, def = []) => {
     try { return JSON.parse(str); } catch (e) { return def; }
 };
 
+let _activeChart = null;
+let _rid = 0;
+function destroyActiveChart() { if (_activeChart) { _activeChart.destroy(); _activeChart = null; } }
+document.addEventListener('turbo:before-cache', destroyActiveChart);
+
+
 const DURATION = 1000;
 const EASING   = 'easeOutQuart';
 
@@ -22,9 +28,38 @@ function watchAndAnimate(canvas, chart) {
     io.observe(canvas);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function run() {
+    destroyActiveChart();
+    const rid = ++_rid;
     Chart.defaults.font.family = "'Inter', sans-serif";
     Chart.defaults.color       = '#747781';
+
+    const initCountUp = () => {
+        document.querySelectorAll('[data-countup]').forEach(el => {
+            const target = parseFloat(el.dataset.countup) || 0;
+            const decimals = (el.dataset.countup.split('.')[1] || '').length;
+            const suffix = el.dataset.suffix || '';
+            const dur = 1200;
+            let started = false;
+
+            const io = new IntersectionObserver((entries) => {
+                if (!entries[0].isIntersecting || started) return;
+                started = true;
+                io.disconnect();
+                const t0 = performance.now();
+                function tick(now) {
+                    const p = Math.min((now - t0) / dur, 1);
+                    const eased = p === 1 ? 1 : 1 - Math.pow(2, -10 * p);
+                    el.textContent = (target * eased).toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + suffix;
+                    if (p < 1) requestAnimationFrame(tick);
+                }
+                requestAnimationFrame(tick);
+            }, { threshold: 0.5 });
+            io.observe(el);
+        });
+    };
+
+    initCountUp();
 
     const tooltipDefaults = {
         backgroundColor : '#0F2D5C',
@@ -40,6 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     document.fonts.ready.then(() => {
+        if (rid !== _rid) return; // superseded — skip stale init
         /* ─── Chart ─── */
         const ctxEl = document.getElementById('techRatingChart');
         if (ctxEl) {
@@ -89,9 +125,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             max:         5,
                             ticks:       { stepSize: 1, font: { size: 11 } },
                             grid:        { color: '#f1f5f9' },
+                            grace:       '5%',
                         },
                         x: {
-                            ticks: { font: { size: 11 } },
+                            ticks: { font: { size: 11, weight: 'bold' } },
                             grid:  { display: false },
                         },
                     },
@@ -106,7 +143,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     },
                 },
             });
+            _activeChart = chart;
             watchAndAnimate(ctxEl, chart);
         }
     });
-});
+} // run()
+
+document.addEventListener('turbo:load', run);
+
+// Fallback: Turbo executes this lazy script AFTER turbo:load fires on first navigation.
+// Check for the chart canvas — if it's in DOM, run immediately.
+if (document.getElementById('techRatingChart')) {
+    run();
+}

@@ -1,458 +1,479 @@
 @php
-  /** @var \App\Models\MaintenanceRequest|null $req */
-  $req = $req ?? null;
+    /** @var \App\Models\MaintenanceRequest|null $req */
+    $req = $req ?? null;
 
-  $assets = is_iterable($assets ?? null) ? collect($assets) : collect();
-  $depts  = is_iterable($depts ?? null) ? collect($depts) : collect();
-  $types  = is_iterable($types ?? null) ? collect($types) : collect();
+    $assets = is_iterable($assets ?? null) ? collect($assets) : collect();
+    $depts = is_iterable($depts ?? null) ? collect($depts) : collect();
+    $types = is_iterable($types ?? null) ? collect($types) : collect();
 
-  $user   = auth()->user();
-  $isEdit = (bool) optional($req)->exists;
+    $user = auth()->user();
+    $isEdit = (bool) optional($req)->exists;
 
-  $line = "border-slate-200";
+    $line = 'border-slate-200';
 
-  $input = "mt-2 w-full h-11 rounded-md border $line bg-white px-3 py-2 text-sm
+    $input = "mt-2 w-full h-11 rounded-md border $line bg-white px-3 py-2 text-sm
             focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
 
-  $textarea = "mt-2 w-full rounded-md border $line bg-white px-3 py-2 text-sm
+    $textarea = "mt-2 w-full rounded-md border $line bg-white px-3 py-2 text-sm
               focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
 
-  $headCls   = "flex items-start gap-3 pb-3 min-h-[56px]";
-  $noCls     = "w-8 h-8 shrink-0 rounded-full border border-emerald-600 bg-emerald-600
+    $headCls = 'flex items-start gap-3 pb-3 min-h-[56px]';
+    $noCls = "w-8 h-8 shrink-0 rounded-full border border-emerald-600 bg-emerald-600
                 flex items-center justify-center text-sm font-bold text-white leading-none";
-  $titleCls  = "text-base font-semibold text-slate-900 leading-tight";
-  $subCls    = "text-sm text-slate-500 leading-snug";
-  $accentWrap= "min-w-0 relative pl-3 pt-[1px]";
-  $accentBar = "absolute left-0 top-[2px] w-[3px] h-9 rounded-full bg-emerald-600/90";
+    $titleCls = 'text-base font-semibold text-slate-900 leading-tight';
+    $subCls = 'text-sm text-slate-500 leading-snug';
+    $accentWrap = 'min-w-0 relative pl-3 pt-[1px]';
+    $accentBar = 'absolute left-0 top-[2px] w-[3px] h-9 rounded-full bg-emerald-600/90';
 
-  $v = function ($key, $default = '') use ($req) {
+    $v = function ($key, $default = '') use ($req) {
         $old = old($key);
-        if (!is_null($old)) return $old;
+        if (!is_null($old)) {
+            return $old;
+        }
 
         $modelVal = data_get($req, $key, null);
-        if (!is_null($modelVal)) return $modelVal;
+        if (!is_null($modelVal)) {
+            return $modelVal;
+        }
 
         $queryVal = request()->query($key, null);
-        if (!is_null($queryVal)) return $queryVal;
+        if (!is_null($queryVal)) {
+            return $queryVal;
+        }
 
         return $default;
     };
 @endphp
 
 <div class="mx-auto max-w-screen-2xl px-3 sm:px-6 lg:px-8">
-  <div class="space-y-10">
+    <div class="space-y-10">
 
-    <div class="relative grid grid-cols-1 lg:grid-cols-2 gap-10">
-      <div class="hidden lg:block absolute inset-y-0 left-1/2 w-px bg-slate-200"></div>
+        <div class="relative grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
+            <div class="hidden lg:block absolute inset-y-0 left-1/2 w-px bg-slate-200"></div>
 
-      <section>
-        <div class="{{ $headCls }}">
-          <div class="{{ $noCls }}">1</div>
-          <div class="{{ $accentWrap }}">
-            <span class="{{ $accentBar }}"></span>
-            <div class="{{ $titleCls }}">ข้อมูลหลัก</div>
-            <div class="{{ $subCls }}">ทรัพย์สิน / หน่วยงาน / สถานที่</div>
-          </div>
+            <section>
+                <div class="{{ $headCls }}">
+                    <div class="{{ $noCls }}">1</div>
+                    <div class="{{ $accentWrap }}">
+                        <span class="{{ $accentBar }}"></span>
+                        <div class="{{ $titleCls }}">ข้อมูลหลัก</div>
+                        <div class="{{ $subCls }}">ทรัพย์สิน / หน่วยงาน / สถานที่</div>
+                    </div>
+                </div>
+
+                <label class="block text-sm font-medium text-slate-700">
+                    ทรัพย์สิน <span class="text-rose-500 font-bold">*</span>
+                    <span
+                        class="ml-1 text-[11px] font-normal text-slate-500 italic">(ไม่จำเป็นต้องระบุหากไม่ได้ซ่อมครุภัณฑ์ในระบบ)</span>
+                </label>
+                <select name="asset_id" class="ts-basic mt-2 w-full" data-placeholder="— เลือกทรัพย์สิน —">
+                    <option value="">— ไม่ระบุ —</option>
+                    @foreach ($assets as $a)
+                        @php $label = trim(($a->asset_code ? $a->asset_code.' - ' : '').($a->name ?? '')); @endphp
+                        <option value="{{ $a->id }}" @selected((string) $v('asset_id') === (string) $a->id)>
+                            {{ $label ?: '—' }}
+                        </option>
+                    @endforeach
+                </select>
+
+                <label class="block text-sm font-medium text-slate-700 mt-4">หน่วยงาน</label>
+                <select name="department_id" class="ts-basic mt-2 w-full" data-placeholder="— เลือกหน่วยงาน —">
+                    <option value="">— ไม่ระบุ —</option>
+                    @foreach ($depts as $d)
+                        @php
+                            $deptName = $d->name_th ?: $d->name_en ?? '';
+                            $label = trim(($d->code ? $d->code . ' - ' : '') . $deptName);
+                        @endphp
+                        <option value="{{ $d->id }}" @selected((string) $v('department_id') === (string) $d->id)>
+                            {{ $label ?: '—' }}
+                        </option>
+                    @endforeach
+                </select>
+
+                <label class="block text-sm font-medium text-slate-700 mt-4">สถานที่ / ตำแหน่งงาน</label>
+                <input type="text" name="location_text" value="{{ $v('location_text') }}" autocomplete="off"
+                    class="{{ $input }}">
+            </section>
+
+            <section>
+                <div class="{{ $headCls }}">
+                    <div class="{{ $noCls }}">2</div>
+                    <div class="{{ $accentWrap }}">
+                        <span class="{{ $accentBar }}"></span>
+                        <div class="{{ $titleCls }}">รายละเอียดปัญหา</div>
+                        <div class="{{ $subCls }}">หัวข้อและอาการเสีย</div>
+                    </div>
+                </div>
+
+                <label class="block text-sm font-medium text-slate-700">
+                    ประเภทงาน (Report Type)
+                </label>
+                <select name="type_id" class="ts-basic mt-2 w-full" data-placeholder="— เลือกประเภทงาน —">
+                    <option value="">— ไม่ระบุ —</option>
+                    @foreach ($types as $t)
+                        <option value="{{ $t->id }}" @selected((string) $v('type_id') === (string) $t->id)>
+                            {{ $t->name }}
+                        </option>
+                    @endforeach
+                </select>
+
+                <label class="block text-sm font-medium text-slate-700 mt-4">
+                    หัวข้อ <span class="text-rose-600">*</span>
+                </label>
+                <input type="text" name="title" value="{{ $v('title') }}" autocomplete="off"
+                    class="{{ $input }}" required>
+
+                <label class="block text-sm font-medium text-slate-700 mt-4">รายละเอียด / อาการเสีย</label>
+                <textarea name="description" rows="6" class="{{ $textarea }}">{{ $v('description') }}</textarea>
+            </section>
         </div>
 
-        <label class="block text-sm font-medium text-slate-700">
-          ทรัพย์สิน <span class="text-rose-500 font-bold">*</span>
-          <span class="ml-1 text-[11px] font-normal text-slate-500 italic">(ไม่จำเป็นต้องระบุหากไม่ได้ซ่อมครุภัณฑ์ในระบบ)</span>
-        </label>
-        <select name="asset_id" class="ts-basic mt-2 w-full" data-placeholder="— เลือกทรัพย์สิน —">
-          <option value="">— ไม่ระบุ —</option>
-          @foreach($assets as $a)
-            @php $label = trim(($a->asset_code ? $a->asset_code.' - ' : '').($a->name ?? '')); @endphp
-            <option value="{{ $a->id }}" @selected((string)$v('asset_id') === (string)$a->id)>
-              {{ $label ?: '—' }}
-            </option>
-          @endforeach
-        </select>
+        <div class="border-t {{ $line }}"></div>
 
-        <label class="block text-sm font-medium text-slate-700 mt-4">หน่วยงาน</label>
-        <select name="department_id" class="ts-basic mt-2 w-full" data-placeholder="— เลือกหน่วยงาน —">
-          <option value="">— ไม่ระบุ —</option>
-          @foreach($depts as $d)
-            @php
-              $deptName = $d->name_th ?: ($d->name_en ?? '');
-              $label = trim(($d->code ? $d->code.' - ' : '').$deptName);
-            @endphp
-            <option value="{{ $d->id }}" @selected((string)$v('department_id') === (string)$d->id)>
-              {{ $label ?: '—' }}
-            </option>
-          @endforeach
-        </select>
+        <div class="relative grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
+            <div class="hidden lg:block absolute inset-y-0 left-1/2 w-px bg-slate-200"></div>
 
-        <label class="block text-sm font-medium text-slate-700 mt-4">สถานที่ / ตำแหน่งงาน</label>
-        <input type="text" name="location_text" value="{{ $v('location_text') }}" autocomplete="off" class="{{ $input }}">
-      </section>
+            <section>
+                <div class="{{ $headCls }}">
+                    <div class="{{ $noCls }}">3</div>
+                    <div class="{{ $accentWrap }}">
+                        <span class="{{ $accentBar }}"></span>
+                        <div class="{{ $titleCls }}">ข้อมูลผู้แจ้ง</div>
+                        <div class="{{ $subCls }}">ระบุข้อมูลและรายละเอียดการติดต่อของผู้แจ้ง</div>
+                    </div>
+                </div>
 
-      <section>
-        <div class="{{ $headCls }}">
-          <div class="{{ $noCls }}">2</div>
-          <div class="{{ $accentWrap }}">
-            <span class="{{ $accentBar }}"></span>
-            <div class="{{ $titleCls }}">รายละเอียดปัญหา</div>
-            <div class="{{ $subCls }}">หัวข้อและอาการเสีย</div>
-          </div>
-        </div>
+                <div class="grid grid-cols-1 gap-4">
+                    @if (!$isEdit && $user)
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">ผู้แจ้ง</label>
+                            <div
+                                class="mt-2 h-11 rounded-md border {{ $line }} bg-slate-50 px-3 flex items-center text-sm text-slate-700">
+                                {{ $user->name }}
+                            </div>
+                            <input type="hidden" name="reporter_name" value="{{ $user->name }}">
+                        </div>
 
-        <label class="block text-sm font-medium text-slate-700">
-          ประเภทงาน (Report Type)
-        </label>
-        <select name="type_id" class="ts-basic mt-2 w-full" data-placeholder="— เลือกประเภทงาน —">
-          <option value="">— ไม่ระบุ —</option>
-          @foreach($types as $t)
-            <option value="{{ $t->id }}" @selected((string)$v('type_id') === (string)$t->id)>
-              {{ $t->name }}
-            </option>
-          @endforeach
-        </select>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">เบอร์โทร (ถ้ามี)</label>
+                            <input type="text" name="reporter_phone" value="{{ $v('reporter_phone') }}"
+                                class="{{ $input }}">
+                        </div>
 
-        <label class="block text-sm font-medium text-slate-700 mt-4">
-          หัวข้อ <span class="text-rose-600">*</span>
-        </label>
-        <input type="text" name="title" value="{{ $v('title') }}" autocomplete="off" class="{{ $input }}" required>
-
-        <label class="block text-sm font-medium text-slate-700 mt-4">รายละเอียด / อาการเสีย</label>
-        <textarea name="description" rows="6" class="{{ $textarea }}">{{ $v('description') }}</textarea>
-      </section>
-    </div>
-
-    <div class="border-t {{ $line }}"></div>
-
-    <div class="relative grid grid-cols-1 lg:grid-cols-2 gap-10">
-      <div class="hidden lg:block absolute inset-y-0 left-1/2 w-px bg-slate-200"></div>
-
-      <section>
-        <div class="{{ $headCls }}">
-          <div class="{{ $noCls }}">3</div>
-          <div class="{{ $accentWrap }}">
-            <span class="{{ $accentBar }}"></span>
-            <div class="{{ $titleCls }}">ผู้แจ้ง &amp; ความสำคัญ</div>
-            <div class="{{ $subCls }}">ข้อมูลผู้แจ้ง + ระดับความสำคัญ</div>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 gap-4">
-          @if(!$isEdit && $user)
-            <div>
-              <label class="block text-sm font-medium text-slate-700">ผู้แจ้ง</label>
-              <div class="mt-2 h-11 rounded-md border {{ $line }} bg-slate-50 px-3 flex items-center text-sm text-slate-700">
-                {{ $user->name }}
-              </div>
-              <input type="hidden" name="reporter_name" value="{{ $user->name }}">
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-slate-700">เบอร์โทร (ถ้ามี)</label>
-              <input type="text" name="reporter_phone" value="{{ $v('reporter_phone') }}" class="{{ $input }}">
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-slate-700">อีเมล (ถ้ามี)</label>
-              <input type="email" name="reporter_email" value="{{ $v('reporter_email', $user->email) }}" class="{{ $input }}">
-            </div>
-          @else
-            <div>
-              <label class="block text-sm font-medium text-slate-700">ชื่อผู้แจ้ง</label>
-              <input type="text" name="reporter_name" value="{{ $v('reporter_name') }}" class="{{ $input }}">
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-slate-700">เบอร์โทร</label>
-              <input type="text" name="reporter_phone" value="{{ $v('reporter_phone') }}" class="{{ $input }}">
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-slate-700">อีเมล</label>
-              <input type="email" name="reporter_email" value="{{ $v('reporter_email') }}" class="{{ $input }}">
-            </div>
-          @endif
-        </div>
-
-        <label class="block text-sm font-medium text-slate-700 mt-4">
-          ระดับความสำคัญ <span class="text-rose-600">*</span>
-        </label>
-        @php 
-          $priority = $v('priority', 'medium'); 
-          $isTeam   = $user && ($user->isAdmin() || $user->isSupervisor() || $user->isTechnician());
-        @endphp
-
-        @if($isTeam)
-          <select name="priority" class="{{ $input }}" required>
-            <option value="low"    @selected($priority === 'low')>ต่ำ</option>
-            <option value="medium" @selected($priority === 'medium')>ปานกลาง</option>
-            <option value="high"   @selected($priority === 'high')>สูง</option>
-            <option value="urgent" @selected($priority === 'urgent')>เร่งด่วน</option>
-          </select>
-        @else
-          <div class="mt-2 h-11 rounded-md border {{ $line }} bg-slate-50 px-3 flex items-center text-sm text-slate-700">
-            @php
-              $pLabels = ['low' => 'ต่ำ', 'medium' => 'ปานกลาง', 'high' => 'สูง', 'urgent' => 'เร่งด่วน'];
-            @endphp
-            {{ $pLabels[$priority] ?? 'ปานกลาง' }}
-          </div>
-          <input type="hidden" name="priority" value="{{ $priority }}">
-        @endif
-      </section>
-
-      <section>
-        <div class="{{ $headCls }}">
-          <div class="{{ $noCls }}">4</div>
-          <div class="{{ $accentWrap }}">
-            <span class="{{ $accentBar }}"></span>
-            <div class="{{ $titleCls }}">ไฟล์แนบ</div>
-            <div class="{{ $subCls }}">แนบไฟล์ / ถ่ายรูปจากมือถือ</div>
-          </div>
-        </div>
-
-        @php $attachments = is_iterable($attachments ?? null) ? $attachments : []; @endphp
-
-        @if($isEdit && !empty($attachments) && count($attachments))
-          <div class="mb-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
-            <p class="text-[13px] font-semibold text-slate-700 mb-4 flex items-center gap-2">
-                <svg class="h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-                </svg>
-                ไฟล์ที่มีอยู่แล้ว ({{ count($attachments) }})
-            </p>
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              @foreach($attachments as $att)
-                @php
-                    $file = $att->file;
-                    $name = $att->original_name ?? ($file?->path ?? 'file');
-                    $isPrivate = (bool) ($att->is_private ?? false);
-                    $mime = $file?->mime ?? '';
-                    $isImg = $mime && str_starts_with($mime, 'image/');
-                    $publicUrl = null;
-                    if ($file && ($file->disk ?? null) && ($file->path ?? null)) {
-                        try {
-                            $disk = \Illuminate\Support\Facades\Storage::disk($file->disk);
-                            $publicUrl = $disk->url($file->path);
-                        } catch (\Throwable $e) { $publicUrl = null; }
-                    }
-                    $canOpenPrivate = auth()->check() && auth()->user()->can('update', $req ?? null);
-                    $canOpen = !$isPrivate || $canOpenPrivate;
-                    $openUrl = $publicUrl;
-                    try { $openUrl = route('attachments.show', $att); } catch (\Throwable $e) { $openUrl = $publicUrl; }
-                @endphp
-                <figure class="overflow-hidden rounded-lg border {{ $line }} bg-white text-xs flex flex-col shadow-sm hover:shadow-md transition">
-                    @if ($canOpen && $openUrl)
-                        <a href="{{ $openUrl }}" target="_blank" rel="noopener" class="block overflow-hidden group border-b border-slate-100">
-                            @if ($isImg)
-                                <img src="{{ $openUrl }}" alt="{{ $att->alt_text ?? $name }}"
-                                    class="h-24 w-full object-cover transition-transform duration-300 group-hover:scale-105">
-                            @else
-                                <div class="grid h-24 w-full place-items-center bg-slate-50 text-slate-500 text-[15px] font-bold group-hover:bg-slate-100 transition-colors">
-                                    {{ strtoupper(pathinfo($name, PATHINFO_EXTENSION) ?: 'FILE') }}
-                                </div>
-                            @endif
-                        </a>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">อีเมล (ถ้ามี)</label>
+                            <input type="email" name="reporter_email"
+                                value="{{ $v('reporter_email', $user->email) }}" class="{{ $input }}">
+                        </div>
                     @else
-                        <div class="grid h-24 w-full place-items-center bg-slate-50 text-slate-400 text-[13px] font-bold border-b border-slate-100">
-                            LOCKED
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">ชื่อผู้แจ้ง</label>
+                            <input type="text" name="reporter_name" value="{{ $v('reporter_name') }}"
+                                class="{{ $input }}">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">เบอร์โทร</label>
+                            <input type="text" name="reporter_phone" value="{{ $v('reporter_phone') }}"
+                                class="{{ $input }}">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">อีเมล</label>
+                            <input type="email" name="reporter_email" value="{{ $v('reporter_email') }}"
+                                class="{{ $input }}">
                         </div>
                     @endif
-                    <figcaption class="px-3 py-2 space-y-1.5 flex-1 flex flex-col justify-between">
-                        <div class="space-y-1">
-                            <div class="flex items-center gap-1.5">
-                                <span class="inline-flex items-center rounded-md px-1 py-0.5 text-[8.5px] font-bold uppercase tracking-wide {{ $isPrivate ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600' }}">
-                                    {{ $isPrivate ? 'Private' : 'Public' }}
-                                </span>
-                            </div>
-                            <div class="text-[11px] font-medium text-slate-700 line-clamp-1" title="{{ $name }}">{{ $name }}</div>
+                </div>
+
+                @php
+                    $isTeam = $user && ($user->isAdmin() || $user->isSupervisor() || $user->isTechnician());
+                @endphp
+            </section>
+
+            <section>
+                <div class="{{ $headCls }}">
+                    <div class="{{ $noCls }}">4</div>
+                    <div class="{{ $accentWrap }}">
+                        <span class="{{ $accentBar }}"></span>
+                        <div class="{{ $titleCls }}">ไฟล์แนบ</div>
+                        <div class="{{ $subCls }}">แนบไฟล์ / ถ่ายรูปจากมือถือ</div>
+                    </div>
+                </div>
+
+                @php $attachments = is_iterable($attachments ?? null) ? $attachments : []; @endphp
+
+                @if ($isEdit && !empty($attachments) && count($attachments))
+                    <div class="mb-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                        <p class="text-[13px] font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                            <svg class="h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2">
+                                <path d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                            </svg>
+                            ไฟล์ที่มีอยู่แล้ว ({{ count($attachments) }})
+                        </p>
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                            @foreach ($attachments as $att)
+                                @php
+                                    $file = $att->file;
+                                    $name = $att->original_name ?? ($file?->path ?? 'file');
+                                    $isPrivate = (bool) ($att->is_private ?? false);
+                                    $mime = $file?->mime ?? '';
+                                    $isImg = $mime && str_starts_with($mime, 'image/');
+                                    $publicUrl = null;
+                                    if ($file && ($file->disk ?? null) && ($file->path ?? null)) {
+                                        try {
+                                            $disk = \Illuminate\Support\Facades\Storage::disk($file->disk);
+                                            $publicUrl = $disk->url($file->path);
+                                        } catch (\Throwable $e) {
+                                            $publicUrl = null;
+                                        }
+                                    }
+                                    $canOpenPrivate =
+                                        auth()->check() &&
+                                        auth()
+                                            ->user()
+                                            ->can('update', $req ?? null);
+                                    $canOpen = !$isPrivate || $canOpenPrivate;
+                                    $openUrl = $publicUrl;
+                                    try {
+                                        $openUrl = route('attachments.show', $att);
+                                    } catch (\Throwable $e) {
+                                        $openUrl = $publicUrl;
+                                    }
+                                @endphp
+                                <figure
+                                    class="overflow-hidden rounded-md border {{ $line }} bg-white text-xs flex flex-col hover: transition">
+                                    @if ($canOpen && $openUrl)
+                                        <a href="{{ $openUrl }}" target="_blank" rel="noopener"
+                                            class="block overflow-hidden group border-b border-slate-100">
+                                            @if ($isImg)
+                                                <img src="{{ $openUrl }}" alt="{{ $att->alt_text ?? $name }}"
+                                                    class="h-24 w-full object-cover transition-transform duration-300 group-hover:scale-105">
+                                            @else
+                                                <div
+                                                    class="grid h-24 w-full place-items-center bg-slate-50 text-slate-500 text-[15px] font-bold group-hover:bg-slate-100 transition-colors">
+                                                    {{ strtoupper(pathinfo($name, PATHINFO_EXTENSION) ?: 'FILE') }}
+                                                </div>
+                                            @endif
+                                        </a>
+                                    @else
+                                        <div
+                                            class="grid h-24 w-full place-items-center bg-slate-50 text-slate-400 text-[13px] font-bold border-b border-slate-100">
+                                            LOCKED
+                                        </div>
+                                    @endif
+                                    <figcaption class="px-3 py-2 space-y-1.5 flex-1 flex flex-col justify-between">
+                                        <div class="space-y-1">
+                                            <div class="flex items-center gap-1.5">
+                                                <span
+                                                    class="inline-flex items-center rounded-md px-1 py-0.5 text-[8.5px] font-bold uppercase tracking-wide {{ $isPrivate ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600' }}">
+                                                    {{ $isPrivate ? 'Private' : 'Public' }}
+                                                </span>
+                                            </div>
+                                            <div class="text-[11px] font-medium text-slate-700 line-clamp-1"
+                                                title="{{ $name }}">{{ $name }}</div>
+                                        </div>
+                                        <div class="pt-2 mt-2 border-t border-slate-50 flex items-center justify-end">
+                                            <label
+                                                class="inline-flex items-center gap-1.5 cursor-pointer bg-rose-50 px-2 py-1 rounded-md border border-rose-100 hover:bg-rose-100 transition">
+                                                <input type="checkbox" name="remove_attachments[]"
+                                                    value="{{ $att->id }}"
+                                                    class="w-3.5 h-3.5 rounded border-slate-300 text-rose-600 focus:ring-rose-200">
+                                                <span class="text-[10px] font-semibold text-rose-700">เลือกลบ</span>
+                                            </label>
+                                        </div>
+                                    </figcaption>
+                                </figure>
+                            @endforeach
                         </div>
-                        <div class="pt-2 mt-2 border-t border-slate-50 flex items-center justify-end">
-                            <label class="inline-flex items-center gap-1.5 cursor-pointer bg-rose-50 px-2 py-1 rounded-md border border-rose-100 hover:bg-rose-100 transition">
-                                <input type="checkbox" name="remove_attachments[]" value="{{ $att->id }}" class="w-3.5 h-3.5 rounded border-slate-300 text-rose-600 focus:ring-rose-200">
-                                <span class="text-[10px] font-semibold text-rose-700">เลือกลบ</span>
-                            </label>
+                    </div>
+                @endif
+
+                <input id="mr_files_submit" type="file" name="files[]" multiple class="hidden">
+                <input id="mr_files_any" type="file" multiple accept="image/*,application/pdf" class="hidden">
+                <input id="mr_files_camera" type="file" accept="image/*" capture="environment" class="hidden">
+
+                <div class="space-y-3">
+                    <div class="flex items-center gap-3">
+                        {{-- ปุ่มแนบไฟล์ (Icon Only) --}}
+                        <button type="button" id="mr_files_any_btn"
+                            class="inline-flex items-center justify-center h-12 w-12 rounded-xl border {{ $line }} bg-white
+                             text-slate-600 hover:bg-slate-50 hover:text-[#0F2D5C] hover:border-slate-300
+                             focus:outline-none focus:ring-4 focus:ring-emerald-50 transition-all active:scale-95 "
+                            title="แนบไฟล์เอกสาร">
+                            <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M21 11.5l-8.5 8.5a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.7-8.7"
+                                    stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </button>
+
+                        {{-- ปุ่มกล้อง (Icon Only) --}}
+                        <button type="button" id="mr_files_camera_btn"
+                            class="inline-flex items-center justify-center h-12 w-12 rounded-xl border {{ $line }} bg-white
+                             text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200 focus:outline-none focus:ring-4 focus:ring-emerald-50 
+                             transition-all active:scale-95 "
+                            aria-label="ถ่ายรูป" title="ถ่ายรูปจากกล้อง">
+                            <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                aria-hidden="true">
+                                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                                <circle cx="12" cy="13" r="4" />
+                            </svg>
+                        </button>
+
+                        <div class="text-[11px] sm:text-[12px] text-slate-500 font-medium leading-tight">
+                            รองรับรูปภาพ / PDF <br class="sm:hidden"> (แนบไฟล์ หรือ ถ่ายรูป)
                         </div>
-                    </figcaption>
-                </figure>
-              @endforeach
-            </div>
-          </div>
-        @endif
+                    </div>
+                </div>
 
-        <input id="mr_files_submit"
-               type="file"
-               name="files[]"
-               multiple
-               class="hidden">
+                {{-- Preview list --}}
+                <div id="mr_files_preview" class="mt-3 hidden">
+                    <div class="text-xs font-medium text-slate-600">ไฟล์ที่เลือก</div>
+                    <div id="mr_files_list"
+                        class="mt-2 divide-y divide-slate-200 rounded-md border {{ $line }} bg-white"></div>
+                </div>
 
-        <input id="mr_files_any"
-               type="file"
-               multiple
-               accept="image/*,application/pdf"
-               class="hidden">
-
-        <input id="mr_files_camera"
-               type="file"
-               accept="image/*"
-               capture="environment"
-               class="hidden">
-
-        <div class="flex items-center gap-2">
-          {{-- ปุ่มแนบไฟล์ --}}
-          <button type="button"
-                  id="mr_files_any_btn"
-                  class="inline-flex items-center justify-center h-11 px-4 rounded-md border {{ $line }} bg-white
-                         text-sm font-medium text-slate-700 hover:bg-slate-50
-                         focus:outline-none focus:ring-2 focus:ring-emerald-100">
-            <svg class="h-4 w-4 mr-2 text-slate-600" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M21 11.5l-8.5 8.5a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.7-8.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            แนบไฟล์
-          </button>
-
-          {{-- ปุ่มกล้อง --}}
-          <button type="button"
-                  id="mr_files_camera_btn"
-                  class="inline-flex items-center justify-center h-11 w-11 rounded-md border {{ $line }} bg-white
-                         hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                  aria-label="ถ่ายรูป">
-            <svg class="h-5 w-5 text-emerald-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-              <circle cx="12" cy="13" r="4"/>
-            </svg>
-          </button>
-
-          <div class="min-w-0">
-            <div class="text-xs text-slate-600">รองรับรูปภาพ และ PDF (แนบไฟล์) / ถ่ายรูป (กล้อง)</div>
-          </div>
-        </div>
-
-        {{-- Preview list --}}
-        <div id="mr_files_preview" class="mt-3 hidden">
-          <div class="text-xs font-medium text-slate-600">ไฟล์ที่เลือก</div>
-          <div id="mr_files_list" class="mt-2 divide-y divide-slate-200 rounded-md border {{ $line }} bg-white"></div>
-        </div>
-
-        <div class="mt-2 p-3 rounded-md bg-amber-50 border border-amber-200">
-          <div class="flex gap-2">
-            <svg class="h-5 w-5 text-amber-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <div class="text-xs text-amber-800 space-y-1">
-              <p class="font-bold">เงื่อนไขการแนบไฟล์และแก้ไขข้อมูล:</p>
-              <ul class="list-disc ml-4 space-y-0.5">
-                <li>จำกัดจำนวนไฟล์แนบสูงสุด 3 ไฟล์ต่อใบงาน</li>
-                <li>ผู้แจ้งซ่อมสามารถแก้ไขข้อมูลและไฟล์แนบได้เฉพาะก่อนช่างรับทราบงาน</li>
-                <li>เมื่อใบงานถูกปิดหรือช่างเริ่มดำเนินการแล้ว จะไม่สามารถแก้ไขข้อมูลพื้นฐานได้</li>
-              </ul>
-            </div>
-          </div>
-        </div>
+                <div class="mt-3 p-3 rounded-md bg-amber-50 border border-amber-200">
+                    <div class="flex gap-2">
+                        <svg class="h-5 w-5 text-amber-600 shrink-0" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2">
+                            <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round"
+                                stroke-linejoin="round" />
+                        </svg>
+                        <div class="text-xs text-amber-800 space-y-1">
+                            <p class="font-bold">เงื่อนไขการแนบไฟล์และแก้ไขข้อมูล:</p>
+                            <ul class="list-disc ml-4 space-y-0.5">
+                                <li>จำกัดจำนวนไฟล์แนบสูงสุด 3 ไฟล์ต่อใบงาน</li>
+                                <li>ผู้แจ้งสามารถแก้ไขข้อมูลและไฟล์แนบได้เฉพาะก่อนเจ้าหน้าที่รับทราบงาน</li>
+                                <li>เมื่อใบงานถูกปิดหรือเจ้าหน้าที่เริ่มดำเนินการแล้ว จะไม่สามารถแก้ไขข้อมูลพื้นฐานได้
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
 
 
-        <script>
-          (function () {
-            const anyInput = document.getElementById('mr_files_any');
-            const camInput = document.getElementById('mr_files_camera');
-            const anyBtn = document.getElementById('mr_files_any_btn');
-            const camBtn = document.getElementById('mr_files_camera_btn');
-            const preview = document.getElementById('mr_files_preview');
-            const list = document.getElementById('mr_files_list');
+                <script>
+                    (function() {
+                        const anyInput = document.getElementById('mr_files_any');
+                        const camInput = document.getElementById('mr_files_camera');
+                        const anyBtn = document.getElementById('mr_files_any_btn');
+                        const camBtn = document.getElementById('mr_files_camera_btn');
+                        const preview = document.getElementById('mr_files_preview');
+                        const list = document.getElementById('mr_files_list');
 
-            if (!anyInput || !camInput || !anyBtn || !camBtn || !preview || !list) return;
+                        if (!anyInput || !camInput || !anyBtn || !camBtn || !preview || !list) return;
 
-            let filesBag = [];
+                        let filesBag = [];
 
-            const keyOf = (f) => `${f.name}|${f.size}|${f.type}|${f.lastModified || 0}`;
+                        const keyOf = (f) => `${f.name}|${f.size}|${f.type}|${f.lastModified || 0}`;
 
-            const syncToInputs = () => {
-              // สร้าง FileList ใหม่ให้ mr_files_submit เพื่อ submit ทีเดียว (รวมทั้งจากกล้องด้วย)
-              const dt = new DataTransfer();
-              filesBag.forEach(f => dt.items.add(f));
-              document.getElementById('mr_files_submit').files = dt.files;
-            };
+                        const syncToInputs = () => {
+                            // สร้าง FileList ใหม่ให้ mr_files_submit เพื่อ submit ทีเดียว (รวมทั้งจากกล้องด้วย)
+                            const dt = new DataTransfer();
+                            filesBag.forEach(f => dt.items.add(f));
+                            document.getElementById('mr_files_submit').files = dt.files;
+                        };
 
-            const render = () => {
-              list.innerHTML = '';
-              if (!filesBag.length) {
-                preview.classList.add('hidden');
-                return;
-              }
-              preview.classList.remove('hidden');
+                        const render = () => {
+                            list.innerHTML = '';
+                            if (!filesBag.length) {
+                                preview.classList.add('hidden');
+                                return;
+                            }
+                            preview.classList.remove('hidden');
 
-              filesBag.forEach((f, idx) => {
-                const card = document.createElement('div');
-                card.className = 'p-2.5 rounded-lg border border-slate-200 bg-white flex justify-between items-center shadow-sm';
-                card.innerHTML = `<div class="flex items-center gap-2 min-w-0 transition-all">
+                            filesBag.forEach((f, idx) => {
+                                const card = document.createElement('div');
+                                card.className =
+                                    'p-2.5 rounded-md border border-slate-200 bg-white flex justify-between items-center ';
+                                card.innerHTML = `<div class="flex items-center gap-2 min-w-0 transition-all">
                     <span class="truncate text-[12px] font-medium text-slate-700">${f.name}</span>
                     <span class="text-[10px] text-slate-400">${(f.size/1024).toFixed(1)}KB</span>
                 </div>
                 <button type="button" class="text-rose-600 hover:text-rose-700 text-[11px] font-semibold">ลบ</button>`;
-                
-                card.querySelector('button').addEventListener('click', () => {
-                  filesBag.splice(idx, 1);
-                  syncToInputs();
-                  render();
-                });
 
-                list.appendChild(card);
-              });
-            };
+                                card.querySelector('button').addEventListener('click', () => {
+                                    filesBag.splice(idx, 1);
+                                    syncToInputs();
+                                    render();
+                                });
 
-            const addFiles = (files) => {
-              const arr = Array.from(files || []);
-              if (!arr.length) return;
+                                list.appendChild(card);
+                            });
+                        };
 
-              const map = new Map(filesBag.map(f => [keyOf(f), f]));
-              arr.forEach(f => map.set(keyOf(f), f));
+                        const addFiles = (files) => {
+                            const arr = Array.from(files || []);
+                            if (!arr.length) return;
 
-              const existingCount = {{ isset($attachments) && is_iterable($attachments) ? count($attachments) : 0 }};
-              const maxAllowed = Math.max(0, 3 - existingCount);
+                            const map = new Map(filesBag.map(f => [keyOf(f), f]));
+                            arr.forEach(f => map.set(keyOf(f), f));
 
-              if (map.size > maxAllowed) {
-                window.dispatchEvent(new CustomEvent('app:toast', {
-                  detail: { type: 'warning', message: 'สามารถแนบไฟล์เพิ่มได้อีก ' + maxAllowed + ' ไฟล์ (สูงสุด 3 ไฟล์ต่อใบงาน)' }
-                }));
-              }
-              filesBag = Array.from(map.values()).slice(0, maxAllowed); // กันเกินโควต้า
-              syncToInputs();
-              render();
-            };
+                            const existingCount =
+                                {{ isset($attachments) && is_iterable($attachments) ? count($attachments) : 0 }};
+                            const maxAllowed = Math.max(0, 3 - existingCount);
 
-            anyBtn.addEventListener('click', () => {
-              anyInput.click();
-            });
+                            if (map.size > maxAllowed) {
+                                window.dispatchEvent(new CustomEvent('app:toast', {
+                                    detail: {
+                                        type: 'warning',
+                                        message: 'สามารถแนบไฟล์เพิ่มได้อีก ' + maxAllowed +
+                                            ' ไฟล์ (สูงสุด 3 ไฟล์ต่อใบงาน)'
+                                    }
+                                }));
+                            }
+                            filesBag = Array.from(map.values()).slice(0, maxAllowed); // กันเกินโควต้า
+                            syncToInputs();
+                            render();
+                        };
 
-            camBtn.addEventListener('click', () => {
-              camInput.click();
-            });
+                        anyBtn.addEventListener('click', () => {
+                            anyInput.click();
+                        });
 
-            anyInput.addEventListener('change', () => {
-              addFiles(anyInput.files);
-              // reset ค่า เพื่อเลือกไฟล์เดิมซ้ำได้
-              anyInput.value = '';
-            });
+                        camBtn.addEventListener('click', () => {
+                            camInput.click();
+                        });
 
-            camInput.addEventListener('change', () => {
-              addFiles(camInput.files);
-              camInput.value = '';
-            });
+                        anyInput.addEventListener('change', () => {
+                            addFiles(anyInput.files);
+                            // reset ค่า เพื่อเลือกไฟล์เดิมซ้ำได้
+                            anyInput.value = '';
+                        });
 
-            // ถ้ามีไฟล์จาก old() (กรณี validation fail) เราไม่สามารถ restore file ได้ด้วยเบราว์เซอร์
-          })();
-        </script>
-      </section>
+                        camInput.addEventListener('change', () => {
+                            addFiles(camInput.files);
+                            camInput.value = '';
+                        });
+
+                        // ถ้ามีไฟล์จาก old() (กรณี validation fail) เราไม่สามารถ restore file ได้ด้วยเบราว์เซอร์
+                    })();
+                </script>
+            </section>
+        </div>
+
     </div>
-
-  </div>
 </div>
 
-<div class="flex justify-end gap-2 pt-4 mt-6 border-t {{ $line }}">
-  <a href="{{ route('maintenance.requests.index') }}"
-     class="inline-flex items-center justify-center h-10 px-4 rounded-lg border {{ $line }} bg-white
-            text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-    ยกเลิก
-  </a>
-  <button type="submit"
-          class="inline-flex items-center justify-center h-10 px-4 rounded-lg bg-emerald-600
-                 text-sm font-medium text-white hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-200 transition-all">
-    {{ $isEdit ? 'บันทึกการแก้ไข' : 'บันทึก' }}
-  </button>
+<div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-6 mt-10 border-t {{ $line }}">
+    <a href="{{ route('maintenance.requests.index') }}"
+        class="inline-flex items-center justify-center gap-1.5 h-11 sm:h-9 px-6 sm:px-3 rounded border {{ $line }} bg-white
+            text-[14px] sm:text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-all ">
+        <span class="material-symbols-outlined text-[18px] sm:text-[17px]">close</span>
+        ยกเลิก
+    </a>
+    <button type="submit"
+        class="inline-flex items-center justify-center overflow-hidden rounded bg-emerald-600 text-[14px] sm:text-[13px] font-bold text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-200 transition-all active:scale-95 group h-11 sm:h-auto">
+        <span
+            class="hidden sm:flex px-2.5 py-2 bg-black/10 items-center justify-center text-white/90 group-hover:text-white border-r border-white/10 h-full">
+            <span class="material-symbols-outlined text-[17px]">{{ $isEdit ? 'save' : 'send' }}</span>
+        </span>
+        <span class="px-6 py-2 leading-none flex items-center gap-2">
+            <span class="sm:hidden material-symbols-outlined text-[18px]">{{ $isEdit ? 'save' : 'send' }}</span>
+            {{ $isEdit ? 'บันทึกการแก้ไข' : 'ส่งใบแจ้งซ่อมบำรุง' }}
+        </span>
+    </button>
 </div>

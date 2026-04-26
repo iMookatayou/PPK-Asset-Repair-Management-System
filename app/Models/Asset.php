@@ -210,12 +210,14 @@ class Asset extends Model
 
     public function scopeLocation($q, ?string $location)
     {
-        return $location ? $q->where('location', $location) : $q;
+        $location = trim((string) $location);
+        return $location !== '' ? $q->where('location', 'like', "%{$location}%") : $q;
     }
 
     public function scopeType($q, ?string $type)
     {
-        return $type ? $q->where('type', $type) : $q;
+        $type = trim((string) $type);
+        return $type !== '' ? $q->where('type', 'like', "%{$type}%") : $q;
     }
 
     public function scopeSortBySafe($q, ?string $by, string $dir = 'desc')

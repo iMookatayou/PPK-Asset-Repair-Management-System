@@ -18,9 +18,35 @@ class ChatController extends Controller
             ->with(['latestMessage' => fn($qq) => $qq->with('user:id,name')])
             ->when($q, fn($qq) => $qq->where('title', 'like', "%{$q}%"))
             ->orderByDesc('created_at')
-            ->paginate(15);
+            ->paginate(15)
+            ->withQueryString();
 
-        return view('chat.index', compact('threads'));
+        $activeThreadId = $r->integer('thread_id');
+        $activeThread = null;
+        $messages = collect();
+        $totalMessages = 0;
+        $lastAt = null;
+
+        if ($activeThreadId) {
+            $activeThread = ChatThread::find($activeThreadId);
+            if ($activeThread) {
+                $messages = $activeThread->messages()
+                    ->with('user:id,name')
+                    ->latest('created_at')
+                    ->take(50)
+                    ->get()
+                    ->reverse()
+                    ->values();
+
+                $totalMessages = $activeThread->messages()->count();
+                $lastAt = $messages->last()?->created_at ?? $activeThread->created_at;
+            }
+        }
+
+        $me = Auth::user();
+        $canManageLock = $me && $me->role !== 'member';
+
+        return view('chat.index', compact('threads', 'activeThread', 'messages', 'totalMessages', 'lastAt', 'me', 'canManageLock'));
     }
 
     public function storeThread(Request $r)
@@ -35,20 +61,18 @@ class ChatController extends Controller
             'is_locked' => false,
         ]);
 
-        return redirect()->route('chat.show', $thread);
+        session(['toast' => [
+            'type' => 'success',
+            'message' => 'สร้างกระทู้ใหม่เรียบร้อยแล้ว',
+            'title' => 'บันทึกสำเร็จ'
+        ]]);
+
+        return redirect()->route('chat.index', ['thread_id' => $thread->id]);
     }
 
     public function show(ChatThread $thread)
     {
-        $messages = $thread->messages()
-            ->with('user:id,name')
-            ->latest('created_at')
-            ->take(50)
-            ->get()
-            ->reverse()
-            ->values();
-
-        return view('chat.show', compact('thread', 'messages'));
+        return redirect()->route('chat.index', ['thread_id' => $thread->id]);
     }
 
     public function messages(Request $r, ChatThread $thread)
@@ -100,7 +124,7 @@ class ChatController extends Controller
                 $q->with('user:id,name')->latest('id')->limit(1);
             }])
             ->latest('updated_at')
-            ->limit(30)
+            ->limit(15)
             ->get();
 
         $items = $threads->map(function ($t) {
@@ -111,6 +135,7 @@ class ChatController extends Controller
                 'show_url'        => route('chat.show', $t),
                 'unread'          => 0, // ถ้าอยากนับ unread จริง ๆ ค่อยต่อ logic เพิ่มทีหลัง
                 'last_user_name'  => $last?->user?->name,
+                'last_user_avatar'=> $last?->user?->avatar_thumb_url,
                 'last_body'       => $last?->body,
                 'last_created_at' => optional($last?->created_at)->toIso8601String(),
             ];
@@ -128,7 +153,13 @@ class ChatController extends Controller
         $thread->is_locked = true;
         $thread->save();
 
-        return back()->with('status', 'ล็อกกระทู้เรียบร้อยแล้ว');
+        session(['toast' => [
+            'type' => 'success',
+            'message' => 'ล็อกกระทู้เรียบร้อยแล้ว ผู้ใช้อื่นจะไม่สามารถส่งข้อความได้',
+            'title' => 'Lock Thread'
+        ]]);
+
+        return back();
     }
 
     public function unlock(ChatThread $thread)
@@ -138,7 +169,32 @@ class ChatController extends Controller
         $thread->is_locked = false;
         $thread->save();
 
-        return back()->with('status', 'ปลดล็อกกระทู้เรียบร้อยแล้ว');
+        session(['toast' => [
+            'type' => 'success',
+            'message' => 'ปลดล็อกกระทู้เรียบร้อยแล้ว เปิดรับการสนทนาตามปกติ',
+            'title' => 'Unlock Thread'
+        ]]);
+
+        return back();
+    }
+
+    public function destroy(ChatThread $thread)
+    {
+        $user = Auth::user();
+
+        if (! $user || $user->role !== 'admin') {
+            abort(403, 'Forbidden. Only administrators can delete threads.');
+        }
+
+        $thread->delete();
+
+        session(['toast' => [
+            'type' => 'success',
+            'message' => 'ลบกระทู้เรียบร้อยแล้ว ข้อมูลทั้งหมดถูกซ่อนจากระบบ',
+            'title' => 'Delete Thread'
+        ]]);
+
+        return redirect()->route('chat.index');
     }
 
     protected function authorizeLocking(ChatThread $thread): void

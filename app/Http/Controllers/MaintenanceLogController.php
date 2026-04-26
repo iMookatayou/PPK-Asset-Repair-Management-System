@@ -28,7 +28,7 @@ class MaintenanceLogController extends Controller
             ])
             ->with(['user:id,name'])
             ->latest('created_at')
-            ->paginate(50);
+            ->paginate(20);
 
         Log::info('[MaintenanceLog::index] listed logs', [
             'request_id' => $req->id,

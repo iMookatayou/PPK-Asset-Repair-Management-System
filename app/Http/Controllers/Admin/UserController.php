@@ -77,7 +77,7 @@ class UserController extends Controller
 
         $list = $q
             ->orderBy('name')
-            ->paginate(20)
+            ->paginate(15)
             ->withQueryString();
 
         // dropdown หน่วยงาน

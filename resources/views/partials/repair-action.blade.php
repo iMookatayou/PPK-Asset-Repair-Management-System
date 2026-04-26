@@ -13,7 +13,7 @@
     <input type="hidden" name="technician_id" value="{{ auth()->id() }}">
   @endif
   <button type="submit"
-          class="rounded-lg px-3 py-1.5 text-xs font-medium text-white focus:outline-none focus:ring-2 {{ $class }}">
+          class="rounded-md px-3 py-1.5 text-xs font-medium text-white focus:outline-none focus:ring-2 {{ $class }}">
     {{ $label }}
   </button>
 </form>

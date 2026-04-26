@@ -1,156 +1,48 @@
-<p align="center">
-  <img src="imagesREADME/PPK.png" width="200" alt="PPK Logo">
-</p>
+# PPK Asset & Repair Management System
 
-## Run with Docker (local)
+ระบบบริหารจัดการงานซ่อมบำรุงและทะเบียนทรัพย์สิน โรงพยาบาลพระปกเกล้า
 
-Quick start:
+## ภาพรวมโครงการ (Project Overview)
 
-1) Copy env and set app key (inside container after up)
+ระบบนี้ถูกพัฒนาขึ้นเพื่อยกระดับการจัดการงานซ่อมบำรุงทรัพย์สินและครุภัณฑ์ภายในองค์กร โดยเน้นความโปร่งใสของข้อมูล ความรวดเร็วในการให้บริการ (SLA) และการสรุปผลเชิงสถิติที่แม่นยำ เพื่อนำไปสู่การวางแผนซ่อมบำรุงเชิงป้องกัน (Preventive Maintenance) ในอนาคต
 
-2) Start stack
+## คุณสมบัติหลัก (Key Features)
 
-3) Generate key and migrate
+- **ระบบแจ้งซ่อมและติดตามสถานะ**: แจ้งซ่อมผ่านระบบพร้อมแนบรูปถ่าย และติดตามสถานะแบบ Real-time
+- **ระบบทะเบียนทรัพย์สิน (Asset Registry)**: เชื่อมต่อข้อมูลครุภัณฑ์ ประวัติการซ่อม และสถานะการใช้งานอัตโนมัติ
+- **SLA Dashboard**: ติดตามความเร็วในการตอบสนอง (Response) และการแก้ไขปัญหา (Resolution) เทียบกับเป้าหมาย
+- **Technician Leaderboard**: ระบบประเมินประสิทธิภาพและจัดอันดับช่างตามผลงานและความพึงพอใจ
+- **Live Chat Communication**: ช่องทางสื่อสารระหว่างผู้แจ้งและช่างซ่อมภายในใบงาน
 
-4) Open app and Vite
+## มาตรฐานการออกแบบ (Design & UI Standards)
 
-Commands (PowerShell):
+เพื่อให้ระบบมีความเป็นมืออาชีพและใช้งานง่าย (User-Centric Design) จึงมีการกำหนดมาตรฐานดังนี้:
 
-```powershell
-# 0) Prepare env (first time)
-Copy-Item .env.docker.example .env -Force
+- **Typography**: ใช้ฟอนต์ Inter เป็นมาตรฐานหลัก
+    - หัวข้อ (Titles): font-semibold (600)
+    - เนื้อหา (Body): font-medium (500) หรือ font-normal (400)
+    - งดใช้ความหนาระดับ Black (900) เพื่อความสะอาดตา
+- **Flat UI Initiative**: เน้นการออกแบบสไตล์ Minimal Flat
+    - ลดการใช้เงา (Shadows) ในระดับ Card และ Button
+    - เน้นการใช้สีพื้นหลังและเส้นขอบ (Borders) ที่บางเบาเพื่อแยกส่วนการใช้งาน
+- **Data Integrity**: ข้อมูลสถานะครุภัณฑ์และใบแจ้งซ่อมจะเชื่อมโยงกัน (Sync) ตลอดเวลา
 
-# 1) Start containers
-docker compose up -d
+## การเข้าใช้งานระบบ (Access)
 
-# 2) App key and DB migrations (first time)
-docker compose exec app php artisan key:generate
-docker compose exec app php artisan migrate --seed
+- **Application URL**: [http://localhost:8000](http://localhost:8000)
 
-# Optional: run tests
-docker compose exec app php artisan test -q
+### หมายเหตุการพัฒนา (Development Notes)
 
-#Request Me if you want .env.docker.example 
-```
+- **Vite Dev Server**: ระบบใช้ Vite สำหรับการโหลด CSS และ Assets ผ่านพอร์ต **4000**
+- หากมีการเปลี่ยนแปลงการตั้งค่าพอร์ต โปรดตรวจสอบที่ไฟล์ `vite.config.js` และไฟล์การตั้งค่าที่เกี่ยวข้อง
 
-URLs:
-- App: http://localhost:8080
-- Vite Dev (hot reload): http://localhost:5173 (exposed to LAN if host machine IP reachable)
-- DB: host=localhost port=3307 db=arm user=arm pass=arm
+## โครงสร้างทางเทคนิค (Technical Stack)
 
-Services:
-- app (php-fpm), web (nginx), node (vite), db (mariadb), redis
+- **Backend**: Laravel 11 (PHP 8.2+)
+- **Frontend**: Tailwind CSS 4.0, Alpine.js, Blade Templates
+- **Database**: MySQL
+- **Real-time**: Vite HMR, Redis (Optional)
 
-Notes:
-- Change ports in `docker-compose.yml` if they conflict locally.
-- For production build, run `npm run build` in the node container or GitHub Actions and serve `public/build`.
- - A root `Dockerfile` is provided for building a production PHP-FPM image (multi-stage). The compose stack uses `./.docker/Dockerfile` for local dev.
- - If you see CORS / `net::ERR_FAILED` when loading `http://localhost:5173` scripts from a different host/IP, remove the file `public/hot` (created by Vite dev) OR configure HMR host below.
+---
 
-### Vite Dev over LAN
-
-To use hot reload from another device (phone/tablet) on the same network:
-
-1. Ensure the dev machine firewall allows inbound port 5173.
-2. Add to `.env` (optional override):
-  ```env
-  VITE_HMR_HOST=192.168.x.y   # your machine LAN IP
-  VITE_HMR_PORT=5173
-  VITE_HMR_PROTOCOL=http
-  ```
-3. Run `npm run dev` (or inside container `docker compose exec node npm run dev`).
-4. Access the app via its LAN address (e.g. `http://192.168.x.y:8080`). The Vite config now exposes HMR on `0.0.0.0` and will serve bundles correctly.
-
-If you switch back to production (no HMR):
-```bash
-rm -f public/hot
-npm run build
-```
-Then reload the app; it will use `public/build` manifest.
-
-Troubleshooting:
-- Stale `public/hot` while not running dev server ⇒ remove it.
-- Multiple “already been used with custom-element” warnings ⇒ harmless (duplicate registration) but ensure only one lottie-player script tag globally.
-- Dropdowns not responding ⇒ confirm `app-*.js` from `public/build` or dev server appears in Network tab and `window.initSearchSelects` is a function.
-## Run locally without Redis (Windows/macOS/Linux)
-
-Redis is optional. The default `.env` already uses database + file drivers so the app runs even if the PHP Redis extension is missing.
-
-Minimal `.env` (excerpt) for a Redis-free setup:
-
-```env
-CACHE_STORE=database        # database cache + rate limiter
-SESSION_DRIVER=file         # file-based sessions
-QUEUE_CONNECTION=database   # uses jobs table (run migrations) OR set sync
-# QUEUE_CONNECTION=sync
-
-# These can be commented out if you prefer (unused unless you switch drivers)
-# REDIS_CLIENT=phpredis
-# REDIS_HOST=127.0.0.1
-# REDIS_PORT=6379
-```
-
-Details:
-- Health endpoint skips Redis when the extension/class isn’t present.
-- Rate limiting (login, etc.) uses the configured cache store; with `database` it writes to the `cache` table.
-- To enable Redis later: install server + PHP extension, then set `CACHE_STORE=redis` and (optionally) `QUEUE_CONNECTION=redis`.
-- If you keep `QUEUE_CONNECTION=database`, run a worker: `php artisan queue:work`.
-
-
-## About Laravel
-
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
-
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
-
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
-
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-## Laravel Sponsors
-
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
-
-### Premium Partners
-
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
-
-## Contributing
-
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Developed for PPK Hospital. All rights reserved.

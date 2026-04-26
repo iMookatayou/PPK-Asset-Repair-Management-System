@@ -44,14 +44,7 @@ class Department extends Model
 
     public function getDisplayNameAttribute(): string
     {
-        $th = trim((string) $this->name_th);
-        $en = trim((string) $this->name_en);
-
-        if ($th && $en) {
-            return "{$th} ({$en})";
-        }
-
-        return $th ?: $en;
+        return trim((string) $this->name_th) ?: trim((string) $this->name_en);
     }
 
     protected $appends = [

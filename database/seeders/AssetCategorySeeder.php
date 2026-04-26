@@ -8,10 +8,12 @@ use Carbon\Carbon;
 
 class AssetCategorySeeder extends Seeder
 {
+    // เริ่มต้นการรัน Seeder สำหรับหมวดหมู่ครุภัณฑ์
     public function run(): void
     {
         $now = Carbon::now();
 
+        // รายการหมวดหมู่หลักๆ ของครุภัณฑ์
         $rows = [
             ['name' => 'เครื่องมือแพทย์',       'slug' => 'medical-equipment', 'color' => '#2563eb', 'description' => 'อุปกรณ์ตรวจ/รักษา/ช่วยพยุงชีพ'],
             ['name' => 'คอมพิวเตอร์และอุปกรณ์', 'slug' => 'computers',         'color' => '#16a34a', 'description' => 'PC, Notebook, Printer, Monitor'],
@@ -24,16 +26,17 @@ class AssetCategorySeeder extends Seeder
             ['name' => 'อุปกรณ์ภาพวินิจฉัย',    'slug' => 'imaging',           'color' => '#111827', 'description' => 'Ultrasound, X-ray (ถ้ามี)'],
         ];
 
+        // เติมข้อมูลสถานะและเวลาที่สร้าง
         foreach ($rows as &$r) {
             $r['is_active']  = true;
             $r['created_at'] = $now;
             $r['updated_at'] = $now;
         }
 
-        // ป้องกันซ้ำด้วย upsert ตาม slug
+        // บันทึกข้อมูลแบบ Upsert (ถ้ามี slug ซ้ำให้ทำการอัปเดตข้อมูลเดิม)
         DB::table('asset_categories')->upsert(
             $rows,
-            ['slug'],
+            ['slug'], // ใช้ slug เป็นตัวระบุเอกลักษณ์
             ['name','color','description','is_active','updated_at']
         );
     }

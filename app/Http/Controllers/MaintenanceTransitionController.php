@@ -95,7 +95,7 @@ class MaintenanceTransitionController extends Controller
             'remark'        => ['nullable', 'string', 'max:2000'], // fallback
         ]);
         
-        $reason = trim($data['reject_reason'] ?? $data['remark'] ?? '') ?: 'ช่างไม่รับเรื่อง';
+        $reason = trim($data['reject_reason'] ?? $data['remark'] ?? '') ?: 'เจ้าหน้าที่ไม่รับเรื่อง';
         
         return $this->handleAction($request, $req, 'reject', MR::STATUS_REJECTED, 'ไม่รับเรื่องเรียบร้อยแล้ว', ['note' => $reason]);
     }
@@ -113,7 +113,7 @@ class MaintenanceTransitionController extends Controller
     public function holdCase(Request $request, MR $req)
     {
         $data = $request->validate(['note' => ['required', 'string', 'max:1000']]);
-        return $this->handleAction($request, $req, 'hold', MR::STATUS_ON_HOLD, 'พักงานเรียบร้อยแล้ว', ['note' => trim($data['note'])]);
+        return $this->handleAction($request, $req, 'hold', MR::STATUS_ON_HOLD, 'หยุดการซ่อมบำรุงชั่วคราวเรียบร้อยแล้ว', ['note' => trim($data['note'])]);
     }
 
     public function resumeCase(Request $request, MR $req)
@@ -129,7 +129,32 @@ class MaintenanceTransitionController extends Controller
 
     public function closeCase(Request $request, MR $req)
     {
-        return $this->handleAction($request, $req, 'close', MR::STATUS_CLOSED, 'อนุมัติเรียบร้อยแล้ว');
+        $actorId = (int) Auth::id();
+        try {
+            Gate::authorize('close', $req);
+            $this->transitionService->applyTransition($req, ['status' => MR::STATUS_CLOSED], $actorId);
+
+            $successMsg = 'อนุมัติผลการซ่อมบำรุงเรียบร้อยแล้ว';
+
+            if ($request->expectsJson()) {
+                return $this->respondWithToast(
+                    $request,
+                    Toast::success($successMsg, 1800),
+                    redirect()->route('maintenance.requests.show', $req->id),
+                    ['message' => $successMsg]
+                );
+            }
+
+            return redirect()
+                ->route('maintenance.requests.show', $req->id)
+                ->with('toast', Toast::success($successMsg, 1800))
+                ->with('show_post_close_modal', true);
+
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return $this->respondWithToast($request, Toast::warning('คุณไม่มีสิทธิ์ทำรายการนี้', 2200), redirect()->route('maintenance.requests.show', $req->id), ['message' => 'คุณไม่มีสิทธิ์ทำรายการนี้'], 403);
+        } catch (\Exception $e) {
+            return $this->respondWithToast($request, Toast::warning($e->getMessage(), 2200), redirect()->route('maintenance.requests.show', $req->id), ['message' => $e->getMessage()], 409);
+        }
     }
 
     public function cancelCase(Request $request, MR $req)
@@ -140,6 +165,6 @@ class MaintenanceTransitionController extends Controller
         
         $note = trim($data['cancel_reason'] ?? '') ?: 'ยกเลิกโดยผู้ใช้งาน';
         
-        return $this->handleAction($request, $req, 'cancel', MR::STATUS_CANCELLED, 'ยกเลิกซ่อมเรียบร้อยแล้ว', ['note' => $note]);
+        return $this->handleAction($request, $req, 'cancel', MR::STATUS_CANCELLED, 'ยกเลิกการซ่อมบำรุงเรียบร้อยแล้ว', ['note' => $note]);
     }
 }

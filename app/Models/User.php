@@ -98,7 +98,7 @@ class User extends Authenticatable
         ], true);
     }
 
-    // ตรวจสอบว่าเป็นกลุ่มช่างหรือทีมทำงานหรือไม่
+    // ตรวจสอบว่าเป็นกลุ่มเจ้าหน้าที่หรือทีมทำงานหรือไม่
     public function isTechnician(): bool
     {
         return in_array($this->role, self::workerRoles(), true);
@@ -149,13 +149,56 @@ class User extends Authenticatable
             ->all();
     }
 
+    public function getCleanNameAttribute(): string
+    {
+        $name = $this->name ?? '';
+        
+        // 1. Remove common English role-based prefixes (e.g. "IT Support ", "Programmer ")
+        $roles = [
+            'IT Support', 'Network Engineer', 'Programmer', 'Technician', 
+            'Admin', 'Supervisor', 'Member'
+        ];
+        foreach ($roles as $r) {
+            if (str_starts_with($name, $r . ' ')) {
+                $name = trim(substr($name, strlen($r) + 1));
+            }
+        }
+
+        // 2. Remove common Thai prefixes/titles
+        $prefixes = [
+            'นาย', 'นางสาว', 'นาง', 'น.ส.', 'นส.', 
+            'ดร.', 'นพ.', 'พญ.', 'ทันตแพทย์', 'ทพ.', 'ทพญ.',
+            'ผศ.', 'รศ.', 'ศ.', 'ว่าที่ร้อยตรี', 'ว่าที่ ร.ต.'
+        ];
+        
+        foreach ($prefixes as $p) {
+            if (str_starts_with($name, $p)) {
+                // Check if it's followed by a space or another character
+                // Some people write "นายสมชาย" (no space) or "นาย สมชาย" (with space)
+                $len = mb_strlen($p);
+                $after = mb_substr($name, $len);
+                if (str_starts_with($after, ' ')) {
+                    $name = trim(mb_substr($name, $len + 1));
+                } else {
+                    $name = trim($after);
+                }
+            }
+        }
+
+        return $name ?: ($this->name ?? 'Unknown');
+    }
+
     public function getRoleLabelAttribute(): string
     {
         return match($this->role) {
-            'technician' => 'ช่างซ่อมบำรุง',
-            'it'         => 'IT',
-            'engineer'   => 'วิศวกร',
-            default      => ucfirst($this->role ?? 'Unknown'),
+            self::ROLE_ADMIN        => 'ผู้ดูแลระบบ (Admin)',
+            self::ROLE_SUPERVISOR   => 'หัวหน้างาน (Supervisor)',
+            self::ROLE_IT_SUPPORT   => 'IT Support',
+            self::ROLE_NETWORK      => 'Network Engineer',
+            self::ROLE_DEVELOPER    => 'Programmer',
+            self::ROLE_TECHNICIAN   => 'เจ้าหน้าที่ซ่อมบำรุง',
+            self::ROLE_MEMBER       => 'บุคลากรทั่วไป',
+            default                 => ucfirst($this->role ?? 'Unknown'),
         };
     }
 
@@ -219,7 +262,7 @@ class User extends Authenticatable
         return $this->hasMany(MaintenanceRating::class, 'rater_id');
     }
 
-    // คะแนนเฉลี่ยที่ช่างได้รับ
+    // คะแนนเฉลี่ยที่เจ้าหน้าที่ได้รับ
     public function getRatingAverageAttribute(): ?float
     {
         if (!$this->technicianRatings()->exists()) {
@@ -241,6 +284,15 @@ class User extends Authenticatable
         if ($path && Storage::disk('public')->exists($path)) {
             return Storage::url($path);
         }
+
+        // Try .webp fallback if the original extension was different
+        if ($path) {
+            $webpPath = preg_replace('/\.(jpg|jpeg|png|avif|gif)$/i', '.webp', $path);
+            if ($webpPath !== $path && Storage::disk('public')->exists($webpPath)) {
+                return Storage::url($webpPath);
+            }
+        }
+
         return $this->uiAvatarUrl(256);
     }
 
@@ -252,16 +304,34 @@ class User extends Authenticatable
         if ($thumb && Storage::disk('public')->exists($thumb)) {
             return Storage::url($thumb);
         }
+
+        // Try .webp fallback for thumb
+        if ($thumb) {
+            $webpThumb = preg_replace('/\.(jpg|jpeg|png|avif|gif)$/i', '.webp', $thumb);
+            if ($webpThumb !== $thumb && Storage::disk('public')->exists($webpThumb)) {
+                return Storage::url($webpThumb);
+            }
+        }
+
         if ($main && Storage::disk('public')->exists($main)) {
             return Storage::url($main);
         }
+
+        // Try .webp fallback for main if no thumb
+        if ($main) {
+            $webpMain = preg_replace('/\.(jpg|jpeg|png|avif|gif)$/i', '.webp', $main);
+            if ($webpMain !== $main && Storage::disk('public')->exists($webpMain)) {
+                return Storage::url($webpMain);
+            }
+        }
+
         return $this->uiAvatarUrl(128);
     }
 
     // สร้างรูปโปรไฟล์จำลองกรณีไม่มีการอัปโหลดรูป
     private function uiAvatarUrl(int $size = 256): string
     {
-        $name = urlencode($this->name ?: 'User');
+        $name = urlencode($this->clean_name ?: 'User');
         $palette = ['0D8ABC','0E2B51','16A34A','7C3AED','EA580C','DB2777','374151'];
         $idx = crc32(strtolower($this->name ?? 'user')) % count($palette);
         $bg  = $palette[$idx];
@@ -269,7 +339,7 @@ class User extends Authenticatable
         return "https://ui-avatars.com/api/?name={$name}&background={$bg}&color=fff&size={$size}&bold=true";
     }
 
-    // คะแนนที่ User คนนี้ได้รับในฐานะช่าง
+    // คะแนนที่ User คนนี้ได้รับในฐานะเจ้าหน้าที่
     public function technicianRatings()
     {
         return $this->hasMany(\App\Models\MaintenanceRating::class, 'technician_id');

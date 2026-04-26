@@ -21,15 +21,6 @@ class StatsController extends Controller
                 'resolved','closed','cancelled'
             ])->count();
 
-            $priorityRaw = DB::table('maintenance_requests')
-                ->selectRaw('priority, COUNT(*) as c')
-                ->groupBy('priority')
-                ->pluck('c','priority')
-                ->all();
-            $priorities = [];
-            foreach (['low','medium','high','urgent'] as $p) {
-                $priorities[$p] = (int) ($priorityRaw[$p] ?? 0);
-            }
 
             $recent = DB::table('maintenance_requests')
                 ->selectRaw('DATE(created_at) as d, COUNT(*) as c')
@@ -48,7 +39,6 @@ class StatsController extends Controller
                 'assets_total'    => $assetTotal,
                 'requests_open'   => $openRequests,
                 'requests_closed' => $closedRequests,
-                'priority_counts' => $priorities,
                 'recent_daily'    => $recentSeries,
             ];
         });

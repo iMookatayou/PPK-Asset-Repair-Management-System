@@ -71,11 +71,32 @@
 {{-- ใช้คลาสเฉพาะเจาะจง mobile-sidebar-container เพื่อไม่ให้กระทบส่วนอื่น --}}
 <div class="mobile-sidebar-container flex flex-col h-full bg-white border-r border-zinc-100 relative">
 
+    {{-- Brand Block (At the top of the sidebar) --}}
+    <div
+        class="sidebar-brand-block h-[80px] bg-[#0F2D5C] flex items-center px-4 flex-shrink-0 transition-all duration-300 relative">
+        <img id="desktopSidebarLogo" src="{{ asset('images/logoppk.png') }}" alt="Logo"
+            class="brand-logo w-auto flex-shrink-0" />
+        <div class="sidebar-brand-text flex flex-col leading-tight ml-3 overflow-hidden transition-opacity duration-200">
+            <span class="brand-en font-bold text-white tracking-wider text-[15px]">PHRAPOKKLAO</span>
+            <span class="text-slate-200 text-[11px] truncate">โรงพยาบาลพระปกเกล้า</span>
+        </div>
+    </div>
+
+    {{-- Triangle Toggle Button (Desktop Only) --}}
+    <button type="button" onclick="toggleSidebarCollapse()"
+        class="hidden lg:flex absolute -right-3.5 top-[40px] -translate-y-1/2 w-7 h-7 bg-white border border-zinc-200 rounded-full items-center justify-center text-zinc-500 hover:text-[#0F2D5C] hover:border-[#0F2D5C] transition-all duration-200 z-[1041]"
+        aria-label="Toggle Sidebar">
+        <svg id="sidebarToggleIcon" class="w-3.5 h-3.5 transition-transform duration-300" fill="none"
+            viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" />
+        </svg>
+    </button>
+
     {{-- ปุ่มกากบาท (X) และ Header สำหรับ Mobile เท่านั้น --}}
     <div class="lg:hidden flex items-center justify-between px-6 py-4 border-b border-zinc-100 flex-shrink-0 bg-white"
         style="padding-top: max(1rem, env(safe-area-inset-top));">
         <div class="font-bold text-[#0F2D5C] tracking-wider text-sm flex items-center gap-2">
-            MAIN MENU
+            เมนูหลัก
         </div>
         <button type="button" onclick="closeSide()"
             class="btn-close-trigger w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full bg-slate-50 text-zinc-500 hover:bg-red-50 hover:text-red-500 active:scale-95 transition-all"
@@ -89,9 +110,9 @@
     {{-- Navigation Section --}}
     <nav class="sidebar-nav flex-1 py-4 overflow-y-auto overscroll-contain no-scrollbar">
 
-        {{-- Section: Command Center --}}
-        <div class="px-6 mb-2 text-[11px] font-bold uppercase tracking-[0.15em] text-indigo-500">
-            Command Center
+        <div
+            class="sidebar-heading px-6 mb-2 text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-400/80 transition-all duration-300">
+            <span class="heading-char">M</span><span class="heading-text">enu (เมนู)</span>
         </div>
 
         @php $active = $is('repair.dashboard'); @endphp
@@ -110,12 +131,12 @@
         </a>
 
         @can('maintenance-type-manage')
-            @php $active = $is('settings.sla.*'); @endphp
-            <a href="{{ $rl('settings.sla.index') }}"
+            @php $active = $is('maintenance.sla.*'); @endphp
+            <a href="{{ $rl('maintenance.sla.index') }}"
                 class="{{ $itemBase }} {{ $linkBase }} {{ $active ? $on : $off }}">
                 <span class="{{ $strip($active) }}"></span>
                 <span class="icon-wrap flex-shrink-0">
-                    <img src="/icon/sla1.avif" class="w-6 h-6 object-contain" alt="SLA">
+                    <img src="/icon/sla1.webp" class="w-6 h-6 object-contain" alt="SLA">
                 </span>
                 <span class="{{ $textBase }}">SLA Dashboard</span>
             </a>
@@ -126,37 +147,29 @@
             class="{{ $itemBase }} {{ $linkBase }} {{ $active ? $on : $off }}">
             <span class="{{ $strip($active) }}"></span>
             <span class="icon-wrap flex-shrink-0">
-                <svg class="w-5 h-5 transition-transform group-hover:scale-110" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M3 21h18" />
                     <rect x="5" y="10" width="3" height="7" rx="1" />
                     <rect x="10.5" y="7" width="3" height="10" rx="1" />
                     <rect x="16" y="4" width="3" height="13" rx="1" />
                 </svg>
             </span>
-            <span class="{{ $textBase }}">Technician Ratings</span>
+            <span class="{{ $textBase }}">Technician Rating</span>
         </a>
 
-        {{-- Section: Operations --}}
-        <div class="px-6 mt-6 mb-2 text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-400/80">
-            Operations
-        </div>
+
 
         @php
-            $active = $is(
-                'maintenance.requests.index',
-                'maintenance.requests.show',
-                'maintenance.requests.create',
-                'maintenance.requests.edit',
-            );
+            // เฉพาะหน้าหลักของการแจ้งซ่อม (index, show, edit, create) ไม่รวมถึงส่วน Rating/Dashboard อื่นๆ
+            $active = $is('maintenance.requests.*') && !$is('maintenance.requests.rating.*');
         @endphp
         <a href="{{ $rl('maintenance.requests.index') }}"
             class="{{ $itemBase }} {{ $linkBase }} {{ $active ? $on : $off }}">
             <span class="{{ $strip($active) }}"></span>
             <span class="icon-wrap flex-shrink-0">
-                <img src="/icon/maintenance.avif" class="w-6 h-6 object-contain" alt="Maintenance">
+                <img src="/icon/maintenance.webp" class="w-6 h-6 object-contain" alt="Maintenance">
             </span>
-            <span class="{{ $textBase }}">Requests</span>
+            <span class="{{ $textBase }}">แจ้งซ่อมบำรุง</span>
         </a>
 
         @can('view-my-jobs')
@@ -165,28 +178,22 @@
                 class="{{ $itemBase }} {{ $linkBase }} {{ $active ? $on : $off }}">
                 <span class="{{ $strip($active) }}"></span>
                 <span class="icon-wrap flex-shrink-0">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                        <rect x="8" y="4" width="8" height="4" rx="1" />
-                        <path d="M9 12h6M9 16h6" />
-                        <rect x="4" y="4" width="16" height="18" rx="2" />
-                    </svg>
+                    <img src="/icon/specifications.webp" class="w-6 h-6 object-contain" alt="Jobs">
                 </span>
-                <span class="{{ $textBase }}">Jobs</span>
+                <span class="{{ $textBase }}">รายการงานซ่อม</span>
             </a>
         @endcan
 
-        @php $active = $is('assets.*'); @endphp
+        @php
+            $active = $is('assets.*');
+        @endphp
         <a href="{{ $rl('assets.index') }}"
             class="{{ $itemBase }} {{ $linkBase }} {{ $active ? $on : $off }}">
             <span class="{{ $strip($active) }}"></span>
             <span class="icon-wrap flex-shrink-0">
-                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="2" y="7" width="20" height="14" rx="2" />
-                    <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
-                    <path d="M2 13h20" />
-                </svg>
+                <img src="/icon/toolbox.webp" class="w-6 h-6 object-contain" alt="Assets">
             </span>
-            <span class="{{ $textBase }}">Assets</span>
+            <span class="{{ $textBase }}">ทะเบียนทรัพย์สิน</span>
         </a>
 
         @php $active = $is('chat.*'); @endphp
@@ -194,50 +201,73 @@
             class="{{ $itemBase }} {{ $linkBase }} {{ $active ? $on : $off }}">
             <span class="{{ $strip($active) }}"></span>
             <span class="icon-wrap flex-shrink-0">
-                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15a4 4 0 0 1-4 4H7l-4 4V5a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
-                </svg>
+                <img src="/icon/topic.webp" class="w-6 h-6 object-contain" alt="Chat">
             </span>
             <span class="{{ $textBase }}">Livechat</span>
         </a>
 
-        {{-- Section: Settings --}}
-        @can('maintenance-type-manage')
-            <div class="px-6 mt-6 mb-2 text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-400/80">
-                Settings
+        {{-- Section: Management (Settings & Admin) --}}
+        @if (auth()->user()->can('maintenance-type-manage') || auth()->user()->can('manage-users'))
+            @php
+                $isMgmtActive = $is('settings.maintenance-types.*', 'settings.notifications.*', 'admin.users.*');
+            @endphp
+            <div x-data="{ open: {{ $isMgmtActive ? 'true' : 'false' }} }" class="relative">
+                <button @click="open = !open" type="button"
+                    class="{{ $itemBase }} {{ $linkBase }} w-full text-left {{ $isMgmtActive ? $on : $off }}">
+                    <span class="{{ $strip($isMgmtActive) }}"></span>
+                    <span class="icon-wrap flex-shrink-0">
+                        <span class="material-symbols-outlined text-[20px] text-zinc-500">settings_suggest</span>
+                    </span>
+                    <span class="menu-text truncate py-1 whitespace-nowrap flex-1 flex items-center justify-between">
+                        <span>การจัดการระบบ</span>
+                        <svg :class="{ 'rotate-180': open }"
+                            class="w-4 h-4 text-zinc-400 transition-transform duration-200" viewBox="0 0 20 20"
+                            fill="currentColor">
+                            <path fill-rule="evenodd"
+                                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                clip-rule="evenodd" />
+                        </svg>
+                    </span>
+                </button>
+                <div x-show="open" style="{{ $isMgmtActive ? '' : 'display: none;' }}"
+                    x-transition:enter="transition-all ease-out duration-200"
+                    x-transition:enter-start="opacity-0 max-h-0" x-transition:enter-end="opacity-100 max-h-60"
+                    x-transition:leave="transition-all ease-in duration-200"
+                    x-transition:leave-start="opacity-100 max-h-60" x-transition:leave-end="opacity-0 max-h-0"
+                    class="overflow-hidden bg-slate-50/50 block">
+                    <div class="py-2 space-y-1">
+                        @can('maintenance-type-manage')
+                            @php $typesActive = $is('settings.maintenance-types.*'); @endphp
+                            <a href="{{ $rl('settings.maintenance-types.index') }}"
+                                class="flex items-center gap-3 h-10 px-6 pl-[4rem] text-[13.5px] font-medium transition-colors hover:bg-slate-100 hover:text-[#0F2D5C] {{ $typesActive ? 'text-[#0F2D5C] font-semibold bg-white ' : 'text-zinc-500' }}">
+                                <span class="material-symbols-outlined text-[18px]">build_circle</span>
+                                <span>ประเภทใบแจ้งซ่อม</span>
+                            </a>
+
+                            @php $notifsActive = $is('settings.notifications.*'); @endphp
+                            <a href="{{ $rl('settings.notifications.index') }}"
+                                class="flex items-center gap-3 h-10 px-6 pl-[4rem] text-[13.5px] font-medium transition-colors hover:bg-slate-100 hover:text-[#0F2D5C] {{ $notifsActive ? 'text-[#0F2D5C] font-semibold bg-white ' : 'text-zinc-500' }}">
+                                <span class="material-symbols-outlined text-[18px]">notifications_active</span>
+                                <span>การแจ้งเตือน</span>
+                            </a>
+                        @endcan
+
+                        @can('manage-users')
+                            @php $usersActive = $is('admin.users.*'); @endphp
+                            <a href="{{ $rl('admin.users.index') }}"
+                                class="flex items-center gap-3 h-10 px-6 pl-[4rem] text-[13.5px] font-medium transition-colors hover:bg-slate-100 hover:text-[#0F2D5C] {{ $usersActive ? 'text-[#0F2D5C] font-semibold bg-white ' : 'text-zinc-500' }}">
+                                <span class="material-symbols-outlined text-[18px]">manage_accounts</span>
+                                <span>ผู้ใช้งานระบบ</span>
+                            </a>
+                        @endcan
+                    </div>
+                </div>
             </div>
+        @endif
 
-            @php $active = $is('settings.maintenance-types.*'); @endphp
-            <a href="{{ $rl('settings.maintenance-types.index') }}"
-                class="{{ $itemBase }} {{ $linkBase }} {{ $active ? $on : $off }}">
-                <span class="{{ $strip($active) }}"></span>
-                <span class="icon-wrap flex-shrink-0">
-                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
-                        <path
-                            d="M19.4 15a7.8 7.8 0 0 0 .1-1 7.8 7.8 0 0 0-.1-1l2-1.5-2-3.5-2.4 1a7.6 7.6 0 0 0-1.7-1l-.3-2.6H9l-.3 2.6a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.5 2 1.5a7.8 7.8 0 0 0-.1 1 7.8 7.8 0 0 0 .1 1l-2 1.5 2 3.5 2.4-1a7.6 7.6 0 0 0 1.7 1l.3 2.6h6l.3-2.6a7.6 7.6 0 0 0 1.7-1l2.4 1 2-3.5-2-1.5Z" />
-                    </svg>
-                </span>
-                <span class="{{ $textBase }}">Maintenance Types</span>
-            </a>
-
-            @php $active = $is('settings.notifications.*'); @endphp
-            <a href="{{ $rl('settings.notifications.index') }}"
-                class="{{ $itemBase }} {{ $linkBase }} {{ $active ? $on : $off }}">
-                <span class="{{ $strip($active) }}"></span>
-                <span class="icon-wrap flex-shrink-0">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                    </svg>
-                </span>
-                <span class="{{ $textBase }}">Notifications</span>
-            </a>
-        @endcan
-
-        {{-- Section: Feedback --}}
-        <div class="px-6 mt-6 mb-2 text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-400/80">
-            Feedback
+        <div
+            class="sidebar-heading px-6 mt-6 mb-2 text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-400/80 transition-all duration-300">
+            <span class="heading-char">H</span><span class="heading-text">elp & Support (ช่วยเหลือ)</span>
         </div>
 
         @php $active = $is('maintenance.requests.rating.evaluate'); @endphp
@@ -245,60 +275,73 @@
             class="{{ $itemBase }} {{ $linkBase }} {{ $active ? $on : $off }}">
             <span class="{{ $strip($active) }}"></span>
             <span class="icon-wrap flex-shrink-0">
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                    <rect x="6" y="4" width="12" height="16" rx="2" />
-                    <path d="M9 4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V6H9V4.5z" />
-                    <path d="M9 11h6" />
-                    <path d="M9 14h3" />
-                    <path d="m11 18 1-2 1 2" />
-                </svg>
+                <img src="/icon/feedback.webp" class="w-6 h-6 object-contain" alt="Feedback">
             </span>
-            <span class="{{ $textBase }}">Evaluate</span>
+            <span class="{{ $textBase }}">ประเมินความพึงพอใจ</span>
         </a>
 
-
-
-        {{-- Section: Account --}}
-        <div class="px-6 mt-6 mb-2 text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-400/80">
-            Account
-        </div>
-
-        @php $active = $is('profile.*'); @endphp
-        <a href="{{ $rl('profile.show') }}"
+        @php $active = $is('help.manual'); @endphp
+        <a href="{{ route('help.manual') }}"
             class="{{ $itemBase }} {{ $linkBase }} {{ $active ? $on : $off }}">
             <span class="{{ $strip($active) }}"></span>
             <span class="icon-wrap flex-shrink-0">
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                <svg class="w-5 h-5 transition-colors" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                    stroke="currentColor">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                    <path d="M12 17h.01" />
                 </svg>
             </span>
-            <span class="{{ $textBase }}">Profile</span>
+            <span class="{{ $textBase }}">คู่มือการใช้งาน</span>
         </a>
 
-        {{-- Section: Administration --}}
-        @can('manage-users')
-            <div class="px-6 mt-6 mb-2 text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-400/80">
-                Administration
+
+
+
+
+        {{-- Administration has been moved to the Management dropdown --}}
+
+    </nav>
+
+    {{-- Section: Account & Help (Fix to bottom) --}}
+    @auth
+        <div class="mt-auto border-t border-zinc-100 p-4 bg-slate-50/50 flex-shrink-0">
+            {{-- Profile Card in Sidebar --}}
+            <div class="flex items-center gap-3 mb-3 pb-3 border-b border-zinc-200 overflow-hidden">
+                <img src="{{ Auth::user()->avatar_url ?? asset('images/default-avatar.png') }}" alt="Avatar"
+                    class="w-10 h-10 rounded-full object-cover border border-white flex-shrink-0 bg-white">
+                <div class="profile-info flex-1 min-w-0 transition-all duration-300">
+                    <div class="text-[13px] font-bold text-slate-900 truncate">{{ Auth::user()->name }}</div>
+                    <div class="text-[11px] text-slate-500 truncate">{{ Auth::user()->email }}</div>
+                </div>
             </div>
 
-            @php $active = $is('admin.users.*'); @endphp
-            <a href="{{ $rl('admin.users.index') }}"
-                class="{{ $itemBase }} {{ $linkBase }} {{ $active ? $on : $off }}">
-                <span class="{{ $strip($active) }}"></span>
-                <span class="icon-wrap flex-shrink-0">
-                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                        <path d="M9 11l2 2 4-4" />
+            <div class="profile-actions flex flex-col gap-1 transition-all duration-300">
+                <a href="{{ $rl('profile.show') }}"
+                    class="flex items-center gap-2 px-3 py-2 rounded-md text-[13px] font-medium text-zinc-500 hover:text-zinc-900 transition-colors">
+                    <svg class="w-4 h-4 flex-shrink-0 transition-colors" fill="none" viewBox="0 0 24 24"
+                        stroke-width="2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
-                </span>
-                <span class="{{ $textBase }}">Manage Users</span>
-            </a>
-        @endcan
+                    <span class="profile-label transition-colors">โปรไฟล์ของฉัน</span>
+                </a>
 
-        {{-- Spacer ท้ายเมนู --}}
-        <div class="h-10"></div>
-    </nav>
+
+
+                <form method="POST" action="{{ route('logout') }}" data-turbo="false" class="mt-1">
+                    @csrf
+                    <button type="submit"
+                        class="w-full flex items-center gap-2 px-3 py-2 rounded-md text-[13px] font-medium text-zinc-500 hover:text-zinc-900 transition-colors">
+                        <svg class="w-4 h-4 flex-shrink-0 transition-colors" fill="none" viewBox="0 0 24 24"
+                            stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        <span class="profile-label text-left transition-colors">ออกจากระบบ</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    @endauth
 </div>

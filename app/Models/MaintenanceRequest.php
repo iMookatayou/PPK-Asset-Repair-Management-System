@@ -22,7 +22,6 @@ class MaintenanceRequest extends Model
         'reporter_id',
         'title',
         'description',
-        'priority',
         'status',
 
         'status_updated_at',
@@ -52,6 +51,7 @@ class MaintenanceRequest extends Model
         'resolved_at',
         'closed_at',
         
+        'response_due_date',
         'sla_due_date',
         'paused_duration_minutes',
 
@@ -73,6 +73,7 @@ class MaintenanceRequest extends Model
         'on_hold_at'          => 'datetime',
         'resolved_at'         => 'datetime',
         'closed_at'           => 'datetime',
+        'response_due_date'   => 'datetime',
         'sla_due_date'        => 'datetime',
         'paused_duration_minutes' => 'integer',
 
@@ -102,11 +103,6 @@ class MaintenanceRequest extends Model
     // legacy
     public const STATUS_COMPLETED    = 'completed';
 
-    public const PRIORITY_LOW    = 'low';
-    public const PRIORITY_MEDIUM = 'medium';
-    public const PRIORITY_HIGH   = 'high';
-    public const PRIORITY_URGENT = 'urgent';
-
     /**
      * Transition map: สถานะปัจจุบัน => สถานะที่อนุญาตให้เปลี่ยนไปได้
      */
@@ -122,17 +118,31 @@ class MaintenanceRequest extends Model
         self::STATUS_REJECTED     => [],
     ];
 
+    public static function operationLabels(): array
+    {
+        return [
+            'requisition' => 'เบิกอะไหล่',
+            'service_fee' => 'ค่าจ้างซ่อม/บริการ',
+            'other'       => 'อื่น ๆ (ระบุในหมายเหตุ)',
+        ];
+    }
+
+    public static function operationMethodLabels(): array
+    {
+        return self::operationLabels();
+    }
+
     public static function statusLabels(): array
     {
         return [
-            self::STATUS_PENDING      => 'รอรับทราบ',
+            self::STATUS_PENDING      => 'รอดำเนินการ',
             self::STATUS_ACKNOWLEDGED => 'รับทราบแล้ว',
             self::STATUS_ACCEPTED     => 'รับเรื่องแล้ว',
             self::STATUS_IN_PROGRESS  => 'กำลังดำเนินการ',
-            self::STATUS_ON_HOLD      => 'พักชั่วคราว',
+            self::STATUS_ON_HOLD      => 'หยุดการซ่อมบำรุงชั่วคราว',
             self::STATUS_RESOLVED     => 'ซ่อมบำรุงเสร็จสิ้น',
-            self::STATUS_CLOSED       => 'อนุมัติ',
-            self::STATUS_CANCELLED    => 'ยกเลิกซ่อม',
+            self::STATUS_CLOSED       => 'อนุมัติผลการซ่อมบำรุง',
+            self::STATUS_CANCELLED    => 'ยกเลิกการซ่อมบำรุง',
             self::STATUS_REJECTED     => 'ไม่รับเรื่อง',
             self::STATUS_COMPLETED    => 'เสร็จสิ้น (legacy)',
         ];
@@ -209,17 +219,9 @@ class MaintenanceRequest extends Model
         return $this->morphOne(\App\Models\Attachment::class, 'attachable')->latestOfMany('id');
     }
 
-    public function ratings()
-    {
-        return $this->hasMany(MaintenanceRating::class, 'maintenance_request_id');
-    }
-
     public function rating()
     {
-        $user = Auth::user();
-
-        return $this->hasOne(MaintenanceRating::class, 'maintenance_request_id')
-            ->when($user, fn($q) => $q->where('rater_id', $user->getKey()));
+        return $this->hasOne(MaintenanceRating::class, 'maintenance_request_id');
     }
 
     public function ratingBy(int $userId)
@@ -278,6 +280,20 @@ class MaintenanceRequest extends Model
             if (empty($model->status_updated_at)) {
                 $model->status_updated_at = now();
             }
+
+            // --- Auto-calculate SLA Targets from Type ---
+            if ($model->type_id) {
+                $type = \App\Models\MaintenanceRequestType::find($model->type_id);
+                if ($type) {
+                    $baseDate = $model->request_date ?? now();
+                    if ($type->default_response_minutes) {
+                        $model->response_due_date = $baseDate->copy()->addMinutes($type->default_response_minutes);
+                    }
+                    if ($type->default_resolution_minutes) {
+                        $model->sla_due_date = $baseDate->copy()->addMinutes($type->default_resolution_minutes);
+                    }
+                }
+            }
         });
 
         static::created(function (self $model) {
@@ -300,11 +316,6 @@ class MaintenanceRequest extends Model
         return $s ? $q->where('status', $s) : $q;
     }
 
-    public function scopePriority($q, ?string $p)
-    {
-        return $p ? $q->where('priority', $p) : $q;
-    }
-
     public function scopeRequestedBetween($q, ?string $from, ?string $to)
     {
         if ($from) $q->where('request_date', '>=', $from);
@@ -312,52 +323,53 @@ class MaintenanceRequest extends Model
         return $q;
     }
 
-    public function scopeSearch($q, ?string $term)
+    public function scopeSearch($query, ?string $term)
     {
         $term = trim((string) $term);
-        if ($term === '') return $q;
+        if ($term === '') return $query;
 
-        $isNumeric = ctype_digit($term);
-        $len = strlen($term);
+        return $query->where(function ($q) use ($term) {
+            // 1. Basic Fields
+            $q->where('maintenance_requests.request_no', 'like', "%{$term}%")
+              ->orWhere('maintenance_requests.title', 'like', "%{$term}%")
+              ->orWhere('maintenance_requests.description', 'like', "%{$term}%")
+              ->orWhere('maintenance_requests.reporter_name', 'like', "%{$term}%")
+              ->orWhere('maintenance_requests.reporter_phone', 'like', "%{$term}%")
+              ->orWhere('maintenance_requests.reporter_email', 'like', "%{$term}%")
+              ->orWhere('maintenance_requests.location_text', 'like', "%{$term}%");
 
-        if ($isNumeric && $len <= 5) {
-            $hash = '#'.$term;
+            // 2. ID (Numeric)
+            if (ctype_digit($term) || (str_starts_with($term, '#') && ctype_digit(substr($term, 1)))) {
+                $numericTerm = ltrim($term, '#');
+                $q->orWhere('maintenance_requests.id', (int) $numericTerm);
+            }
 
-            return $q->where(function ($w) use ($term, $hash) {
-                    $w->where('maintenance_requests.id', (int) $term)
-                      ->orWhere('maintenance_requests.title', 'like', "%{$hash}%")
-                      ->orWhere('maintenance_requests.title', 'like', "%{$term}%");
-                })
-                ->orderByRaw(
-                    "CASE
-                        WHEN maintenance_requests.id = ? THEN 0
-                        WHEN maintenance_requests.title LIKE ? THEN 1
-                        WHEN maintenance_requests.title LIKE ? THEN 2
-                        ELSE 9
-                    END ASC",
-                    [(int)$term, "%{$hash}%", "%{$term}%"]
-                )
-                ->orderByDesc('maintenance_requests.id');
-        }
+            // 3. Asset Relations
+            $q->orWhereHas('asset', fn ($qa) =>
+                $qa->where('assets.name', 'like', "%{$term}%")
+                   ->orWhere('assets.asset_code', 'like', "%{$term}%")
+                   ->orWhere('assets.his_asset_id', 'like', "%{$term}%")
+                   ->orWhere('assets.serial_number', 'like', "%{$term}%")
+            );
 
-        return $q->where(function ($w) use ($term) {
-                $w->where('maintenance_requests.id', $term)
-                  ->orWhere('maintenance_requests.title', 'like', "%{$term}%")
-                  ->orWhere('maintenance_requests.description', 'like', "%{$term}%")
-                  ->orWhere('maintenance_requests.request_no', 'like', "%{$term}%")
-                  ->orWhere('maintenance_requests.reporter_name', 'like', "%{$term}%")
-                  ->orWhere('maintenance_requests.reporter_phone', 'like', "%{$term}%")
-                  ->orWhere('maintenance_requests.reporter_email', 'like', "%{$term}%")
-                  ->orWhereHas('reporter', fn ($qr) =>
-                        $qr->where('name', 'like', "%{$term}%")
-                           ->orWhere('email', 'like', "%{$term}%")
-                  )
-                  ->orWhereHas('asset', fn ($qa) =>
-                        $qa->where('name', 'like', "%{$term}%")
-                           ->orWhere('asset_code', 'like', "%{$term}%")
-                  );
-            })
-            ->orderByDesc('maintenance_requests.id');
+            // 4. Reporter User Relation
+            $q->orWhereHas('reporter', fn ($qr) =>
+                $qr->where('users.name', 'like', "%{$term}%")
+                   ->orWhere('users.email', 'like', "%{$term}%")
+            );
+
+            // 5. Department Relation
+            $q->orWhereHas('department', fn ($qd) =>
+                $qd->where('departments.name_th', 'like', "%{$term}%")
+                   ->orWhere('departments.name_en', 'like', "%{$term}%")
+                   ->orWhere('departments.code', 'like', "%{$term}%")
+            );
+
+            // 6. Technician Relation
+            $q->orWhereHas('technician', fn ($qt) =>
+                $qt->where('users.name', 'like', "%{$term}%")
+            );
+        });
     }
 
     /* ================= STATE HELPERS (สำคัญ) ================= */
@@ -427,13 +439,9 @@ class MaintenanceRequest extends Model
                 if (!$this->accepted_at) {
                     $this->accepted_at = $now;
                     
-                    $slaTarget = \App\Models\SlaConfig::where('priority_level', $this->priority ?? \App\Models\SlaConfig::PRIORITY_DEFAULT)
-                        ->where('is_active', true)->first() 
-                        ?? \App\Models\SlaConfig::where('priority_level', \App\Models\SlaConfig::PRIORITY_DEFAULT)->first();
-                    
-                    if ($slaTarget) {
-                        $this->sla_due_date = $now->copy()->addMinutes($slaTarget->resolution_time_minutes);
-                    }
+                    // If SLA was not set at creation (e.g. legacy or type changed), 
+                    // we can re-verify here, but the primary source is now the Job Type.
+                    // We remove SlaConfig logic entirely.
                 }
                 break;
 
@@ -471,8 +479,12 @@ class MaintenanceRequest extends Model
         $saved = $this->save();
 
         try {
+            $labels = self::statusLabels();
+            $fromLabel = $labels[$from] ?? $from;
+            $toLabel = $labels[$toStatus] ?? $toStatus;
+            
             $text = trim(implode(' ', array_filter([
-                "[{$from} -> {$toStatus}]",
+                "[{$fromLabel} -> {$toLabel}]",
                 $note,
             ])));
 

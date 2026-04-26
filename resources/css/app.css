@@ -1,8 +1,57 @@
-@import "./repair/my-jobs.css";
+@import "./intro-frame-assembly.css";
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer utilities {
+    .animate-modal-in {
+        animation: modalIn 0.18s ease-out forwards;
+    }
+
+    .custom-scrollbar {
+        scrollbar-width: thin;
+        scrollbar-color: #e2e8f0 transparent;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #e2e8f0;
+        border-radius: 4px;
+    }
+
+    .animate-bounce-slow {
+        animation: bounce-slow 3s infinite;
+    }
+
+    .animate-bounce-x {
+        animation: bounce-x 1s infinite;
+    }
+
+    @keyframes bounce-slow {
+        0%, 100% { transform: translateY(-5%); animation-timing-function: cubic-bezier(0.8, 0, 1, 1); }
+        50% { transform: translateY(0); animation-timing-function: cubic-bezier(0, 0, 0.2, 1); }
+    }
+
+    @keyframes bounce-x {
+        0%, 100% {
+            transform: translateX(-25%);
+            animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+        }
+        50% {
+            transform: none;
+            animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+        }
+    }
+}
+
+@keyframes modalIn {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
 
 body{
   display: block !important;
@@ -15,6 +64,17 @@ body{
 
 [x-cloak] { display: none !important; }
 @plugin "daisyui";
+
+/* ─── Override DaisyUI textarea min-height ───────────────────────────
+   DaisyUI sets min-height: 5rem on every <textarea>.
+   This locks the box height and prevents both the rows="2" attribute
+   and our JS auto-expand from working correctly.
+   Resetting it here (after the plugin) wins the CSS cascade.
+─────────────────────────────────────────────────────────────────── */
+textarea:not(.keep-height) {
+    min-height: unset !important;
+    height: auto !important;
+}
 
 .menu-item {
   font-size: 0.95rem;

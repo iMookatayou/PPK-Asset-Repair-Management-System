@@ -14,6 +14,13 @@ class MaintenanceRequestPolicy
 
     public function before(User $user, string $ability)
     {
+        // 'rate' is excluded from admin bypass so that the full rate() policy
+        // always runs — this ensures the Rate button is hidden even for admins
+        // once a job has already been rated (1:1 enforcement in the UI).
+        if ($ability === 'rate') {
+            return null;
+        }
+
         if ($this->isAdminTeam($user)) {
             return Response::allow();
         }
@@ -28,7 +35,7 @@ class MaintenanceRequestPolicy
 
     protected function isWorker(User $user): bool
     {
-        // ทีมงาน (ช่าง/IT/หัวหน้า ฯลฯ ตามระบบคุณ)
+        // ทีมงาน (เจ้าหน้าที่/IT/หัวหน้า ฯลฯ ตามระบบคุณ)
         return in_array($user->role, User::teamRoles(), true);
     }
 
@@ -164,7 +171,7 @@ class MaintenanceRequestPolicy
         // ต้องเป็นทีมงานช่าง/เจ้าหน้าที่
         if (!$this->isWorker($user)) return Response::deny('เฉพาะเจ้าหน้าที่เท่านั้น');
 
-        // ปลดล็อค: ช่างทุกคนสามารถกด "เริ่มดำเนินการ" ได้เลย 
+        // ปลดล็อค: เจ้าหน้าที่ทุกคนสามารถกด "เริ่มดำเนินการ" ได้เลย 
         // โดยไม่ต้องถูกสั่งงานก่อน (เพื่อรองรับการจ่ายงานกันเอง)
         if ($req->status === MR::STATUS_ACCEPTED) return Response::allow();
 
@@ -179,14 +186,14 @@ class MaintenanceRequestPolicy
         if (!$this->isWorker($user)) return Response::deny('เฉพาะเจ้าหน้าที่เท่านั้น');
 
         if (!$this->isAssignedWorker($user, $req)) {
-            return Response::deny('อนุญาตให้พักงานเฉพาะผู้ที่ได้รับมอบหมายเท่านั้น');
+            return Response::deny('อนุญาตให้หยุดการซ่อมบำรุงชั่วคราวเฉพาะผู้ที่ได้รับมอบหมายเท่านั้น');
         }
 
         if (in_array($req->status, [MR::STATUS_ACCEPTED, MR::STATUS_IN_PROGRESS], true)) {
             return Response::allow();
         }
 
-        return Response::deny('พักงานได้เมื่อรับเรื่องแล้วหรือกำลังดำเนินการเท่านั้น');
+        return Response::deny('หยุดการซ่อมบำรุงชั่วคราวได้เมื่อรับเรื่องแล้วหรือกำลังดำเนินการเท่านั้น');
     }
 
     // resume
@@ -254,12 +261,12 @@ class MaintenanceRequestPolicy
             return Response::deny('ใบงานนี้สิ้นสุดแล้ว ไม่สามารถแนบไฟล์เพิ่มได้');
         }
 
-        // ช่างแนบไฟล์ได้ตอนทำงาน (รวมถึงตอนเพิ่งรับเรือง หรือตอนซ่อมเสร็จแล้วแต่ยังไม่ปิดงาน)
+        // เจ้าหน้าที่แนบไฟล์ได้ตอนทำงาน (รวมถึงตอนเพิ่งรับเรือง หรือตอนซ่อมเสร็จแล้วแต่ยังไม่ปิดงาน)
         if ($this->isAssignedWorker($user, $req) && in_array((string) $req->status, [MR::STATUS_ACKNOWLEDGED, MR::STATUS_ACCEPTED, MR::STATUS_IN_PROGRESS, MR::STATUS_ON_HOLD, MR::STATUS_RESOLVED], true)) {
             return Response::allow();
         }
 
-        // ผู้แจ้งแนบไฟล์ได้จนกว่าช่างจะเริ่มงาน
+        // ผู้แจ้งแนบไฟล์ได้จนกว่าเจ้าหน้าที่จะเริ่มงาน
         if ((int) $req->reporter_id === (int) $user->id && in_array((string) $req->status, [MR::STATUS_PENDING, MR::STATUS_ACKNOWLEDGED, MR::STATUS_ACCEPTED], true)) {
             return Response::allow();
         }
@@ -277,7 +284,7 @@ class MaintenanceRequestPolicy
             return Response::deny('ใบงานนี้สิ้นสุดแล้ว ไม่สามารถลบไฟล์ได้');
         }
 
-        // ช่างลบไฟล์ได้ตอนทำงาน
+        // เจ้าหน้าที่ลบไฟล์ได้ตอนทำงาน
         if ($this->isAssignedWorker($user, $req) && in_array((string) $req->status, [MR::STATUS_ACKNOWLEDGED, MR::STATUS_ACCEPTED, MR::STATUS_IN_PROGRESS, MR::STATUS_ON_HOLD, MR::STATUS_RESOLVED], true)) {
             return Response::allow();
         }
@@ -293,13 +300,13 @@ class MaintenanceRequestPolicy
     // assign (มอบหมายทีม)
     public function assign(User $user, MR $req): Response
     {
-        // 1. Admin/Supervisor หรือทีมงาน (ช่าง/IT ฯลฯ) สามารถมอบหมายงานได้
+        // 1. Admin/Supervisor หรือทีมงาน (เจ้าหน้าที่/IT ฯลฯ) สามารถมอบหมายงานได้
         // เพื่อรองรับการส่งต่องาน (Handoff) เช่น IT support รับเรื่องแล้วส่งต่อให้ Programmer
         if ($this->isAdminTeam($user) || $this->isWorker($user)) {
             return Response::allow();
         }
 
-        return Response::deny('อนุญาตให้มอบหมายทีมช่างเฉพาะผู้ดูแลหรือทีมเจ้าหน้าที่เท่านั้น');
+        return Response::deny('อนุญาตให้มอบหมายทีมเจ้าหน้าที่เฉพาะผู้ดูแลหรือทีมเจ้าหน้าที่เท่านั้น');
     }
 
     // cancel (รวมศูนย์การยกเลิก)
@@ -376,7 +383,7 @@ class MaintenanceRequestPolicy
             return Response::deny('ใบงานนี้ปิดงานเรียบร้อยแล้ว ไม่สามารถแก้ไขรายงานการปฏิบัติงานได้');
         }
 
-        // 3. สถานะอื่นๆ (รวมถึง Resolved) ช่างที่ได้รับมอบหมายสามารถบันทึก/แก้ไขได้
+        // 3. สถานะอื่นๆ (รวมถึง Resolved) เจ้าหน้าที่ที่ได้รับมอบหมายสามารถบันทึก/แก้ไขได้
         if ($this->isAssignedWorker($user, $req)) {
             return Response::allow();
         }
@@ -394,10 +401,19 @@ class MaintenanceRequestPolicy
 
         // 2. งานต้องอยู่ในสถานะ "ปิดงาน (closed)" เท่านั้น
         if ($req->status !== MR::STATUS_CLOSED) {
-            return Response::deny('สามารถประเมินได้เมื่อปิดงานเรียบร้อยแล้วเท่านั้น');
+            return Response::deny('สามารถประเมินได้เมื่ออนุมัติปิดงานเรียบร้อยแล้วเท่านั้น');
         }
 
-        // 3. อนุญาตให้ประเมินได้
+        // 3. ตรวจว่าเคยให้คะแนนแล้วหรือยัง (ป้องกันปุ่มแสดงซ้ำหลังให้คะแนน)
+        $alreadyRated = \App\Models\MaintenanceRating::query()
+            ->where('maintenance_request_id', $req->id)
+            ->exists();
+
+        if ($alreadyRated) {
+            return Response::deny('งานนี้มีการให้คะแนนไปแล้ว');
+        }
+
+        // 4. อนุญาตให้ประเมินได้
         return Response::allow();
     }
 }

@@ -97,7 +97,8 @@
                     </div>
 
                     <div>
-                        <label class="{{ $labelCls }}">รหัสทะเบียน รพจ <span class="{{ $hintCls }}">(HIS ID)</span></label>
+                        <label class="{{ $labelCls }}">รหัสทะเบียน รพจ <span class="{{ $hintCls }}">(HIS
+                                ID)</span></label>
                         @if ($readonly)
                             <div class="{{ $displayBox }} text-blue-700 font-semibold">
                                 {{ $asset->his_asset_id ?? '—' }}</div>
@@ -154,7 +155,8 @@
                     </div>
 
                     <div>
-                        <label class="{{ $labelCls }}">หมายเลขเครื่อง <span class="{{ $hintCls }}">(Serial No.)</span></label>
+                        <label class="{{ $labelCls }}">หมายเลขเครื่อง <span class="{{ $hintCls }}">(Serial
+                                No.)</span></label>
                         @if ($readonly)
                             <div class="{{ $displayBox }} font-mono">{{ $asset->serial_number ?? '—' }}</div>
                         @else
@@ -164,7 +166,8 @@
                     </div>
 
                     <div>
-                        <label class="{{ $labelCls }}">หมายเลขโทรศัพท์ภายใน <span class="{{ $hintCls }}">(ป้ายเหลือง)</span></label>
+                        <label class="{{ $labelCls }}">หมายเลขโทรศัพท์ภายใน <span
+                                class="{{ $hintCls }}">(ป้ายเหลือง)</span></label>
                         @if ($readonly)
                             <div class="{{ $displayBox }}">{{ $asset->internal_phone ?? '—' }}</div>
                         @else
@@ -220,7 +223,8 @@
                     </div>
 
                     <div>
-                        <label class="{{ $labelCls }}">ราคาจัดซื้อจัดจ้าง <span class="{{ $hintCls }}">(บาท)</span></label>
+                        <label class="{{ $labelCls }}">ราคาจัดซื้อจัดจ้าง <span
+                                class="{{ $hintCls }}">(บาท)</span></label>
                         @if ($readonly)
                             <div class="{{ $displayBox }}">
                                 {{ $asset->formatted_price ?? '—' }}
@@ -305,7 +309,8 @@
                                 <option value="">— เลือกหน่วยงาน —</option>
                                 @foreach ($departments ?? collect() as $d)
                                     <option value="{{ $d->id }}" @selected((string) $d->id === (string) $v('department_id'))>
-                                        {{ ($d->code ? $d->code . ' - ' : '') . ($d->name_th ?: $d->name_en) }}</option>
+                                        {{ ($d->code ? $d->code . ' - ' : '') . ($d->name_th ?: $d->name_en) }}
+                                    </option>
                                 @endforeach
                             </select>
                         @endif
@@ -352,7 +357,8 @@
                     @if (!$readonly)
                         <label class="{{ $labelCls }}">เลือกรูปภาพครุภัณฑ์</label>
                         <div class="flex items-center gap-2">
-                            <input id="hero_image_any" type="file" name="hero_image" accept="image/*" class="hidden">
+                            <input id="hero_image_any" type="file" name="hero_image" accept="image/*"
+                                class="hidden">
                             <input id="hero_image_camera" type="file" name="hero_image" accept="image/*"
                                 capture="environment" class="hidden">
 
@@ -384,8 +390,10 @@
 
                         <div class="mt-3 p-3 rounded-md bg-amber-50 border border-amber-200">
                             <div class="flex gap-2">
-                                <svg class="h-5 w-5 text-amber-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/>
+                                <svg class="h-5 w-5 text-amber-600 shrink-0" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2">
+                                    <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                        stroke-linecap="round" stroke-linejoin="round" />
                                 </svg>
                                 <div class="text-[11px] text-amber-800 space-y-1">
                                     <p class="font-bold">เงื่อนไขการอัปโหลดรูปภาพหลัก:</p>
@@ -405,11 +413,11 @@
                             </p>
                             <div class="relative inline-block">
                                 <img id="hero_image_preview_img" src="{{ $asset->hero_image_url }}"
-                                    class="h-32 w-auto rounded-lg border border-slate-200 object-cover shadow-sm">
+                                    class="h-32 w-auto rounded-lg border border-slate-200 object-cover ">
                                 <button type="button" id="hero_image_remove_btn"
-                                    class="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-md hover:bg-rose-700 transition">
-                                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="3">
+                                    class="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-rose-600 text-white flex items-center justify-center hover:bg-rose-700 transition">
+                                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="3">
                                         <path d="M18 6L6 18M6 6l12 12" />
                                     </svg>
                                 </button>
@@ -454,8 +462,8 @@
                         <label class="{{ $labelCls }}">เลือกไฟล์เอกสารเพิ่มเติม</label>
                         <div class="flex items-center gap-2">
                             <input id="att_files_submit" type="file" name="files[]" multiple class="hidden">
-                            <input id="att_files_any" type="file" multiple
-                                accept="image/*,application/pdf" class="hidden">
+                            <input id="att_files_any" type="file" multiple accept="image/*,application/pdf"
+                                class="hidden">
                             <input id="att_files_camera" type="file" accept="image/*" capture="environment"
                                 class="hidden">
 
@@ -482,8 +490,10 @@
 
                         <div class="mt-3 p-3 rounded-md bg-amber-50 border border-amber-200">
                             <div class="flex gap-2">
-                                <svg class="h-5 w-5 text-amber-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/>
+                                <svg class="h-5 w-5 text-amber-600 shrink-0" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2">
+                                    <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                        stroke-linecap="round" stroke-linejoin="round" />
                                 </svg>
                                 <div class="text-[11px] text-amber-800 space-y-1">
                                     <p class="font-bold">เงื่อนไขการแนบไฟล์เพิ่มเติม:</p>
@@ -506,30 +516,47 @@
                         @if ($attached->count())
                             <div class="mt-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
                                 <p class="text-[12px] font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                                    <svg class="h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                                    <svg class="h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2">
+                                        <path d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                                     </svg>
                                     ไฟล์ที่มีอยู่แล้ว ({{ $attached->count() }})
                                 </p>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     @foreach ($attached as $att)
-                                        <div class="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-white bg-white shadow-sm transition hover:shadow-md group">
+                                        <div
+                                            class="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-white bg-white transition hover: group">
                                             <div class="flex items-center gap-2.5 min-w-0">
-                                                <div class="w-8 h-8 shrink-0 rounded bg-slate-50 flex items-center justify-center text-slate-400">
-                                                    @if(str_starts_with($att->mime_type ?? '', 'image/'))
-                                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                                <div
+                                                    class="w-8 h-8 shrink-0 rounded bg-slate-50 flex items-center justify-center text-slate-400">
+                                                    @if (str_starts_with($att->mime_type ?? '', 'image/'))
+                                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                                                            stroke="currentColor">
+                                                            <path
+                                                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                        </svg>
                                                     @else
-                                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                                                            stroke="currentColor">
+                                                            <path
+                                                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                        </svg>
                                                     @endif
                                                 </div>
                                                 <div class="min-w-0">
-                                                    <div class="text-[12px] font-medium text-slate-700 truncate" title="{{ $att->original_name }}">{{ $att->original_name }}</div>
-                                                    <div class="text-[10px] text-slate-400">{{ number_format(($att->file_size ?? 0)/1024, 1) }} KB</div>
+                                                    <div class="text-[12px] font-medium text-slate-700 truncate"
+                                                        title="{{ $att->original_name }}">{{ $att->original_name }}
+                                                    </div>
+                                                    <div class="text-[10px] text-slate-400">
+                                                        {{ number_format(($att->file_size ?? 0) / 1024, 1) }} KB</div>
                                                 </div>
                                             </div>
                                             <label class="flex items-center gap-1.5 cursor-pointer">
-                                                <input type="checkbox" name="remove_attachments[]" value="{{ $att->id }}" class="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-100">
-                                                <span class="text-[11px] font-medium text-rose-600 group-hover:text-rose-700">ลบ</span>
+                                                <input type="checkbox" name="remove_attachments[]"
+                                                    value="{{ $att->id }}"
+                                                    class="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-100">
+                                                <span
+                                                    class="text-[11px] font-medium text-rose-600 group-hover:text-rose-700">ลบ</span>
                                             </label>
                                         </div>
                                     @endforeach
@@ -542,7 +569,7 @@
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                                 @foreach ($attached as $att)
                                     <a href="{{ Storage::url($att->file_path) }}" target="_blank"
-                                        class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors shadow-sm group">
+                                        class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors group">
                                         <div
                                             class="w-10 h-10 shrink-0 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
                                             @if (str_starts_with($att->mime_type ?? '', 'image/'))
@@ -643,7 +670,8 @@
                         }
                         Object.entries(fieldMap).forEach(([key, id]) => {
                             if (json.data[key] == null) return;
-                            const el = document.getElementById(id) || document.getElementsByName(id)[0];
+                            const el = document.getElementById(id) || document.getElementsByName(
+                                id)[0];
                             if (el) {
                                 if (el.tomselect) {
                                     el.tomselect.setValue(json.data[key]);
@@ -663,7 +691,19 @@
             }
 
             // --- Standardized Upload Logic (Helper Function) ---
-            function setupUploader({ anyId, camId, anyBtnId, camBtnId, previewId, listId, removeBtnId, previewImgId, labelId, isSingle = false, maxMB = 10 }) {
+            function setupUploader({
+                anyId,
+                camId,
+                anyBtnId,
+                camBtnId,
+                previewId,
+                listId,
+                removeBtnId,
+                previewImgId,
+                labelId,
+                isSingle = false,
+                maxMB = 10
+            }) {
                 const anyInput = document.getElementById(anyId);
                 const camInput = document.getElementById(camId);
                 const anyBtn = document.getElementById(anyBtnId);
@@ -680,13 +720,18 @@
                 const maxBytes = maxMB * 1024 * 1024;
 
                 const showToast = (msg, type = 'warning') => {
-                    window.dispatchEvent(new CustomEvent('app:toast', { detail: { type, message: msg } }));
+                    window.dispatchEvent(new CustomEvent('app:toast', {
+                        detail: {
+                            type,
+                            message: msg
+                        }
+                    }));
                 };
 
                 const sync = () => {
                     const dt = new DataTransfer();
                     filesBag.forEach(f => dt.items.add(f));
-                    
+
                     // If it's the attachments section, submit via the dedicated input
                     const submitInput = document.getElementById(anyId.replace('_any', '_submit'));
                     if (submitInput) {
@@ -697,24 +742,29 @@
                 };
 
                 const renderSingle = () => {
-                   if (!filesBag.length) {
-                       return;
-                   }
-                   const f = filesBag[0];
-                   if (previewImg) previewImg.src = URL.createObjectURL(f);
-                   if (label) label.textContent = 'รูปภาพที่เลือกใหม่:';
-                   if (preview) preview.classList.remove('hidden');
+                    if (!filesBag.length) {
+                        return;
+                    }
+                    const f = filesBag[0];
+                    if (previewImg) previewImg.src = URL.createObjectURL(f);
+                    if (label) label.textContent = 'รูปภาพที่เลือกใหม่:';
+                    if (preview) preview.classList.remove('hidden');
                 };
 
                 const renderMultiple = () => {
                     if (!list) return;
                     list.innerHTML = '';
-                    if (!filesBag.length) { preview.classList.add('hidden'); return; }
+                    if (!filesBag.length) {
+                        preview.classList.add('hidden');
+                        return;
+                    }
                     preview.classList.remove('hidden');
                     filesBag.forEach((f, idx) => {
                         const item = document.createElement('div');
-                        item.className = 'p-2.5 rounded-lg border border-slate-200 bg-white flex justify-between items-center shadow-sm';
-                        item.innerHTML = `<div class="flex items-center gap-2 min-w-0 transition-all">
+                        item.className =
+                            'p-2.5 rounded-lg border border-slate-200 bg-white flex justify-between items-center ';
+                        item.innerHTML =
+                            `<div class="flex items-center gap-2 min-w-0 transition-all">
                             <span class="truncate text-[12px] font-medium text-slate-700">${f.name}</span>
                             <span class="text-[10px] text-slate-400">${(f.size/1024).toFixed(1)}KB</span>
                         </div>
@@ -764,8 +814,14 @@
                     }
                 };
 
-                anyInput.onchange = () => { handleFiles(anyInput.files); anyInput.value = ''; };
-                camInput.onchange = () => { handleFiles(camInput.files); camInput.value = ''; };
+                anyInput.onchange = () => {
+                    handleFiles(anyInput.files);
+                    anyInput.value = '';
+                };
+                camInput.onchange = () => {
+                    handleFiles(camInput.files);
+                    camInput.value = '';
+                };
 
                 if (isSingle && previewImg) {
                     previewImg.dataset.original = previewImg.src;
@@ -774,16 +830,28 @@
 
             // Step 5: Hero Image (Single, 5MB)
             setupUploader({
-                anyId: 'hero_image_any', camId: 'hero_image_camera', anyBtnId: 'hero_image_any_btn', camBtnId: 'hero_image_camera_btn',
-                previewId: 'hero_image_preview_box', removeBtnId: 'hero_image_remove_btn', previewImgId: 'hero_image_preview_img', labelId: 'hero_preview_label',
-                isSingle: true, maxMB: 5
+                anyId: 'hero_image_any',
+                camId: 'hero_image_camera',
+                anyBtnId: 'hero_image_any_btn',
+                camBtnId: 'hero_image_camera_btn',
+                previewId: 'hero_image_preview_box',
+                removeBtnId: 'hero_image_remove_btn',
+                previewImgId: 'hero_image_preview_img',
+                labelId: 'hero_preview_label',
+                isSingle: true,
+                maxMB: 5
             });
 
             // Step 6: Attachments (Multiple, 10MB)
             setupUploader({
-                anyId: 'att_files_any', camId: 'att_files_camera', anyBtnId: 'att_files_any_btn', camBtnId: 'att_files_camera_btn',
-                previewId: 'att_files_preview', listId: 'att_files_list',
-                isSingle: false, maxMB: 10
+                anyId: 'att_files_any',
+                camId: 'att_files_camera',
+                anyBtnId: 'att_files_any_btn',
+                camBtnId: 'att_files_camera_btn',
+                previewId: 'att_files_preview',
+                listId: 'att_files_list',
+                isSingle: false,
+                maxMB: 10
             });
         })();
     </script>

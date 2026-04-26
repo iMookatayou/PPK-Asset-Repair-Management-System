@@ -67,7 +67,7 @@
   {{-- แผง dropdown --}}
   <div
     data-dsd-panel
-    class="absolute top-full left-0 right-0 z-50 mt-1 rounded-lg border border-slate-200 bg-white shadow-lg hidden"
+    class="absolute top-full left-0 right-0 z-50 mt-1 rounded-lg border border-slate-200 bg-white hidden"
     style="max-height: {{ $panelMaxHeight }}"
   >
     {{-- ช่อง search ด้านใน panel --}}

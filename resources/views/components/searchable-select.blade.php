@@ -54,7 +54,7 @@
   </div>
 
   <div data-ss-panel
-       class="hidden absolute z-30 mt-2 w-full rounded-lg border border-slate-200 bg-white shadow-lg">
+       class="hidden absolute z-30 mt-2 w-full rounded-lg border border-slate-200 bg-white ">
 
     <ul data-ss-list class="max-h-64 overflow-auto py-1">
       <li data-ss-option

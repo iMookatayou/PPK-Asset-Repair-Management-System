@@ -130,14 +130,14 @@
             background:#eef3fb;
         }
 
-        /* ตารางทีมช่างให้แน่นขึ้น */
+        /* ตารางทีมเจ้าหน้าที่ให้แน่นขึ้น */
         table.grid.grid-workers th,
         table.grid.grid-workers td {
             padding:1px 2px;
             font-size:10px;
         }
 
-        /* ===== TWO-COL (รายละเอียด + ทีมช่าง) ===== */
+        /* ===== TWO-COL (รายละเอียด + ทีมเจ้าหน้าที่) ===== */
         table.two-col {
             width: 100%;
             border-collapse: collapse;
@@ -204,19 +204,10 @@
         'in_progress' => 'ระหว่างดำเนินการ',
         'on_hold'     => 'พักไว้',
         'resolved'    => 'ซ่อมบำรุงเสร็จสิ้น',
-        'closed'      => 'อนุมัติ',
-        'cancelled'   => 'ยกเลิกซ่อม',
+        'closed'      => 'อนุมัติผลการซ่อมบำรุง',
+        'cancelled'   => 'ยกเลิกการซ่อมบำรุง',
         'rejected'    => 'ไม่รับเรื่อง',
     ][$status] ?? $status;
-
-    $prio = strtolower((string) $req->priority);
-    $prioLabel = [
-        'low'    => 'ต่ำ',
-        'medium' => 'ปานกลาง',
-        'high'   => 'เร่งด่วน',
-        'urgent' => 'เร่งด่วนมาก',
-    ][$prio] ?? ($req->priority ?? '—');
-
     $workers = $req->workers ?? collect();
 @endphp
 
@@ -264,12 +255,6 @@
             <td>{{ $statusLabel }}</td>
         </tr>
         <tr>
-            <td class="label">เลขอ้างอิงภายใน</td>
-            <td>{{ $req->request_no ?? '—' }}</td>
-            <td class="label">ระดับความสำคัญ</td>
-            <td>{{ $prioLabel }}</td>
-        </tr>
-        <tr>
             <td class="label">ผู้แจ้ง</td>
             <td>
                 {{ $req->reporter->name ?? $req->reporter_name ?? '-' }}<br>
@@ -296,7 +281,7 @@
                     <span class="small">รหัสครุภัณฑ์: {{ $req->asset->asset_code }}</span>
                 @endif
             </td>
-            <td class="label">ช่างหลัก</td>
+            <td class="label">เจ้าหน้าที่หลัก</td>
             <td>{{ $req->technician->name ?? '-' }}</td>
         </tr>
     </table>
@@ -304,7 +289,7 @@
     <table class="grid">
         <tr>
             <th>รับคำขอ</th>
-            <th>มอบหมายทีมช่าง</th>
+            <th>มอบหมายทีมเจ้าหน้าที่</th>
             <th>เสร็จสิ้น / ปิดงาน</th>
         </tr>
         <tr>
@@ -317,7 +302,7 @@
     </table>
 </div>
 
-{{-- ================= ส่วนที่ 2 — รายละเอียดปัญหา + ทีมช่าง ================= --}}
+{{-- ================= ส่วนที่ 2 — รายละเอียดปัญหา + ทีมเจ้าหน้าที่ ================= --}}
 <div class="section-block">
     <table class="two-col">
         <tr>
@@ -338,19 +323,19 @@
                 </div>
             </td>
 
-            {{-- RIGHT: ทีมช่าง --}}
+            {{-- RIGHT: ทีมเจ้าหน้าที่ --}}
             <td class="two-col-right">
-                <div class="section-title">ทีมช่างที่รับผิดชอบ</div>
+                <div class="section-title">ทีมเจ้าหน้าที่ที่รับผิดชอบ</div>
 
                 @if($workers->isEmpty())
                     <div class="box box-muted small">
-                        ยังไม่ได้มอบหมายทีมช่าง (ช่างหลัก: {{ $req->technician->name ?? '-' }})
+                        ยังไม่ได้มอบหมายทีมเจ้าหน้าที่ (เจ้าหน้าที่หลัก: {{ $req->technician->name ?? '-' }})
                     </div>
                 @else
                     <table class="grid grid-workers">
                         <tr>
                             <th style="width: 12%;">ลำดับ</th>
-                            <th style="width: 58%;">ชื่อช่าง / บทบาทในทีม</th>
+                            <th style="width: 58%;">ชื่อเจ้าหน้าที่ / บทบาทในทีม</th>
                             <th style="width: 30%;">สถานะ</th>
                         </tr>
                         @foreach($workers as $i => $w)
@@ -359,7 +344,7 @@
                                 $aStatus = $assign?->status;
                                 $statusText = $aStatus === \App\Models\MaintenanceAssignment::STATUS_IN_PROGRESS ? 'กำลังดำเนินการ'
                                              : ($aStatus === \App\Models\MaintenanceAssignment::STATUS_DONE ? 'เสร็จสิ้น'
-                                             : ($aStatus === \App\Models\MaintenanceAssignment::STATUS_CANCELLED ? 'ยกเลิกซ่อม' : 'ไม่ระบุ'));
+                                             : ($aStatus === \App\Models\MaintenanceAssignment::STATUS_CANCELLED ? 'ยกเลิกการซ่อมบำรุง' : 'ไม่ระบุ'));
                             @endphp
                             <tr>
                                 <td class="text-center">{{ $i + 1 }}</td>
@@ -408,7 +393,7 @@
         </div>
         <div>
             <span class="checkbox-box {{ ($opLog->operation_method ?? '') === 'service_fee' ? 'checked' : '' }}"></span>
-            ค่าบริการ / ค่าแรงช่าง
+            ค่าบริการ / ค่าแรงเจ้าหน้าที่
         </div>
         <div>
             <span class="checkbox-box {{ ($opLog->operation_method ?? '') === 'other' ? 'checked' : '' }}"></span>
@@ -439,7 +424,7 @@
     <table class="signature-table">
         <tr>
             <td>
-                <div class="small">ผู้แจ้งซ่อม</div>
+                <div class="small">ผู้แจ้ง</div>
                 <div class="signature-line"></div>
                 <div class="small">
                     ( {{ $req->reporter->name ?? '........................' }} )
@@ -447,7 +432,7 @@
                 <div class="small">วันที่ ....../....../..........</div>
             </td>
             <td>
-                <div class="small">ช่างผู้ปฏิบัติงาน</div>
+                <div class="small">เจ้าหน้าที่ผู้ปฏิบัติงาน</div>
                 <div class="signature-line"></div>
                 <div class="small">
                     ( {{ $req->technician->name ?? '........................' }} )

@@ -8,26 +8,28 @@ use App\Models\Department;
 
 class DepartmentSeeder extends Seeder
 {
+    // เริ่มต้นการรัน Seeder สำหรับข้อมูลหน่วยงาน/แผนก
     public function run(): void
     {
+        // รายการแผนกต่างๆ ในโรงพยาบาล
         $rows = [
             ['code' => 'ADM',   'th' => 'ฝ่ายบริหารทั่วไป',               'en' => 'General Administration'],
             ['code' => 'FIN',   'th' => 'ฝ่ายการเงินและบัญชี',            'en' => 'Finance & Accounting'],
             ['code' => 'HR',    'th' => 'ฝ่ายทรัพยากรบุคคล',              'en' => 'Human Resources'],
-            ['code' => 'IT',    'th' => 'ฝ่ายเทคโนโลยีสารสนเทศ',          'en' => 'Information Technology'],
+            ['code' => 'IT',    'th' => 'กลุ่มงานเทคโนโลยีสารสนเทศ',      'en' => 'กลุ่มงานเทคโนโลยีสารสนเทศ'],
             ['code' => 'PROC',  'th' => 'ฝ่ายพัสดุและจัดซื้อ',             'en' => 'Procurement & Supplies'],
-            ['code' => 'FAC',   'th' => 'อาคารสถานที่/ซ่อมบำรุง',          'en' => 'Facilities & Maintenance'],
+            ['code' => 'FAC',   'th' => 'ฝ่ายซ่อมบำรุง',                'en' => 'Facilities & Maintenance'],
             ['code' => 'BME',   'th' => 'วิศวกรรมชีวการแพทย์',            'en' => 'Biomedical Engineering'],
-            ['code' => 'HIM',   'th' => 'เวชระเบียน/สารสนเทศสุขภาพ',      'en' => 'Health Information Management'],
+            ['code' => 'HIM',   'th' => 'เวชระเบียน',                  'en' => 'Health Information Management'],
             ['code' => 'QA',    'th' => 'คุณภาพและความเสี่ยง',            'en' => 'Quality & Risk Management'],
             ['code' => 'IC',    'th' => 'ควบคุมการติดเชื้อ',               'en' => 'Infection Control'],
             ['code' => 'EDU',   'th' => 'การศึกษาและฝึกอบรม',             'en' => 'Education & Training'],
             ['code' => 'PR',    'th' => 'ประชาสัมพันธ์',                   'en' => 'Public Relations'],
             ['code' => 'SEC',   'th' => 'รักษาความปลอดภัย',               'en' => 'Security'],
-            ['code' => 'HK',    'th' => 'แม่บ้าน/ทำความสะอาด',            'en' => 'Housekeeping'],
-            ['code' => 'LDY',   'th' => 'ซักฟอก',                           'en' => 'Laundry'],
+            ['code' => 'HK',    'th' => 'งานแม่บ้าน',                   'en' => 'Housekeeping'],
+            ['code' => 'LDY',   'th' => 'งานซักฟอก',                    'en' => 'Laundry'],
             ['code' => 'NUT',   'th' => 'โภชนาการและอาหาร',               'en' => 'Nutrition & Dietetics'],
-            ['code' => 'LOG',   'th' => 'ขนส่ง/คลังกลาง',                  'en' => 'Logistics & Central Supply'],
+            ['code' => 'LOG',   'th' => 'งานขนส่ง',                    'en' => 'Logistics & Central Supply'],
             ['code' => 'MED',   'th' => 'อายุรกรรม',                       'en' => 'Internal Medicine'],
             ['code' => 'IPD',   'th' => 'หอผู้ป่วยใน',                       'en' => 'In-Patient Department'],
             ['code' => 'SURG',  'th' => 'ศัลยกรรม',                        'en' => 'Surgery'],
@@ -39,23 +41,25 @@ class DepartmentSeeder extends Seeder
             ['code' => 'ANES',  'th' => 'วิสัญญีวิทยา',                    'en' => 'Anesthesiology'],
             ['code' => 'EM',    'th' => 'เวชศาสตร์ฉุกเฉิน',                'en' => 'Emergency Medicine'],
             ['code' => 'RAD',   'th' => 'รังสีวิทยา',                       'en' => 'Radiology'],
-            ['code' => 'LAB',   'th' => 'ห้องปฏิบัติการ/พยาธิวิทยา',      'en' => 'Laboratory & Pathology'],
+            ['code' => 'LAB',   'th' => 'ห้องปฏิบัติการ',                 'en' => 'Laboratory & Pathology'],
             ['code' => 'PHARM', 'th' => 'เภสัชกรรม',                        'en' => 'Pharmacy'],
             ['code' => 'REHAB', 'th' => 'เวชกรรมฟื้นฟู',                    'en' => 'Rehabilitation Medicine'],
             ['code' => 'DENT',  'th' => 'ทันตกรรม',                         'en' => 'Dentistry'],
-            ['code' => 'PSY',   'th' => 'จิตเวช',                           'en' => 'Psychiatry'],
-            ['code' => 'COMM',  'th' => 'เวชกรรมสังคม/เวชป้องกัน',         'en' => 'Community & Preventive Medicine'],
+            ['code' => 'PSY',   'th' => 'จิตเวชกรรม',                      'en' => 'Psychiatry'],
+            ['code' => 'COMM',  'th' => 'เวชกรรมสังคม',                  'en' => 'Community & Preventive Medicine'],
             ['code' => 'SW',    'th' => 'สังคมสงเคราะห์',                   'en' => 'Social Work'],
         ];
 
+        // ตรวจสอบคอลัมน์ในตารางเพื่อรองรับเวอร์ชันที่ต่างกัน
         $hasNameTh = Schema::hasColumn('departments', 'name_th');
         $hasNameEn = Schema::hasColumn('departments', 'name_en');
         $hasName   = Schema::hasColumn('departments', 'name');
 
+        // บันทึกข้อมูลทีละแถว
         foreach ($rows as $r) {
             if ($hasNameTh && $hasNameEn) {
                 Department::updateOrCreate(
-                    ['code' => $r['code']],
+                    ['code' => $r['code']], // ใช้รหัสอ้างอิง code
                     ['name_th' => $r['th'], 'name_en' => $r['en']]
                 );
             } elseif ($hasName) {

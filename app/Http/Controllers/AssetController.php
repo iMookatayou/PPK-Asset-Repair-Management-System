@@ -55,23 +55,23 @@ class AssetController extends Controller
             ->with(['categoryRef', 'department'])
             ->search($q)
             ->status($status)
-            ->when($type !== '', fn($s) => $s->where('type', $type))
-            ->when($request->filled('category_id'), fn($s) => $s->where('category_id', $categoryId))
+            ->category($categoryId)
             ->departmentId($deptId)
-            ->when($location !== '', fn($s) => $s->where('location', $location));
+            ->type($type)
+            ->location($location);
 
         if ($q !== '') {
-            $qEsc = str_replace("'", "''", $q);
             $baseQuery->orderByRaw("
                 CASE
-                    WHEN assets.asset_code = '{$qEsc}' THEN 0
-                    WHEN assets.asset_code LIKE '{$qEsc}%' THEN 1
-                    WHEN assets.asset_code LIKE '%{$qEsc}%' THEN 2
-                    WHEN assets.serial_number LIKE '%{$qEsc}%' THEN 3
-                    WHEN assets.name LIKE '%{$qEsc}%' THEN 4
+                    WHEN assets.asset_code = ? THEN 0
+                    WHEN assets.his_asset_id = ? THEN 1
+                    WHEN assets.asset_code LIKE ? THEN 2
+                    WHEN assets.his_asset_id LIKE ? THEN 3
+                    WHEN assets.name LIKE ? THEN 4
+                    WHEN assets.serial_number LIKE ? THEN 5
                     ELSE 9
                 END
-            ");
+            ", [$q, $q, "{$q}%", "{$q}%", "%{$q}%", "%{$q}%"]);
         }
 
         $filteredTotal = (clone $baseQuery)->toBase()->count();
@@ -110,6 +110,7 @@ class AssetController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('create', Asset::class);
         $rules = [
             'asset_code'      => ['required', 'string', 'max:100', 'unique:assets,asset_code'],
             'name'            => ['required', 'string', 'max:255'],
@@ -203,6 +204,7 @@ class AssetController extends Controller
 
     public function update(Request $request, Asset $asset)
     {
+        $this->authorize('update', $asset);
         $rules = [
             'asset_code'      => ['sometimes', 'string', 'max:100', 'unique:assets,asset_code,' . $asset->id],
             'name'            => ['sometimes', 'string', 'max:255'],
@@ -308,6 +310,7 @@ class AssetController extends Controller
 
     public function destroy(Asset $asset)
     {
+        $this->authorize('delete', $asset);
         $assetCode = $asset->asset_code;
         $assetId   = $asset->id;
 
@@ -349,10 +352,10 @@ class AssetController extends Controller
             ->with(['categoryRef', 'department'])
             ->search($q)
             ->status($status)
-            ->when($request->filled('category_id'), fn($s) => $s->where('category_id', $categoryId))
+            ->category($categoryId)
             ->departmentId($deptId)
-            ->when($type !== '', fn($s) => $s->where('type', $type))
-            ->when($location !== '', fn($s) => $s->where('location', $location));
+            ->type($type)
+            ->location($location);
 
         if ($q !== '') {
             $assetsQ->orderByRaw("
@@ -402,6 +405,7 @@ class AssetController extends Controller
 
     public function createPage()
     {
+        $this->authorize('create', Asset::class);
         $departments = \App\Models\Department::query()
             ->select(['id', 'code', 'name_th', 'name_en'])
             ->orderByRaw('COALESCE(name_th, name_en, code) asc')
@@ -421,6 +425,7 @@ class AssetController extends Controller
 
     public function storePage(Request $request)
     {
+        $this->authorize('create', Asset::class);
         $validator = Validator::make($request->all(), [
             'asset_code'      => ['required', 'string', 'max:100', 'unique:assets,asset_code'],
             'name'            => ['required', 'string', 'max:255'],
@@ -535,6 +540,7 @@ class AssetController extends Controller
 
     public function editPage(Asset $asset)
     {
+        $this->authorize('update', $asset);
         $asset->load(['categoryRef', 'department', 'maintenanceRequests.reporter']);
 
         $departments = \App\Models\Department::query()
@@ -564,6 +570,7 @@ class AssetController extends Controller
 
     public function updatePage(Request $request, Asset $asset)
     {
+        $this->authorize('update', $asset);
         $validator = Validator::make($request->all(), [
             'asset_code'      => ['sometimes', 'string', 'max:100', 'unique:assets,asset_code,' . $asset->id],
             'name'            => ['sometimes', 'string', 'max:255'],
@@ -659,6 +666,7 @@ class AssetController extends Controller
 
     public function destroyPage(Asset $asset)
     {
+        $this->authorize('delete', $asset);
         $assetCode = $asset->asset_code;
         $assetId   = $asset->id;
         $assetName = $asset->name;

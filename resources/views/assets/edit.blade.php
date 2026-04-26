@@ -62,17 +62,16 @@
                 {{-- RIGHT --}}
                 <div class="flex flex-wrap items-center justify-start sm:justify-end gap-2">
                     <a href="{{ route('maintenance.requests.create', ['asset_id' => $asset->id]) }}"
-                        class="inline-flex items-center h-9 gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 transition-all">
+                        class="inline-flex items-center h-9 gap-2 rounded-md border border-transparent bg-emerald-600 px-4 text-[13px] font-medium text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-200 transition-all">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14" />
                         </svg>
                         สร้างคำขอซ่อมใหม่
                     </a>
-                    <a href="javascript:history.back()"
-                        class="inline-flex items-center h-9 gap-2 rounded-lg border {{ $line }} bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                            <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round" />
+                    <a href="{{ url()->previous() !== url()->current() ? url()->previous() : route('assets.index') }}"
+                        class="inline-flex items-center h-9 gap-2 rounded-md border border-slate-200 bg-white px-4 text-[13px] font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 transition-all">
+                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
                         กลับ
                     </a>
@@ -84,34 +83,36 @@
 @endsection
 
 @section('content')
-        <form method="POST" action="{{ route('assets.update', $asset) }}" enctype="multipart/form-data" class="space-y-8"
-            novalidate>
-            @csrf
-            @method('PUT')
+    <form method="POST" action="{{ route('assets.update', $asset) }}" enctype="multipart/form-data" class="space-y-8"
+        novalidate>
+        @csrf
+        @method('PUT')
 
-            @include('assets._form', [
-                'asset' => $asset,
-                'categories' => $categories ?? collect(),
-                'departments' => $departments ?? collect(),
-            ])
+        @include('assets._form', [
+            'asset' => $asset,
+            'categories' => $categories ?? collect(),
+            'departments' => $departments ?? collect(),
+        ])
 
-                    </div>
-                </section>
+        <div class="mx-auto max-w-screen-2xl px-3 sm:px-6 lg:px-8 pb-10">
+            <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-6 mt-6 border-t {{ $line }}">
+                <a href="javascript:history.back()"
+                    class="inline-flex items-center justify-center gap-2 h-11 px-8 rounded-md border {{ $line }} bg-white
+                        text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-all">
+                    <span class="material-symbols-outlined text-[17px]">close</span>
+                    ยกเลิก
+                </a>
+                <button type="submit"
+                    class="inline-flex items-center justify-center overflow-hidden rounded-md bg-emerald-600 text-[13px] font-bold text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-200 transition-all active:scale-95 group h-11 shrink-0">
+                    <span
+                        class="px-2.5 bg-black/10 flex items-center justify-center text-white/90 group-hover:text-white border-r border-white/10 h-full">
+                        <span class="material-symbols-outlined text-[17px]">check</span>
+                    </span>
+                    <span class="px-6 leading-none">
+                        บันทึกการแก้ไข
+                    </span>
+                </button>
             </div>
-
-            <div class="mx-auto max-w-screen-2xl px-3 sm:px-6 lg:px-8 pb-8">
-                <div class="flex justify-end gap-2 pt-4 border-t {{ $line }}">
-                    <a href="javascript:history.back()"
-                        class="inline-flex items-center justify-center h-10 px-4 rounded-lg border {{ $line }} bg-white
-                      text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-                        ยกเลิก
-                    </a>
-                    <button type="submit"
-                        class="inline-flex items-center justify-center h-10 px-4 rounded-lg bg-emerald-700
-                           text-sm font-medium text-white hover:bg-emerald-800 focus:ring-2 focus:ring-emerald-200 transition-all">
-                        บันทึกการแก้ไขข้อมูล
-                    </button>
-                </div>
-            </div>
-        </form>
+        </div>
+    </form>
 @endsection
